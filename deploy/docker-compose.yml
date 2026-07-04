@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  work_flow_client:
+    image: work_flow_client:dev
+    container_name: work_flow_client_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_BACKEND_URL=http://game_watchman_server:12008
+      - NODE_ENV=development
+    volumes:
+      # 映射上层目录到容器，实现代码热更新
+      - ..:/app
+      # 排除 node_modules，使用容器内已安装的依赖
+      - /app/node_modules
+    networks:
+      - redis-network
+    restart: unless-stopped
+
+networks:
+  redis-network:
+    external: true

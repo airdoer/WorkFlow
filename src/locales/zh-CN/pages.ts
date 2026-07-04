@@ -1,6 +1,6 @@
 export default {
   'pages.layouts.userLayout.title':
-    'Ant Design 是西湖区最具影响力的 Web 设计规范',
+    'WorkFlow - 智能工作流管理平台',
   'pages.login.accountLogin.tab': '账户密码登录',
   'pages.login.accountLogin.errorMessage':
     '错误的用户名和密码(admin/ant.design)',
@@ -25,7 +25,7 @@ export default {
   'pages.login.loginWith': '其他登录方式 :',
   'pages.login.registerAccount': '注册账户',
   'pages.welcome.link': '欢迎使用',
-  'pages.welcome.celebrationTitle': '欢迎使用 Ant Design Pro {v6}',
+  'pages.welcome.celebrationTitle': '欢迎使用 WorkFlow {v6}',
   'pages.welcome.alertMessage': '更快更强的重型组件，已经发布。',
   'pages.welcome.infoCard.umi.title': '了解 umi',
   'pages.welcome.infoCard.umi.desc':
