@@ -26,6 +26,21 @@ import { errorConfig } from './requestErrorConfig';
 const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
 
+// 获取后端 API 地址
+// 优先使用环境变量 FLASK_BACKEND_URL，否则使用默认值
+const getBackendURL = () => {
+  // 运行时环境变量（Docker 容器中通过 window 注入）
+  if (typeof window !== 'undefined' && (window as any).FLASK_BACKEND_URL) {
+    return (window as any).FLASK_BACKEND_URL;
+  }
+  // 构建时环境变量
+  if (process.env.FLASK_BACKEND_URL) {
+    return process.env.FLASK_BACKEND_URL;
+  }
+  // 默认值
+  return isDev ? '' : 'https://pro-api.ant-design-demo.workers.dev';
+};
+
 /**
  * @see https://umijs.org/docs/api/runtime-config#getinitialstate
  * */
@@ -190,7 +205,7 @@ export const layout: RunTimeLayoutConfig = ({
  * @doc https://umijs.org/docs/max/request#配置
  */
 export const request: RequestConfig = {
-  baseURL: isDev ? '' : 'https://pro-api.ant-design-demo.workers.dev',
+  baseURL: getBackendURL(),
   ...errorConfig,
 };
 

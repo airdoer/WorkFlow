@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+.vscode
+.husky
+*.log
+*.md
+!README.md
+.cache
+.temp
+.DS_Store

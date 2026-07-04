@@ -1,0 +1,15 @@
+version: '3.7'
+services:
+  work_flow_client:
+    image: work_flow_client:latest
+    container_name: work_flow_client_container
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_BACKEND_URL=http://game_watchman_server:12008
+    networks:
+      - redis-network
+
+networks:
+  redis-network:
+    external: true

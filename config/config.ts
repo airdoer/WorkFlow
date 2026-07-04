@@ -188,7 +188,9 @@ export default defineConfig({
   headScripts: [
     // 解决首次加载时白屏的问题
     { src: join(PUBLIC_PATH, 'scripts/loading.js'), async: true },
-  ],
+    // 注入环境变量配置（仅在生产环境）
+    process.env.NODE_ENV === 'production' && { src: join(PUBLIC_PATH, 'env-config.js') },
+  ].filter(Boolean),
 
   //================ pro 插件配置 =================
   plugins: ['@umijs/max-plugin-openapi', '@umijs/request-record'],
@@ -231,6 +233,12 @@ export default defineConfig({
     'process.env.COMMIT_HASH': commitHash,
     __APP_VERSION__: require('./../package.json').version,
     __UMI_VERSION__: require('@umijs/max/package.json').version,
-    __UTOO_VERSION__: require('@utoo/pack/package.json').version,
+    __UTOO_VERSION__: (() => {
+      try {
+        return require('@utoo/pack/package.json').version;
+      } catch {
+        return 'unknown';
+      }
+    })(),
   },
 });
