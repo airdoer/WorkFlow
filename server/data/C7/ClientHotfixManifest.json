@@ -1,0 +1,14 @@
+[
+    {
+        "FileName": "client_hotfix_yechengyin_239092",
+        "EffectServers": ["c7_preonline"]
+    },
+    {
+        "FileName": "client_hotfix_nongtanggao_239677",
+        "EffectServers": ["c7_qa4","c7_taptap_review","c7_preonline"]
+    },
+    {
+        "FileName": "client_hotfix_nongtanggao_239752",
+        "EffectServers": ["c7_qa4","c7_dev_weekly","c7_preonline"]
+    }
+]

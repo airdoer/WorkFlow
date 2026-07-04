@@ -1,0 +1,1016 @@
+{
+  "Account": {
+    "indexes": [
+      {
+        "index": [["accountID", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "accountID": "hashed"
+    }
+  },
+  "AvatarActor": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "engine_auto_save": true,
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "nick_name": {
+    "indexes": [
+      {
+        "index": [["nickname", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "nickname": "hashed"
+    }
+  },
+  "reserved_col": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ]
+  },
+  "offline_fri_sys_msg": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "id": "hashed"
+    }
+  },
+  "global_player_basic_info": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["shortUid", 1]],
+        "options": {}
+      },
+      {
+        "index": [["rolename", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "quest_plane_archive": {
+    "indexes": [
+      {
+        "index": [
+          ["roleID", 1],
+          ["questID", 1]
+        ],
+        "options": {}
+      },
+      {
+        "index": [
+          ["roleID", 1],
+          ["ringID", 1]
+        ],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "roleID": "hashed"
+    }
+  },
+  "friend_club": {
+    "indexes": [
+      {
+        "index": [["clubId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "clubId": "hashed"
+    }
+  },
+  "friendship_data": {
+    "indexes": [
+      {
+        "index": [["roleID", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["relations.friendID", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "roleID": "hashed"
+    }
+  },
+  "role_whisper_msg": {
+    "indexes": [
+      {
+        "index": [
+          ["smallGbId", 1],
+          ["bigGbId", 1]
+        ],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["whispers.logID", 1]],
+        "options": {}
+      },
+      {
+        "index": [["recordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      }
+    ],
+    "shard_key": {
+      "smallGbId": "hashed"
+    }
+  },
+  "offline_unread_msg": {
+    "indexes": [
+      {
+        "index": [["roleID", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["senders.senderID", 1]],
+        "options": {}
+      },
+      {
+        "index": [["recordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      }
+    ],
+    "shard_key": {
+      "roleID": "hashed"
+    }
+  },
+  "appearance_lottery_record": {
+    "indexes": [
+      {
+        "index": [["roleID", 1], ["lotteryPoolId", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "roleID": "hashed"
+    }
+  },
+
+  "Guild": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "mall_goods": {
+    "indexes": [
+      {
+        "index": [["goodId", 1]],
+        "options": {}
+      },
+      {
+        "index": [["refreshType", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "dungeon_auction_order": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "mail": {
+    "indexes": [
+      {
+        "index": [["receiver", 1]],
+        "options": {}
+      },
+      {
+        "index": [
+          ["receiver", 1],
+          ["insertTS", 1]
+        ],
+        "options": {}
+      },
+      {
+        "index": [
+          ["receiver", 1],
+          ["id", 1]
+        ],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "receiver": "hashed"
+    }
+  },
+  "mail_template_count": {
+    "indexes": [
+      {
+        "index": [
+          ["receiver", 1],
+          ["template_id", 1]
+        ],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "receiver": "hashed"
+    }
+  },
+  "mail_favorites": {
+    "indexes": [
+      {
+        "index": [
+          ["uid", 1],
+          ["id", 1]
+        ],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "uid": "hashed"
+    }
+  },
+  "server_mail": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["destroyTime", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "server_counter": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "server_data_version": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["name", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ]
+  },
+  "shared_counter": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "remained_counter": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "kg_gm_seq_id": {
+    "indexes": [
+      {
+        "index": [["seqId", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      }
+    ]
+  },
+  "GlobalDataService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "ServerLevelService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "GameRecordService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "FriendService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "GuildService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "MallService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "QuizService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "MoneySaleService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "ChampionService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "ChampionTroopService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "LoginQueueService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },  
+  "champion_troop_infos": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["createTime", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "id": "hashed"
+    }
+  },
+  "money_sale_order": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "record_replay": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "team_3v3_detail_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["GameId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "GameId": "hashed"
+    }
+  },
+  "team_3v3_brief_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "team_12v12_detail_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["GameId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "GameId": "hashed"
+    }
+  },
+  "team_12v12_brief_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "team_6v6_detail_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["GameId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "GameId": "hashed"
+    }
+  },
+  "team_6v6_brief_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 2592000
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "pvp_champion_detail_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 94608000
+        }
+      },
+      {
+        "index": [["GameId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "GameId": "hashed"
+    }
+  },
+  "pvp_champion_brief_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 94608000
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1], ["SeasonId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "pvp_champion_season_champion": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["seasonID", 1], ["regionID", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "id": "hashed"
+    }
+  },
+  "guild_bid_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 1209600
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "world_bid_record_table": {
+    "indexes": [
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 1209600
+        }
+      },
+      {
+        "index": [["AvatarActorId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "AvatarActorId": "hashed"
+    }
+  },
+  "stall_item": {
+    "indexes": [
+      {
+        "index": [["itemGbId", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "itemGbId": "hashed"
+    }
+  },
+  "stall_item_stats_info": {
+    "indexes": [
+      {
+        "index": [["itemId", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "itemId": "hashed"
+    }
+  },
+  "stall_overtime_item": {
+    "indexes": [
+      {
+        "index": [["itemGbId", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["playerGbId", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "itemGbId": "hashed"
+    }
+  },
+  "stall_sold_record": {
+    "indexes": [
+      {
+        "index": [["gbId", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "gbId": "hashed"
+    }
+  },
+  "StallService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "RankService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "RankServiceV2": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "PVPMatchService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "RedPacketService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "red_packet_record": {
+    "indexes": [
+      {
+        "index": [["avatarID", 1], ["matchYear", 1], ["recordType", 1]],
+        "options": {}
+      },
+      {
+        "index": [["uuid", 1], ["recordType", 1], ["avatarID", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "uuid": "hashed"
+    }
+  },
+  "order": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["orderType", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "umsg": {
+    "indexes": [
+      {
+        "index": [["commandUniqueID", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["avatarID", 1]],
+        "options": {}
+      },
+      {
+        "index": [["expireAt", 1]],
+        "options": {
+          "expireAfterSeconds": 0
+        }
+      }
+    ],
+    "shard_key": {
+      "commandUniqueID": "hashed"
+    }
+  },
+  "world_bid_base_data": {
+    "indexes": [
+      {
+        "index": [["activityId", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "world_bid_item_data": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+      {
+        "index": [["activityId", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "homeland_building": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "_id": "hashed"
+    }
+  },
+  "HomeService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "chat_custom_img": {
+    "indexes": [
+      {
+        "index": [["uid", 1]],
+        "options": {}
+      },
+      {
+        "index": [
+          ["uid", 1],
+          ["id", 1]
+        ],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "uid": "hashed"
+    }
+  },
+  "TarotTeamService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "TarotTeamCacheService": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      }
+    ]
+  },
+  "tarot_team_info": {
+    "indexes": [
+      {
+        "index": [["_id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "id": "hashed"
+    }
+  },
+  "tarot_team_application": {
+    "indexes": [
+      {
+        "index": [
+          ["id", 1]
+        ],
+        "options": {}
+      },
+      {
+        "index": [
+          ["tgtId", 1]
+        ],
+        "options": {}
+      },
+      {
+        "index": [["RecordTime", 1]],
+        "options": {
+          "expireAfterSeconds": 15552000
+        }
+      }
+    ]
+  },
+  "tarot_team_former_name": {
+    "indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {}
+      }
+    ],
+    "shard_key": {
+      "id": "hashed"
+    }
+  },
+  "rank_list": {
+    "indexes": [
+      {
+        "index": [["rankId", 1], ["regionId", 1], ["childId", 1], ["id", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "rankId": "hashed"
+    }
+  },
+  "persistent_party_infos": {
+		"indexes": [
+      {
+        "index": [["id", 1]],
+        "options": {}
+      },
+      {
+        "index": [["createTime", 1]],
+        "options": {}
+      }
+		]
+  },
+  "fellow_gacha_records": {
+		"indexes": [
+      {
+        "index": [["avatarID", 1], ["gachaPoolType", 1]],
+        "options": {}
+      },
+      {
+        "index": [["lastTime", 1]],
+        "options": {
+          "expireAfterSeconds": 15552000
+        }
+      }
+		],
+    "shard_key": {
+      "avatarID": "hashed"
+    }
+  },
+  "pay_order": {
+		"indexes": [
+      {
+        "index": [["roleID", 1], ["orderID", 1]],
+        "options": {
+          "unique": true
+        }
+      },
+       {
+        "index": [["roleID", 1], ["status", 1]],
+        "options": {}
+      }
+		],
+    "shard_key": {
+      "roleID": "hashed"
+    }
+  },
+  "shop_gift": {
+		"indexes": [
+      {
+        "index": [["opNUID", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+		],
+    "shard_key": {
+      "opNUID": "hashed"
+    }
+  },
+  "commonInteractor_private_state": {
+    "indexes": [
+      {
+        "index": [["avatarID", 1], ["spaceTemplateID", 1]],
+        "options": {
+          "unique": true
+        }
+      }
+    ],
+    "shard_key": {
+      "avatarID": "hashed"
+    }
+  },
+  "gvg_battle_record": {
+    "indexes": [
+      {
+        "index": [["logicServerID", 1], ["gameIndex", 1]],
+        "options": {}
+      }
+    ]
+  }
+}

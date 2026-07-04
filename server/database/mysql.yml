@@ -1,0 +1,30 @@
+version: '3.7'
+services:
+  flask_mysql:
+    image: mysql:8.0.32
+    restart: always
+    container_name: flask_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 'c1pwd'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'no'
+      MYSQL_DATABASE: 'work_flow'
+    ports:
+      - "3307:3306"
+    volumes:
+      - /app/flask_mysql/log:/var/log/mysql
+      - /app/flask_mysql/data:/var/lib/mysql
+      - /app/flask_mysql/conf:/etc/mysql/conf.d
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    networks:
+      - work_flow_mysql_network
+
+networks:
+  work_flow_mysql_network:
+    name: work_flow_mysql_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.5.1/24

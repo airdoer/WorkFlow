@@ -1,0 +1,10 @@
+{
+    "preonline": {
+        "namespaces": ["c7_preonline", "c7_preonline_cross"],
+        "name": "线上预发布服"
+    },
+    "online": {
+        "namespaces": ["c7_paid_test_1", "c7_paid_test_2", "c7_publish_center_service", "c7_publish_cross_battle_1", "c7_publish_cross_battle_2"],
+        "name": "线上正式服"
+    }
+}

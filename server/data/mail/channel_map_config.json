@@ -1,0 +1,116 @@
+{
+  "channelMap": {
+    "ks": [
+      {
+        "value": "INTER_TEST",
+        "remark": "内部包"
+      },
+      {
+        "value": "GW_KS_MENG",
+        "remark": "官网安卓"
+      },
+      {
+        "value": "PC_GW_MENG",
+        "remark": "PC官网"
+      },
+      {
+        "value": "PC_SW_MENG",
+        "remark": "网吧-顺网"
+      },
+      {
+        "value": "PC_YY_MENG",
+        "remark": "网吧-易游"
+      },
+      {
+        "value": "PC_YGX_MENG",
+        "remark": "网吧-云更新"
+      },
+      {
+        "value": "PC_MT_MENG",
+        "remark": "网吧-马蹄更新"
+      },
+      {
+        "value": "PC_TXRG_MENG",
+        "remark": "腾讯软管"
+      },
+      {
+        "value": "PC_360RG_MENG",
+        "remark": "360软管"
+      },
+      {
+        "value": "PC_LENOVO_MENG",
+        "remark": "联想应用商店"
+      },
+      {
+        "value": "DSP_TTDY_MENG",
+        "remark": "抖音"
+      },
+      {
+        "value": "DSP_KS_MENG",
+        "remark": "快手"
+      },
+      {
+        "value": "DSP_GDT_MENG",
+        "remark": "广点通"
+      },
+      {
+        "value": "DSP_BDSEM_MENG",
+        "remark": "百度SEM"
+      },
+      {
+        "value": "QD_TAPTAP_MENG",
+        "remark": "TapTap"
+      },
+      {
+        "value": "QD_HYKB_MENG",
+        "remark": "好游快爆"
+      },
+      {
+        "value": "DSP_ALIUC_MENG",
+        "remark": "阿里汇川"
+      },
+      {
+        "value": "PC_BDSEM_MENG",
+        "remark": "百度SEMPC"
+      },
+      {
+        "value": "QD_GOOGLE_WJMHDY",
+        "remark": "HMT_GP"
+      },
+      {
+        "value": "QD_APPSTOREOVERSEA_WJMHDY",
+        "remark": "HMT_iOS"
+      },
+      {
+        "value": "QD_THIRDCHANNEL_WJMHDY",
+        "remark": "HMT_MyCard"
+      },
+      {
+        "value": "PC_THIRDCHANNEL_WJMHDY",
+        "remark": "HMT_PC"
+      }
+    ],
+
+    "appstore": [
+        {
+          "value": "INTER_TEST",
+          "remark": "内部包"
+        },
+        {
+          "value": "APPSTORE",
+          "remark": "苹果商店"
+        }
+    ],
+
+    "bili": [
+        {
+          "value": "QD_BILI_MENG",
+          "remark": "B站联运"
+        },
+        {
+          "value": "PC_BILI_MENG",
+          "remark": "B站PC"
+        }
+    ]
+  }
+}

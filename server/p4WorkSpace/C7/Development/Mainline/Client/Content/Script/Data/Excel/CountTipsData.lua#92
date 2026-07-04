@@ -1,0 +1,70 @@
+--
+-- 表名: $UITips_界面提醒.xlsx  页名：$CountTips_计数提醒
+--
+
+local TopData = {
+	data = {
+		[1] = {
+			["CountBarRuleID"] = 1,
+			["DisplayType"] = 1,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408038400'),
+			["DestroyTime"] = 100,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 8120122,
+			["Data2Type"] = 1,
+			["Data2Param1"] = 10,
+		},
+		[2] = {
+			["CountBarRuleID"] = 2,
+			["DisplayType"] = 1,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408038400'),
+			["DestroyTime"] = 100,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 8120121,
+			["Data2Type"] = 1,
+			["Data2Param1"] = 10,
+		},
+		[3] = {
+			["CountBarRuleID"] = 3,
+			["DisplayType"] = 3,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408038912'),
+			["DestroyTime"] = 100,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 84005601,
+			["Data2Type"] = 0,
+			["Data2Param1"] = 0,
+		},
+		[4] = {
+			["CountBarRuleID"] = 4,
+			["DisplayType"] = 3,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408038400'),
+			["DestroyTime"] = 100,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 8120122,
+			["Data2Type"] = 0,
+			["Data2Param1"] = 0,
+		},
+		[5] = {
+			["CountBarRuleID"] = 5,
+			["DisplayType"] = 3,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408039424'),
+			["DestroyTime"] = 500,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 84005510,
+			["Data2Type"] = 0,
+			["Data2Param1"] = 0,
+		},
+		[6] = {
+			["CountBarRuleID"] = 6,
+			["DisplayType"] = 3,
+			["Description"] = Game.TableDataManager:GetLangStr('str_61161408039680'),
+			["DestroyTime"] = 500,
+			["Data1Type"] = 2,
+			["Data1Param1"] = 85005130,
+			["Data2Type"] = 0,
+			["Data2Param1"] = 0,
+		},
+	},
+}
+
+return TopData

@@ -1,0 +1,18 @@
+-- Inputs: (FightProp_属性公式.xlsx, CounterAttack_反伤); Outputs: CounterAttackData; Def: None; PrimaryKeys: ['ID']
+
+local TopData = {
+	data = {
+		[1790000] = {
+			["ID"] = 1790000,
+			["ActionName"] = "Player_PhyAtk_Counter",
+			["CounterAttackType"] = 0,
+		},
+		[1790001] = {
+			["ID"] = 1790001,
+			["ActionName"] = "Player_PhyAtk_Counter",
+			["CounterAttackType"] = 0,
+		},
+	},
+}
+
+return TopData

@@ -1,0 +1,248 @@
+{
+    "common": {
+      "cpu_factor": 0.0,
+      "service_tag": {
+        "LuaService": true,
+        "PyService": true,
+        "PyMicroService": false,
+        "LuaMicroService": false
+      },
+      "mongodb": {
+        "msMongo": {
+          "auth_source": "admin"
+        },
+        "gsMongo": {
+          "auth_source": "admin"
+        }
+      },
+      "need_create_mongo_index": false
+    },
+    "OnlineService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua",
+      "wait_shard0_ready_before_cluster_ready": true
+    },
+    "LoginQueueService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "persistent": true,
+      "script": "lua"
+    },
+    "TeamService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 2,
+      "script": "lua"
+    },
+    "TeamMatchService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 2,
+      "script": "lua"
+    },
+    "GlobalDataService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "logic_server_shared": true,
+      "script": "lua",
+      "persistent": true
+    },
+    "PVPMatchService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 2,
+      "script": "lua",
+      "persistent": true
+    },
+    "GameRecordService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true
+    },
+    "DungeonAuctionService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua"
+    },
+    "DungeonRollService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua"
+    },
+    "WorldService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "logic_server_shared": true,
+      "script": "lua"
+    },
+    "ChatServiceLua": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "FriendService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua"
+    },
+    "FriendClubService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 8,
+      "script": "lua"
+    },
+    "GuildService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true
+    },
+    "DataCenterService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 5,
+      "script": "lua",
+      "logic_server_shared": true
+    },
+    "ItemSnapShotService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "MallService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true
+    },
+    "WorldBossActivityService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "RankServiceV2": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua",
+      "persistent": true,
+      "boot_depend_services": ["GuildService", "TarotTeamCacheService"]
+    },
+    "RouterService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "logic_server_shared": true,
+      "script": "lua"
+    },
+    "MoneySaleService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true,
+      "boot_depend_services": ["GlobalDataService"]
+    },
+    "StallService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true,
+      "boot_depend_services": ["GlobalDataService", "MoneySaleService"]
+    },
+    "LoadBalanceService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "logic_server_shared": true,
+      "script": "lua"
+    },
+    "RedPacketService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 2,
+      "script": "lua",
+      "persistent": true
+    },
+    "WorldBidService": {
+      "logic_tag": "LuaMicroService",
+      "shard_cnt": 3,
+      "script": "lua"
+    },
+    "ChampionService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "persistent": true,
+      "boot_depend_services": ["ChampionTroopService"]
+    },
+    "HomeService":{
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "TeaRoomService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua",
+      "logic_server_shared": true
+    },
+    "TeaRoomInfoCacheService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "logic_server_shared": true
+    },
+    "TarotTeamService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "persistent": true,
+      "script": "lua",
+      "boot_depend_services": ["TarotTeamCacheService"]
+    },
+    "TarotTeamCacheService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "ChampionTroopService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "persistent": true,
+      "script": "lua"
+    },
+    "GlobalLoginQueueService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "logic_server_shared": true,
+      "script": "lua"
+    },
+    "PartyService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 3,
+      "script": "lua",
+      "logic_server_shared": true
+    },
+    "PartyInfoCacheService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "logic_server_shared": true,
+      "boot_depend_services": ["PartyService"]
+    },
+    "GVGService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "ServerLevelService": {
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "logic_server_shared": true,
+      "persistent": true
+    },
+    "SuddenEventService":{
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua"
+    },
+    "PVPLastHuntService":{
+      "logic_tag": "LuaService",
+      "shard_cnt": 1,
+      "script": "lua",
+      "logic_server_shared": true
+    }
+}

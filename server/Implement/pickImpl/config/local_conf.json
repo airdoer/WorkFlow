@@ -1,0 +1,72 @@
+{
+  "c7_personal_17220205": [
+    {
+      "group_name": "mongodb_groups4",
+      "hosts": [
+        "172.20.5.92:27017"
+      ],
+      "alias": "测试用",
+      "auth_source": "admin",
+      "username": "root",
+      "password": "Zu4tK7vZFmfzWcE4YU",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_dev_weekly_main": [
+    {
+      "group_name": "mongodb_groups4",
+      "hosts": [
+        "172.20.5.92:27017"
+      ],
+      "alias": "dev 周版本服",
+      "auth_source": "admin",
+      "username": "root",
+      "password": "Zu4tK7vZFmfzWcE4YU",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_personal_172202042GM048BJD": [
+    {
+      "group_name": "mongodb_groups4",
+      "hosts": [
+        "172.20.5.92:27017"
+      ],
+      "alias": "冉杨私服",
+      "username": "root",
+      "password": "Zu4tK7vZFmfzWcE4YU",
+      "auth_source": "admin",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_personal_17220203GM090Z6R": [
+    {
+      "group_name": "mongodb_groups4",
+      "hosts": [
+        "172.20.5.92:27017"
+      ],
+      "alias": "私服_陈特",
+      "username": "root",
+      "password": "Zu4tK7vZFmfzWcE4YU",
+      "auth_source": "admin",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_personal_172202017GM0T3FQM": [
+    {
+      "group_name": "mongodb_groups4",
+      "hosts": [
+        "172.20.5.92:27017"
+      ],
+      "alias": "谢宇豪私服",
+      "username": "root",
+      "password": "Zu4tK7vZFmfzWcE4YU",
+      "auth_source": "admin",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+rsync -avz --no-times --no-group --no-owner -e "ssh -i ~/.pwd/id_rsa" /data/chenzhixu/game-watchman/server/ chenzhixu@172.28.193.12:/data/chenzhixu/game-watchman/server/

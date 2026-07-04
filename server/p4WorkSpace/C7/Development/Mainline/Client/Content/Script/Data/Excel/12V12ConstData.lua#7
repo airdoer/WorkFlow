@@ -1,0 +1,52 @@
+--
+-- 表名: $PVPRank_PVP段位表.xlsx  页名：$12V12Const_12V12常量表
+--
+
+local TopData = {
+	data = {
+		["SupremeRankId"] = {
+			["ID"] = "SupremeRankId",
+			["Type"] = "Int()",
+			["Value"] = 28,
+			["ExportControl"] = "cs",
+		},
+		["SupremeRank2Id"] = {
+			["ID"] = "SupremeRank2Id",
+			["Type"] = "Int()",
+			["Value"] = 29,
+			["ExportControl"] = "cs",
+		},
+		["DefaultRankId"] = {
+			["ID"] = "DefaultRankId",
+			["Type"] = "Int()",
+			["Value"] = 1,
+			["ExportControl"] = "cs",
+		},
+		["DefaultRankIdDisplayMaxScore"] = {
+			["ID"] = "DefaultRankIdDisplayMaxScore",
+			["Type"] = "Int()",
+			["Value"] = 100,
+			["ExportControl"] = "c",
+		},
+		["ProtectScoreDescTips"] = {
+			["ID"] = "ProtectScoreDescTips",
+			["Type"] = "Int()",
+			["Value"] = 6427202,
+			["ExportControl"] = "c",
+		},
+		["12v12_BeginSeasonId"] = {
+			["ID"] = "12v12_BeginSeasonId",
+			["Type"] = "Int()",
+			["Value"] = 1,
+			["ExportControl"] = "cs",
+		},
+		["PVP_ARENA_REWARD_DESC_TIPS"] = {
+			["ID"] = "PVP_ARENA_REWARD_DESC_TIPS",
+			["Type"] = "Int()",
+			["Value"] = 6427231,
+			["ExportControl"] = "c",
+		},
+	},
+}
+
+return TopData

@@ -1,0 +1,22 @@
+-- Inputs: (FightPropAndSettings_战斗属性及设定.xlsx, CounterAttack_反伤); Outputs: CounterAttackData; Def: None; PrimaryKeys: ['ID']
+
+local TopData = {
+	data = {
+		[1790000] = {
+			["ID"] = 1790000,
+			["ActionName"] = "Player_PhyAtk_Counter",
+			["SrcBuffList"] = {},
+			["DstBuffList"] = {},
+			["CounterAttackType"] = 0,
+		},
+		[1790001] = {
+			["ID"] = 1790001,
+			["ActionName"] = "Player_PhyAtk_Counter",
+			["SrcBuffList"] = {},
+			["DstBuffList"] = {},
+			["CounterAttackType"] = 0,
+		},
+	},
+}
+
+return TopData

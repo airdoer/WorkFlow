@@ -1,0 +1,20 @@
+version: '3.7'
+services:
+  flask_redis:
+    image: redis:6.0.8
+    restart: always
+    container_name: flask_redis
+    ports:
+      - "13000:6379"
+    command:
+      --requirepass c1pwd
+    networks:
+      - work_flow_redis_network
+
+networks:
+  work_flow_redis_network:
+    name: work_flow_redis_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.7.1/24

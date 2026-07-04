@@ -1,0 +1,28 @@
+version: '3.7'
+services:
+  work_flow_server:
+    image: work_flow_server:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '0.9'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "16666:16666"
+      - "127.0.0.1:6666:6666"
+    networks:
+      - redis-network
+      - mongo_network
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - P4PASSWD=${P4PASSWD}
+    volumes:
+      - .:/app
+    command: /bin/bash -c "python app.py > /app/log/hotfix_flask.log 2>&1"
+
+networks:
+  redis-network:
+    external: true
+  mongo_network:
+    external: true

@@ -1,0 +1,49 @@
+[2025-08-23 01:20:41] INFO in appImp: add route: hotfixTool
+[2025-08-23 01:20:41] INFO in app: config info:
+[2025-08-23 01:20:41] INFO in app: Server: 0.0.0.0:12008
+[2025-08-23 01:20:41] INFO in app: Redis: 172.28.205.21:13000
+[2025-08-23 01:20:41] INFO in app: Mysql: 172.28.205.21:3307
+[2025-08-23 01:20:41] INFO in TelnetHandler: GeventTelnetServer start at: ('127.0.0.1', 6668)
+[2025-08-23 01:20:41] INFO in TelnetHandler: console listen at 127.0.0.1: 6668
+[2025-08-23 01:21:08] INFO in appImp: flask home
+192.168.4.1 - - [2025-08-23 01:21:08] "GET /home HTTP/1.1" 200 291 0.001927
+192.168.4.1 - - [2025-08-23 01:21:08] "GET /favicon.ico HTTP/1.1" 404 493 0.000933
+Exception in thread Thread-1 (redis_subscriber):
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/redis/connection.py", line 559, in connect
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/redis/connection.py", line 615, in _connect
+    raise err
+  File "/usr/local/lib/python3.11/site-packages/redis/connection.py", line 603, in _connect
+    sock.connect(socket_address)
+  File "/usr/local/lib/python3.11/site-packages/gevent/_socketcommon.py", line 590, in connect
+    self._internal_connect(address)
+  File "/usr/local/lib/python3.11/site-packages/gevent/_socketcommon.py", line 634, in _internal_connect
+    raise _SocketError(err, strerror(err))
+TimeoutError: [Errno 110] Connection timed out
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/threading.py", line 1045, in _bootstrap_inner
+    self.run()
+  File "/usr/local/lib/python3.11/threading.py", line 982, in run
+    self._target(*self._args, **self._kwargs)
+  File "/app/dbImp/redisImp.py", line 82, in redis_subscriber
+    pubsub.subscribe(CMD_CHANNEL_NAME)
+  File "/usr/local/lib/python3.11/site-packages/redis/client.py", line 3580, in subscribe
+    ret_val = self.execute_command('SUBSCRIBE', *iterkeys(new_channels))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/redis/client.py", line 3466, in execute_command
+    self.connection = self.connection_pool.get_connection(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/redis/connection.py", line 1192, in get_connection
+    connection.connect()
+  File "/usr/local/lib/python3.11/site-packages/redis/connection.py", line 561, in connect
+    raise TimeoutError("Timeout connecting to server")
+redis.exceptions.TimeoutError: Timeout connecting to server
+[2025-08-23 03:34:46] INFO in appImp: flask home
+192.168.4.1 - - [2025-08-23 03:34:46] "GET /home HTTP/1.1" 200 291 0.025178
+[2025-08-23 03:36:28] INFO in appImp: flask home
+192.168.4.1 - - [2025-08-23 03:36:28] "GET /home HTTP/1.1" 200 291 0.002007

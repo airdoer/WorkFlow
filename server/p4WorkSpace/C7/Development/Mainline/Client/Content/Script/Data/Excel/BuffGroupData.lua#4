@@ -1,0 +1,84 @@
+--
+-- 表名: BuffDataNewBuffGroup(后处理)
+--
+
+local TopData = {
+    buff2GroupInfo = {
+        [12] = {['ActiveNum'] = 1, ['GroupID'] = 2024, ['Priority'] = 3, }, 
+        [13] = {['ActiveNum'] = 1, ['GroupID'] = 2024, ['Priority'] = 2, }, 
+        [14] = {['ActiveNum'] = 1, ['GroupID'] = 2024, ['Priority'] = 1, }, 
+        [8100507] = {['ActiveNum'] = 1, ['GroupID'] = 1, ['Priority'] = 2, }, 
+        [8100508] = {['ActiveNum'] = 1, ['GroupID'] = 1, ['Priority'] = 1, }, 
+        [82060022] = {['ActiveNum'] = 1, ['GroupID'] = 8, ['Priority'] = 2, }, 
+        [82060035] = {['ActiveNum'] = 1, ['GroupID'] = 8, ['Priority'] = 1, }, 
+        [82900001] = {['ActiveNum'] = 1, ['GroupID'] = 2, ['Priority'] = 2, }, 
+        [82900002] = {['ActiveNum'] = 1, ['GroupID'] = 2, ['Priority'] = 1, }, 
+        [82900003] = {['ActiveNum'] = 1, ['GroupID'] = 3, ['Priority'] = 2, }, 
+        [82900004] = {['ActiveNum'] = 1, ['GroupID'] = 3, ['Priority'] = 1, }, 
+        [82900005] = {['ActiveNum'] = 1, ['GroupID'] = 4, ['Priority'] = 2, }, 
+        [82900006] = {['ActiveNum'] = 1, ['GroupID'] = 5, ['Priority'] = 2, }, 
+        [82900007] = {['ActiveNum'] = 1, ['GroupID'] = 4, ['Priority'] = 1, }, 
+        [82900008] = {['ActiveNum'] = 1, ['GroupID'] = 5, ['Priority'] = 1, }, 
+        [82900009] = {['ActiveNum'] = 1, ['GroupID'] = 6, ['Priority'] = 2, }, 
+        [82900010] = {['ActiveNum'] = 1, ['GroupID'] = 6, ['Priority'] = 1, }, 
+        [82900011] = {['ActiveNum'] = 1, ['GroupID'] = 7, ['Priority'] = 2, }, 
+        [82900013] = {['ActiveNum'] = 1, ['GroupID'] = 7, ['Priority'] = 1, }, 
+        [88007249] = {['ActiveNum'] = 1, ['GroupID'] = 9, ['Priority'] = 4, }, 
+        [88007250] = {['ActiveNum'] = 1, ['GroupID'] = 9, ['Priority'] = 3, }, 
+        [88007251] = {['ActiveNum'] = 1, ['GroupID'] = 9, ['Priority'] = 2, }, 
+        [88007252] = {['ActiveNum'] = 1, ['GroupID'] = 9, ['Priority'] = 1, }, 
+    },
+    data = {
+        [1] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{8100507, 2}, {8100508, 1}, }, 
+            ['ID'] = 1, 
+        },
+        [2] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900001, 2}, {82900002, 1}, }, 
+            ['ID'] = 2, 
+        },
+        [3] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900003, 2}, {82900004, 1}, }, 
+            ['ID'] = 3, 
+        },
+        [4] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900005, 2}, {82900007, 1}, }, 
+            ['ID'] = 4, 
+        },
+        [5] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900006, 2}, {82900008, 1}, }, 
+            ['ID'] = 5, 
+        },
+        [6] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900009, 2}, {82900010, 1}, }, 
+            ['ID'] = 6, 
+        },
+        [7] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82900011, 2}, {82900013, 1}, }, 
+            ['ID'] = 7, 
+        },
+        [8] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{82060035, 1}, {82060022, 2}, }, 
+            ['ID'] = 8, 
+        },
+        [9] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{88007249, 4}, {88007250, 3}, {88007251, 2}, {88007252, 1}, }, 
+            ['ID'] = 9, 
+        },
+        [2024] = {
+            ['ActiveNum'] = 1, 
+            ['BuffPriorityList'] = {{12, 3}, {13, 2}, {14, 1}, }, 
+            ['ID'] = 2024, 
+        },
+    }
+}
+return TopData

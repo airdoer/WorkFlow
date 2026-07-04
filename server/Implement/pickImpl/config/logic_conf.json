@@ -1,0 +1,160 @@
+{
+  "c7_daily_logic": [
+    {
+      "group_name": "mongodb_groups4",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups2",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_ai_training_logic": [
+    {
+      "group_name": "mongodb_groups2",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_weekly_logic": [
+    {
+      "group_name": "mongodb_groups3",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups3",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_acceptance_logic": [
+    {
+      "group_name": "mongodb_groups4",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups1",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_nvidia_test_logic": [
+    {
+      "group_name": "mongodb_groups4",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups1",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_taptap_review_logic": [
+    {
+      "group_name": "mongodb_groups4",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups1",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_qa_stress_logic": [
+    {
+      "group_name": "mongodb_groups5",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups5",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_massive_stress_logic": [
+    {
+      "group_name": "mongodb_groups1",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups4",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_massive_stress_txyun_1_logic": [
+    {
+      "group_name": "ksgame_xh_massive_stress_hb_mongo_txyun_01",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups6",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_massive_stress_txyun_2_logic": [
+    {
+      "group_name": "ksgame_xh_massive_stress_hb_mongo_txyun_02_8.0",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups7",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_massive_stress_txyun_3_logic": [
+    {
+      "group_name": "ksgame_xh_massive_stress_hb_mongo_txyun_03",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups8",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_crimson_advent_logic": [
+    {
+      "group_name": "ksgame_xh_c7_crimson_advent_hb_mongo_txyun",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "ksgame_xh_c7_crimson_advent_txyun_hb_redis",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_preonline_logic": [
+    {
+      "group_name": "ksgame_xh_massive_stress_hb_mongo_txyun_01",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    },
+    {
+      "group_name": "redis_groups6",
+      "group_type": "redis",
+      "group_usage": "gs"
+    }
+  ],
+  "c7_massive_stress_aliyun_logic": [
+    {
+      "group_name": "mongodb_groups_8_0",
+      "group_type": "mongodb",
+      "group_usage": "gs"
+    }
+  ]
+}

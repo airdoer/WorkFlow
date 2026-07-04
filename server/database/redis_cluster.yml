@@ -1,0 +1,70 @@
+version: '3.7'
+
+services:
+  # Redis Master 1
+  redis-master-1:
+    image: redislabs/rebloom:latest
+    container_name: c7_ms_redis_cluster_master_1
+    ports:
+      - "11001:6379"
+    volumes:
+      - ./redis/data/master1:/data
+      - ./redis/conf/master1.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - redis-cluster-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # Redis Master 2
+  redis-master-2:
+    image: redislabs/rebloom:latest
+    container_name: c7_ms_redis_cluster_master_2
+    ports:
+      - "11002:6379"
+    volumes:
+      - ./redis/data/master2:/data
+      - ./redis/conf/master2.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - redis-cluster-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # Redis Master 3
+  redis-master-3:
+    image: redislabs/rebloom:latest
+    container_name: c7_ms_redis_cluster_master_3
+    ports:
+      - "11003:6379"
+    volumes:
+      - ./redis/data/master3:/data
+      - ./redis/conf/master3.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - redis-cluster-network
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # 创建Redis Cluster的初始化容器
+  redis-cluster-init:
+    image: redislabs/rebloom:latest
+    container_name: c7_ms_redis_cluster_init
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+    networks:
+      - redis-cluster-network
+    command: sh -c "sleep 5 && redis-cli --cluster create redis-master-1:6379 redis-master-2:6379 redis-master-3:6379 --cluster-replicas 0 --cluster-yes -a c7pwd"
+    profiles:
+      - init
+
+networks:
+  redis-cluster-network:
+    name: redis-cluster-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.70.0/24
+
+
+volumes:
+  redis-data-master1:
+  redis-data-master2:
+  redis-data-master3:
+

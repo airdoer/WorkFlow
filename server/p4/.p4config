@@ -1,0 +1,3 @@
+P4PORT=172.20.6.59:1666
+P4USER=teamcity
+P4CLIENT=c8-windows-11_Mainline_GenerateTable

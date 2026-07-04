@@ -1,0 +1,86 @@
+{
+    "collection_info_path": "./config/collection_info.json",
+    "service_base_path": "./config/service_base.json",
+    "config_path": "./config/docker_config_new.json",
+    "db": {
+        "weekly": {
+            "mongo_cluster": {
+                "c7_dev_weekly": {
+                    "hosts": [
+                        "172.20.5.92:27017"
+                    ],
+                    "username": "root",
+                    "password": "Zu4tK7vZFmfzWcE4YU",
+                    "auth_source": "admin"
+                },
+                "c7_dev_weekly_main": {
+                    "hosts": [
+                        "172.20.5.92:27017"
+                    ],
+                    "username": "root",
+                    "password": "Zu4tK7vZFmfzWcE4YU",
+                    "auth_source": "admin"
+                },
+                "c7_dev_weekly_backup": {
+                    "hosts": [
+                        "172.20.5.92:27017"
+                    ],
+                    "username": "root",
+                    "password": "Zu4tK7vZFmfzWcE4YU",
+                    "auth_source": "admin"
+                },
+                "c7_personal_172202026": {
+                    "hosts": [
+                        "172.20.5.92:27017"
+                    ],
+                    "username": "root",
+                    "password": "Zu4tK7vZFmfzWcE4YU",
+                    "auth_source": "admin"
+                }
+            },
+            "shared_database": "c7_dev_weekly",
+            "logic_server_database": {
+                "1": "c7_dev_weekly_backup",
+                "jydTest": "c7_personal_172202026",
+                "10014": "c7_dev_weekly_main"
+            }
+        },
+        "local": {
+            "mongo_cluster": {
+                "jydTest": {
+                    "hosts": [
+                        "172.28.195.113:27777"
+                    ],
+                    "username": "admin",
+                    "password": "c7pwd",
+                    "auth_source": "admin"
+                },
+                "c7_personal_172202026": {
+                    "hosts": [
+                        "172.20.5.92:27017"
+                    ],
+                    "username": "root",
+                    "password": "Zu4tK7vZFmfzWcE4YU",
+                    "auth_source": "admin"
+                }
+            },
+            "shared_database": "jydTest",
+            "logic_server_database": {
+                "2": "jydTest",
+                "jydTest": "c7_personal_172202026"
+            }
+        }
+    },
+    "src_logic_id": "jydTest",
+    "dst_logic_id": "jydTest",
+    "Account": [],
+    "AvatarID": [],
+    "AvatarName": [
+        "三"
+    ],
+    "Service": [],
+    "Collection": {},
+    "DestAccount": "test",
+    "SourceEnvironmont": "local",
+    "DestEnvironmont": "local"
+}
