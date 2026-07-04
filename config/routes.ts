@@ -287,6 +287,12 @@ export default [
     component: './chatbot',
   },
   {
+    path: '/flowDemo',
+    name: 'flowDemo',
+    icon: 'bulb',
+    component: './FlowDemo',
+  },
+  {
     path: '/',
     redirect: '/dashboard/analysis',
   },
