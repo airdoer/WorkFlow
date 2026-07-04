@@ -36,23 +36,8 @@ const menuItems: MenuProps['items'] = [
 ];
 
 const loginOut = async () => {
-  try {
-    await outLogin();
-  } catch {
-    // Local logout has already cleared user state; redirect should still proceed.
-  }
-  const { search, pathname } = window.location;
-  const urlParams = new URL(window.location.href).searchParams;
-  const searchParams = new URLSearchParams({
-    redirect: pathname + search,
-  });
-  const redirect = urlParams.get('redirect');
-  if (window.location.pathname !== '/user/login' && !redirect) {
-    history.replace({
-      pathname: '/user/login',
-      search: searchParams.toString(),
-    });
-  }
+  // 禁用鉴权：不执行登出操作，不跳转到登录页
+  console.log('Logout disabled in no-auth mode');
 };
 
 export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({

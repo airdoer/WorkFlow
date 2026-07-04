@@ -17,7 +17,7 @@ if [ -n "$1" ]; then
             ;;
         down)
             # 保留原有的down参数处理
-            docker compose -f deploy/work_flow_client.yml down
+            docker-compose -f ../deploy/work_flow_client.yml down
             exit 0
             ;;
     esac

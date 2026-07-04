@@ -52,36 +52,23 @@ export async function getInitialState(): Promise<{
   settingDrawerOpen?: boolean;
 }> {
   const fetchUserInfo = async () => {
-    try {
-      const msg = await queryCurrentUser({
-        skipErrorHandler: true,
-      });
-      return msg.data;
-    } catch (_error) {
-      const { pathname, search, hash } = history.location;
-      history.replace(
-        `${loginPath}?redirect=${encodeURIComponent(pathname + search + hash)}`,
-      );
-    }
-    return undefined;
-  };
-  // 如果不是登录页面，执行
-  const { location } = history;
-  if (
-    ![loginPath, '/user/register', '/user/register-result'].includes(
-      location.pathname,
-    )
-  ) {
-    const currentUser = await fetchUserInfo();
+    // 禁用鉴权：返回模拟用户数据
     return {
-      fetchUserInfo,
-      currentUser,
-      settings: defaultSettings as Partial<LayoutSettings>,
-      settingDrawerOpen: false,
-    };
-  }
+      name: 'Guest User',
+      avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
+      userid: 'guest',
+      email: 'guest@example.com',
+      signature: 'No authentication required',
+      title: 'Guest',
+      group: 'Visitor',
+      access: 'admin',
+    } as API.CurrentUser;
+  };
+  // 直接返回用户信息，不做登录检查
+  const currentUser = await fetchUserInfo();
   return {
     fetchUserInfo,
+    currentUser,
     settings: defaultSettings as Partial<LayoutSettings>,
     settingDrawerOpen: false,
   };
@@ -126,13 +113,7 @@ export const layout: RunTimeLayoutConfig = ({
     // },
     footerRender: () => <Footer />,
     onPageChange: () => {
-      const { location } = history;
-      // 如果没有登录，重定向到 login
-      if (!initialState?.currentUser && location.pathname !== loginPath) {
-        history.replace(
-          `${loginPath}?redirect=${encodeURIComponent(location.pathname + location.search + location.hash)}`,
-        );
-      }
+      // 禁用鉴权：不做任何登录检查
     },
     bgLayoutImgList: [
       {
