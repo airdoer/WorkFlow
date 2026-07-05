@@ -19,3 +19,7 @@ export interface WorkflowJSON {
     targetPortID?: string;
   }>;
 }
+
+export interface WorkflowNodeExecutor {
+  run(input: any, config: any): Promise<any>;
+}

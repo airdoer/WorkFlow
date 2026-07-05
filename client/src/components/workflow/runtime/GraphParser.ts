@@ -1,0 +1,48 @@
+import type { WorkflowJSON } from '../types';
+
+export class GraphParser {
+  static parse(json: WorkflowJSON): string[] {
+    const nodes = json.nodes || [];
+    const edges = json.edges || [];
+
+    const adj: Record<string, string[]> = {};
+    const inDegree: Record<string, number> = {};
+    const nodeMap: Record<string, any> = {};
+
+    for (const node of nodes) {
+      adj[node.id] = [];
+      inDegree[node.id] = 0;
+      nodeMap[node.id] = node;
+    }
+
+    for (const edge of edges) {
+      const src = edge.sourceNodeID;
+      const tgt = edge.targetNodeID;
+      if (adj[src] && inDegree[tgt] !== undefined) {
+        adj[src].push(tgt);
+        inDegree[tgt]++;
+      }
+    }
+
+    const queue: string[] = [];
+    for (const nid of Object.keys(inDegree)) {
+      if (inDegree[nid] === 0) queue.push(nid);
+    }
+
+    const order: string[] = [];
+    while (queue.length > 0) {
+      const nid = queue.shift()!;
+      order.push(nid);
+      for (const neighbor of adj[nid]) {
+        inDegree[neighbor]--;
+        if (inDegree[neighbor] === 0) queue.push(neighbor);
+      }
+    }
+
+    if (order.length !== nodes.length) {
+      throw new Error('工作流中存在循环依赖');
+    }
+
+    return order;
+  }
+}

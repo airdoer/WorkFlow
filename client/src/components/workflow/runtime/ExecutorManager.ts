@@ -1,0 +1,29 @@
+import type { WorkflowNodeExecutor } from '../types';
+
+const executorMap: Record<string, WorkflowNodeExecutor> = {};
+
+export const ExecutorManager = {
+  register(type: string, executor: WorkflowNodeExecutor) {
+    executorMap[type] = executor;
+  },
+
+  get(type: string): WorkflowNodeExecutor | undefined {
+    return executorMap[type];
+  },
+
+  async runNode(type: string, input: any, config: any): Promise<any> {
+    const executor = executorMap[type];
+    if (!executor) throw new Error(`Unknown node type: ${type}`);
+    return executor.run(input, config);
+  },
+};
+
+import ExcelExecutor from '../nodes/Excel/executor';
+import LuaExecutor from '../nodes/Lua/executor';
+import JsonExecutor from '../nodes/Json/executor';
+import PromptExecutor from '../nodes/Prompt/executor';
+
+ExecutorManager.register('excel', ExcelExecutor);
+ExecutorManager.register('lua', LuaExecutor);
+ExecutorManager.register('json', JsonExecutor);
+ExecutorManager.register('prompt', PromptExecutor);
