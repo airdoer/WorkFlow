@@ -1,15 +1,12 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import {
   FreeLayoutEditorProvider,
   EditorRenderer,
   FreeLayoutPluginContext,
-  createShortcutsPlugin,
 } from '@flowgram.ai/free-layout-editor';
 import { createBackgroundPlugin } from '@flowgram.ai/background-plugin';
 import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin';
 import { createFreeSnapPlugin } from '@flowgram.ai/free-snap-plugin';
-import { createFreeAutoLayoutPlugin } from '@flowgram.ai/free-auto-layout-plugin';
-import { createFreeHistoryPlugin } from '@flowgram.ai/free-history-plugin';
 import Toolbox from './Toolbox';
 import PropertyPanel from './PropertyPanel';
 import Toolbar from './Toolbar';
@@ -30,6 +27,7 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
   onSave,
 }) => {
   const editorRef = useRef<FreeLayoutPluginContext | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const handleRun = useCallback((json: WorkflowJSON) => {
     console.log('Run workflow:', json);
@@ -58,6 +56,28 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
     [],
   );
 
+  // 监听节点选择变化
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const editor = editorRef.current;
+    
+    // 监听选择变化事件
+    const handleSelectionChange = () => {
+      const selected = editor.document?.getSelectedWorkflowNodes?.() || [];
+      setSelectedNode(selected[0] || null);
+    };
+
+    // 订阅文档变化事件
+    const unsubscribe = editor.document?.addEventListener?.('selectionChange', handleSelectionChange);
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Toolbar
@@ -84,15 +104,12 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
               createBackgroundPlugin(),
               createMinimapPlugin(),
               createFreeSnapPlugin(),
-              createFreeAutoLayoutPlugin(),
-              createFreeHistoryPlugin(),
-              createShortcutsPlugin(),
             ]}
           >
             <EditorRenderer style={{ width: '100%', height: '100%' }} />
+            <PropertyPanel editorRef={editorRef} selectedNode={selectedNode} />
           </FreeLayoutEditorProvider>
         </div>
-        <PropertyPanel />
       </div>
     </div>
   );
