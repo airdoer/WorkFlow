@@ -18,7 +18,7 @@ services:
       - P4PASSWD=${P4PASSWD}
     volumes:
       - .:/app
-    command: /bin/bash -c "python app.py > /app/log/hotfix_flask.log 2>&1"
+    command: /bin/bash -c "python app.py > /app/log/work_flow_server.log 2>&1"
 
 networks:
   redis-network:

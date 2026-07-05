@@ -22,8 +22,8 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# 添加文件处理器，将日志写入 hotfix_flask.log
-file_handler = logging.FileHandler('log/hotfix_flask.log')
+# 添加文件处理器，将日志写入 work_flow_server.log
+file_handler = logging.FileHandler('log/work_flow_server.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s'))
 app.logger.addHandler(file_handler)

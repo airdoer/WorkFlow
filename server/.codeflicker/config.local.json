@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Fetch(domain:flowgram.ai)",
+      "Write(/data/chenzhixu/WorkFlow/docs/**)",
+      "Edit(/data/chenzhixu/WorkFlow/client/**)"
+    ]
+  }
+}

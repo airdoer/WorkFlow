@@ -1,0 +1,691 @@
+{
+  "server/weekly/ChatComponent.doChannelSend@hotfix_tianjia_305732.lua@hotfix_tianjia_311766.lua": {
+    "func_name": "ChatComponent.doChannelSend",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_tianjia_305732.lua",
+      "hotfix_tianjia_311766.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:28.019436",
+    "notified_authors": [
+      "tianjia",
+      "wb_wengjingxin"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:30.226049",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:31.808065",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:33.293257",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:35.065189",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:36.610511",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:38.103381",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:39.663786",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:41.446081",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:42.985541",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:44.601648",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:46.067815",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:47.518866",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:49.304229",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:50.830092",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:52.389520",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_2.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:53.950007",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_2.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:55.504574",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_2.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:57.339895",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_2.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:17:59.299925",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_2.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:01.139317",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:02.691797",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:04.212042",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:05.805792",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:07.456461",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_310460.lua@hotfix_xieyuhao_310460_2.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_310460.lua",
+      "hotfix_xieyuhao_310460_2.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:09.057579",
+    "notified_authors": [
+      "linshimeng",
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent.checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent.checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:10.332482",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/FashionComponent_checkSaveStain@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "FashionComponent_checkSaveStain",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:11.673761",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckFashionStainInfo@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckFashionStainInfo",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:12.964023",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckStainDataValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckStainDataValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:14.260651",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.CheckHSBValid@hotfix_xieyuhao_307548.lua@hotfix_xieyuhao_307548_2.lua@hotfix_xieyuhao_307548_3.lua@hotfix_xieyuhao_310460_3.lua": {
+    "func_name": "appearance_utils.CheckHSBValid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_307548.lua",
+      "hotfix_xieyuhao_307548_2.lua",
+      "hotfix_xieyuhao_307548_3.lua",
+      "hotfix_xieyuhao_310460_3.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:15.652716",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.SaveAppearanceToStrategy@hotfix_xieyuhao_306256.lua@hotfix_xieyuhao_308282_2.lua": {
+    "func_name": "appearance_utils.SaveAppearanceToStrategy",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_306256.lua",
+      "hotfix_xieyuhao_308282_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:17.032822",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.SaveAppearanceToStrategy@hotfix_xieyuhao_306256.lua@hotfix_xieyuhao_308282.lua": {
+    "func_name": "appearance_utils.SaveAppearanceToStrategy",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_306256.lua",
+      "hotfix_xieyuhao_308282.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:18.148056",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/appearance_utils.SaveAppearanceToStrategy@hotfix_xieyuhao_306256.lua@hotfix_xieyuhao_308282.lua@hotfix_xieyuhao_308282_2.lua": {
+    "func_name": "appearance_utils.SaveAppearanceToStrategy",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_xieyuhao_306256.lua",
+      "hotfix_xieyuhao_308282.lua",
+      "hotfix_xieyuhao_308282_2.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:19.289311",
+    "notified_authors": [
+      "wb_huangguanzhong",
+      "xieyuhao"
+    ]
+  },
+  "server/weekly/_onDayRefresh@hotfix_liaohaiqiang_1_306579.lua@hotfix_liaohaiqiang_2_306579.lua": {
+    "func_name": "_onDayRefresh",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_liaohaiqiang_1_306579.lua",
+      "hotfix_liaohaiqiang_2_306579.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:20.561551",
+    "notified_authors": [
+      "liaohaiqiang",
+      "lishijie03"
+    ]
+  },
+  "server/weekly/_resetStandardMoneySaleTotalNum@hotfix_liaohaiqiang_1_306579.lua@hotfix_liaohaiqiang_2_306579.lua": {
+    "func_name": "_resetStandardMoneySaleTotalNum",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_liaohaiqiang_1_306579.lua",
+      "hotfix_liaohaiqiang_2_306579.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:21.689348",
+    "notified_authors": [
+      "liaohaiqiang",
+      "lishijie03"
+    ]
+  },
+  "server/weekly/_InitSystemBuyOrder@hotfix_liaohaiqiang_1_306579.lua@hotfix_liaohaiqiang_2_306579.lua": {
+    "func_name": "_InitSystemBuyOrder",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_liaohaiqiang_1_306579.lua",
+      "hotfix_liaohaiqiang_2_306579.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:22.804784",
+    "notified_authors": [
+      "liaohaiqiang",
+      "lishijie03"
+    ]
+  },
+  "server/weekly/PollutionComponent._stopPollutionState@hotfix_huangtao05_305513.lua@hotfix_huangtao05_308834.lua": {
+    "func_name": "PollutionComponent._stopPollutionState",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_huangtao05_305513.lua",
+      "hotfix_huangtao05_308834.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:24.285797",
+    "notified_authors": [
+      "huangtao05",
+      "wb_tangliang05"
+    ]
+  },
+  "server/weekly/PollutionComponent__stopPollutionState@hotfix_huangtao05_305513.lua@hotfix_huangtao05_308834.lua": {
+    "func_name": "PollutionComponent__stopPollutionState",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_huangtao05_305513.lua",
+      "hotfix_huangtao05_308834.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:25.374026",
+    "notified_authors": [
+      "huangtao05",
+      "wb_tangliang05"
+    ]
+  },
+  "server/weekly/AvatarSuddenEventComponent.RecheckSuddenEventRegion@hotfix_nongtanggao_304769.lua@hotfix_nongtanggao_312271.lua": {
+    "func_name": "AvatarSuddenEventComponent.RecheckSuddenEventRegion",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_nongtanggao_304769.lua",
+      "hotfix_nongtanggao_312271.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:27.017262",
+    "notified_authors": [
+      "nongtanggao",
+      "songmingyang",
+      "wb_liwendan"
+    ]
+  },
+  "server/weekly/Dungeon_module.Dungeon.tryDungeonSettle@hotfix_huangjiayuan_307077.lua@hotfix_huangjiayuan_307600_1.lua": {
+    "func_name": "Dungeon_module.Dungeon.tryDungeonSettle",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_huangjiayuan_307077.lua",
+      "hotfix_huangjiayuan_307600_1.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:28.314013",
+    "notified_authors": [
+      "huangjiayuan",
+      "wangyan26"
+    ]
+  },
+  "server/weekly/SealedComponent.doReCalcSealedEntryInvalid@hotfix_fuzuotao_308192.lua@hotfix_fuzuotao_312899.lua": {
+    "func_name": "SealedComponent.doReCalcSealedEntryInvalid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_fuzuotao_308192.lua",
+      "hotfix_fuzuotao_312899.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:30.059198",
+    "notified_authors": [
+      "chenkai12",
+      "fuzuotao"
+    ]
+  },
+  "server/weekly/SealedComponent_doReCalcSealedEntryInvalid@hotfix_fuzuotao_308192.lua@hotfix_fuzuotao_312899.lua": {
+    "func_name": "SealedComponent_doReCalcSealedEntryInvalid",
+    "side": "server",
+    "branch_type": "weekly",
+    "conflicting_files": [
+      "hotfix_fuzuotao_308192.lua",
+      "hotfix_fuzuotao_312899.lua"
+    ],
+    "notified_at": "2026-07-05T04:18:31.154522",
+    "notified_authors": [
+      "chenkai12",
+      "fuzuotao"
+    ]
+  }
+}

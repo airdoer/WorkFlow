@@ -1,205 +1,135 @@
-"""
-Workflow CRUD and Runtime Implementation
-"""
 import json
+import os
 import uuid
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-import asyncio
+
+WORKFLOW_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow')
 
 
-# In-memory storage (for now, can be replaced with database later)
-_workflows: Dict[str, Dict[str, Any]] = {}
-_tasks: Dict[str, Dict[str, Any]] = {}
+def _ensure_dir():
+    os.makedirs(WORKFLOW_DATA_DIR, exist_ok=True)
+
+
+def _workflow_path(workflow_id):
+    return os.path.join(WORKFLOW_DATA_DIR, f"{workflow_id}.json")
 
 
 class WorkflowManager:
-    """Manages workflow CRUD operations"""
-    
     @staticmethod
-    def save(name: str, workflow_json: Dict[str, Any], workflow_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Save or update a workflow
-        
-        Args:
-            name: Workflow name
-            workflow_json: Workflow JSON data
-            workflow_id: Optional workflow ID (for updates)
-            
-        Returns:
-            Workflow info with id and name
-        """
-        if workflow_id is None:
+    def save(name, workflow_json, workflow_id=None):
+        _ensure_dir()
+        if not workflow_id:
             workflow_id = str(uuid.uuid4())
-        
-        _workflows[workflow_id] = {
-            "id": workflow_id,
-            "name": name,
-            "json": workflow_json,
-            "created_at": datetime.now().isoformat() if workflow_id not in _workflows else _workflows[workflow_id].get("created_at"),
-            "updated_at": datetime.now().isoformat()
+        now = datetime.now().isoformat()
+        record = {
+            'id': workflow_id,
+            'name': name,
+            'json': workflow_json,
+            'updatedAt': now,
         }
-        
-        return {"id": workflow_id, "name": name}
-    
+        with open(_workflow_path(workflow_id), 'w') as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+        return {'id': workflow_id, 'name': name}
+
     @staticmethod
-    def get(workflow_id: str) -> Optional[Dict[str, Any]]:
-        """Get workflow by ID"""
-        return _workflows.get(workflow_id)
-    
+    def get(workflow_id):
+        path = _workflow_path(workflow_id)
+        if not os.path.exists(path):
+            return None
+        with open(path) as f:
+            return json.load(f)
+
     @staticmethod
-    def list_all() -> List[Dict[str, Any]]:
-        """List all workflows"""
-        return [
-            {
-                "id": wf["id"],
-                "name": wf["name"],
-                "updatedAt": wf["updated_at"]
-            }
-            for wf in _workflows.values()
-        ]
-    
+    def list_all():
+        _ensure_dir()
+        result = []
+        for fname in os.listdir(WORKFLOW_DATA_DIR):
+            if fname.endswith('.json'):
+                with open(os.path.join(WORKFLOW_DATA_DIR, fname)) as f:
+                    data = json.load(f)
+                    result.append({
+                        'id': data.get('id'),
+                        'name': data.get('name'),
+                        'updatedAt': data.get('updatedAt'),
+                    })
+        result.sort(key=lambda x: x.get('updatedAt', ''), reverse=True)
+        return result
+
     @staticmethod
-    def delete(workflow_id: str) -> bool:
-        """Delete a workflow"""
-        if workflow_id in _workflows:
-            del _workflows[workflow_id]
-            return True
-        return False
+    def delete(workflow_id):
+        path = _workflow_path(workflow_id)
+        if not os.path.exists(path):
+            return False
+        os.remove(path)
+        return True
 
 
 class WorkflowRuntime:
-    """Handles workflow execution"""
-    
-    @staticmethod
-    async def run(workflow_json: Dict[str, Any], task_id: Optional[str] = None) -> str:
-        """
-        Run a workflow
-        
-        Args:
-            workflow_json: Workflow JSON data
-            task_id: Optional task ID
-            
-        Returns:
-            Task ID for tracking execution
-        """
-        from .nodeExecutor import ExecutorManager
-        
-        if task_id is None:
-            task_id = str(uuid.uuid4())
-        
-        # Initialize task status
-        _tasks[task_id] = {
-            "id": task_id,
-            "status": "running",
-            "nodes": {},
-            "result": None,
-            "error": None,
-            "started_at": datetime.now().isoformat()
-        }
-        
-        # Parse workflow
-        nodes = workflow_json.get("nodes", [])
-        edges = workflow_json.get("edges", [])
-        
-        # Build DAG
-        node_map = {node["id"]: node for node in nodes}
-        execution_order = WorkflowRuntime._topological_sort(nodes, edges)
-        
-        # Context for storing node outputs
-        context = {}
-        
-        try:
-            # Execute nodes in order
-            for node_id in execution_order:
-                node = node_map[node_id]
-                node_type = node.get("type")
-                node_data = node.get("data", {})
-                
-                # Mark node as started
-                _tasks[task_id]["nodes"][node_id] = "running"
-                
-                # Collect inputs from upstream nodes
-                input_data = {}
-                for edge in edges:
-                    if edge.get("targetNodeID") == node_id:
-                        source_id = edge.get("sourceNodeID")
-                        if source_id in context:
-                            input_data[source_id] = context[source_id]
-                
-                # Execute node
-                output = await ExecutorManager.run_node(node_type, node_data, input_data)
-                context[node_id] = output
-                
-                # Mark node as completed
-                _tasks[task_id]["nodes"][node_id] = "completed"
-            
-            # Mark workflow as completed
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = context
-            _tasks[task_id]["completed_at"] = datetime.now().isoformat()
-            
-        except Exception as e:
-            # Mark workflow as failed
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
-            _tasks[task_id]["failed_at"] = datetime.now().isoformat()
-        
-        return task_id
-    
-    @staticmethod
-    def _topological_sort(nodes: List[Dict], edges: List[Dict]) -> List[str]:
-        """
-        Perform topological sort on workflow DAG
-        
-        Args:
-            nodes: List of nodes
-            edges: List of edges
-            
-        Returns:
-            List of node IDs in execution order
-        """
-        from collections import defaultdict, deque
-        
-        # Build adjacency list and in-degree map
-        graph = defaultdict(list)
-        in_degree = {node["id"]: 0 for node in nodes}
-        
+    _tasks = {}
+
+    @classmethod
+    async def run(cls, workflow_json, task_id):
+        from Implement.workflowImpl.nodeExecutor import ExecutorManager
+        from collections import deque
+
+        nodes = workflow_json.get('nodes', [])
+        edges = workflow_json.get('edges', [])
+
+        adj = {n['id']: [] for n in nodes}
+        in_degree = {n['id']: 0 for n in nodes}
+        node_map = {n['id']: n for n in nodes}
+
         for edge in edges:
-            source = edge.get("sourceNodeID")
-            target = edge.get("targetNodeID")
-            graph[source].append(target)
-            in_degree[target] += 1
-        
-        # Kahn's algorithm
-        queue = deque([node_id for node_id, degree in in_degree.items() if degree == 0])
-        result = []
-        
+            src = edge.get('sourceNodeID')
+            tgt = edge.get('targetNodeID')
+            if src in adj and tgt in in_degree:
+                adj[src].append(tgt)
+                in_degree[tgt] += 1
+
+        queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
+        order = []
         while queue:
-            node_id = queue.popleft()
-            result.append(node_id)
-            
-            for neighbor in graph[node_id]:
+            nid = queue.popleft()
+            order.append(nid)
+            for neighbor in adj[nid]:
                 in_degree[neighbor] -= 1
                 if in_degree[neighbor] == 0:
                     queue.append(neighbor)
-        
-        # Check for cycles
-        if len(result) != len(nodes):
-            raise ValueError("Workflow contains cycles")
-        
-        return result
-    
-    @staticmethod
-    def get_task_status(task_id: str) -> Optional[Dict[str, Any]]:
-        """Get task execution status"""
-        return _tasks.get(task_id)
-    
-    @staticmethod
-    def cancel_task(task_id: str) -> bool:
-        """Cancel a running task"""
-        if task_id in _tasks and _tasks[task_id]["status"] == "running":
-            _tasks[task_id]["status"] = "cancelled"
-            _tasks[task_id]["cancelled_at"] = datetime.now().isoformat()
+
+        if len(order) != len(nodes):
+            raise ValueError("Workflow contains a cycle")
+
+        cls._tasks[task_id] = {
+            'status': 'processing',
+            'nodes': {nid: 'idle' for nid in order},
+            'result': None,
+        }
+
+        context = {}
+        for nid in order:
+            node = node_map[nid]
+            cls._tasks[task_id]['nodes'][nid] = 'processing'
+
+            input_edges = [e for e in edges if e.get('targetNodeID') == nid]
+            input_data = {}
+            for edge in input_edges:
+                src_output = context.get(edge.get('sourceNodeID'), {})
+                input_data.update(src_output)
+
+            output = await ExecutorManager.run_node(node.get('type', ''), node.get('data', {}), input_data)
+            context[nid] = output
+            cls._tasks[task_id]['nodes'][nid] = 'success'
+
+        cls._tasks[task_id]['status'] = 'success'
+        cls._tasks[task_id]['result'] = context
+
+    @classmethod
+    def get_task_status(cls, task_id):
+        return cls._tasks.get(task_id)
+
+    @classmethod
+    def cancel_task(cls, task_id):
+        if task_id in cls._tasks:
+            cls._tasks[task_id]['status'] = 'canceled'
             return True
         return False

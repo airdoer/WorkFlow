@@ -6,6 +6,10 @@ FROM python:3.11 AS develop_home
 WORKDIR /app
 RUN echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始构建 develop_home 阶段镜像..."
 COPY requirements.txt ./
+ARG http_proxy
+ARG https_proxy
+ENV http_proxy=${http_proxy}
+ENV https_proxy=${https_proxy}
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 # Python 依赖
@@ -32,15 +36,16 @@ FROM python:3.11 AS develop
 WORKDIR /app
 RUN echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始构建 develop 阶段镜像..."
 COPY requirements.txt ./
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
-# 代理设置（如有必要）
-ENV http_proxy="http://10.52.57.90:11080"
-ENV https_proxy="http://10.52.57.90:11080"
-ENV HTTP_PROXY="http://10.52.57.90:11080"
-ENV HTTPS_PROXY="http://10.52.57.90:11080"
+ARG http_proxy
+ARG https_proxy
+ENV http_proxy=${http_proxy}
+ENV https_proxy=${https_proxy}
+ENV HTTP_PROXY=${http_proxy}
+ENV HTTPS_PROXY=${https_proxy}
 ENV no_proxy="localhost,127.0.0.1,localaddress,localdomain.com,internal,corp.kuaishou.com,test.gifshow.com,staging.kuaishou.com"
 ENV NO_PROXY="localhost,127.0.0.1,localaddress,localdomain.com,internal,corp.kuaishou.com,test.gifshow.com,staging.kuaishou.com"
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 # Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -U cos-python-sdk-v5
