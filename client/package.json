@@ -51,7 +51,22 @@
     "highlight.js": "^11.11.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "topojson-client": "^3.1.0"
+    "reactflow": "^11.11.0",
+    "topojson-client": "^3.1.0",
+    "zustand": "^4.5.0",
+    "@flowgram.ai/free-layout-editor": "^1.0.12",
+    "@flowgram.ai/free-layout-core": "^1.0.12",
+    "@flowgram.ai/form-core": "^1.0.12",
+    "@flowgram.ai/node": "^1.0.12",
+    "@flowgram.ai/form-antd-materials": "^1.0.12",
+    "@flowgram.ai/background-plugin": "^1.0.12",
+    "@flowgram.ai/minimap-plugin": "^1.0.12",
+    "@flowgram.ai/free-snap-plugin": "^1.0.12",
+    "@flowgram.ai/free-auto-layout-plugin": "^1.0.12",
+    "@flowgram.ai/free-history-plugin": "^1.0.12",
+    "@flowgram.ai/shortcuts-plugin": "^1.0.12",
+    "@flowgram.ai/export-plugin": "^1.0.12",
+    "@flowgram.ai/runtime-js": "^1.0.12"
   },
   "devDependencies": {
     "@ant-design/cli": "^6.5.0",

@@ -8,7 +8,7 @@ if 'ROUTER_LIST' in os.environ:
     routerList = routerListStr.split(',')
 else:
     routerList = ['battle', 'battleExternal', 'heatmap', 'xlsx', 'gameServerRoute', 'battleServerRoute', 'serverInfoRoute', 'hotfixTool', 'hotfixMongoRoute']
-    routerList = ['auth', 'mailTool', 'hotfixTool', 'hotfixMongoRoute', 'mongoImportRoute', 'IdMgrTool', 'otherTool', 'serverConfig', 'kdipTool']
+    routerList = ['WorkFlow']
 
 print('--- use router list: ', routerList)
 enableMonkeyPatch = True
