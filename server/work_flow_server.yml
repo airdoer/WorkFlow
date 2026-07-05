@@ -13,7 +13,6 @@ services:
       - "127.0.0.1:6666:6666"
     networks:
       - redis-network
-      - mongo_network
     environment:
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - P4PASSWD=${P4PASSWD}
@@ -23,6 +22,4 @@ services:
 
 networks:
   redis-network:
-    external: true
-  mongo_network:
     external: true

@@ -14,24 +14,24 @@ print('--- use router list: ', routerList)
 enableMonkeyPatch = True
 
 # Redis
-redis_host = "172.28.205.21"
-redis_port = 13000
-password = "c1pwd"
+redis_host = "my_redis"
+redis_port = 6379
+password = "redispwd"
 cluster = False
 
 # mongo
-mongo_host = "router01"
+mongo_host = "my_mongo"
 mongo_port = 27017
 mongo_db = "work_flow"
 mongo_user = "admin"
-mongo_password = "c7pwd"
+mongo_password = "mongopwd"
 
 # telnet console
 TELNET_IP = "0.0.0.0"
 TELNET_PORT = 6668
 
 # MySQL
-HOSTNAME = "172.28.205.21"
+HOSTNAME = "my_mysql"
 PORT = 3307
 USERNAME = "root"
 PASSWORD = "c1pwd"
