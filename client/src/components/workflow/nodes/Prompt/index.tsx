@@ -4,6 +4,7 @@ import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-edit
 export const PromptNodeRegistry: FlowNodeRegistry = {
   type: 'prompt',
   meta: {
+    title: 'Prompt',
     defaultPorts: [{ type: 'output' }, { type: 'input' }],
   },
   formMeta: {

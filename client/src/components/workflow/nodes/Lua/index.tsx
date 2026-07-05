@@ -4,6 +4,7 @@ import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-edit
 export const LuaNodeRegistry: FlowNodeRegistry = {
   type: 'lua',
   meta: {
+    title: 'Lua',
     defaultPorts: [{ type: 'output' }, { type: 'input' }],
   },
   formMeta: {

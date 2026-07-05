@@ -4,6 +4,7 @@ import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-edit
 export const ExcelNodeRegistry: FlowNodeRegistry = {
   type: 'excel',
   meta: {
+    title: 'Excel',
     defaultPorts: [{ type: 'output' }, { type: 'input' }],
   },
   formMeta: {

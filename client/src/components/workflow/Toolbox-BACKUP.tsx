@@ -1,3 +1,4 @@
+// 备份当前的 Toolbox 实现（点击创建）
 import React from 'react';
 import { nodeRegistryList } from './NodeRegistry';
 

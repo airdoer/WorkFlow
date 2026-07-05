@@ -3,7 +3,9 @@ import {
   FreeLayoutEditorProvider,
   EditorRenderer,
   FreeLayoutPluginContext,
+  WorkflowNodeRenderer,
 } from '@flowgram.ai/free-layout-editor';
+import { NodeRender } from '@flowgram.ai/form-core';
 import { createBackgroundPlugin } from '@flowgram.ai/background-plugin';
 import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin';
 import { createFreeSnapPlugin } from '@flowgram.ai/free-snap-plugin';
@@ -33,29 +35,6 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
     console.log('Run workflow:', json);
   }, []);
 
-  const handleCanvasDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const nodeType = e.dataTransfer.getData('workflow-node-type');
-      if (!nodeType || !editorRef.current) return;
-
-      const document = editorRef.current.document;
-      const canvasRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const x = e.clientX - canvasRect.left;
-      const y = e.clientY - canvasRect.top;
-
-      document.createWorkflowNode({
-        id: `${nodeType}_${Date.now()}`,
-        type: nodeType,
-        meta: { position: { x, y } },
-        data: {},
-        blocks: [],
-        edges: [],
-      });
-    },
-    [],
-  );
-
   // 监听节点选择变化
   useEffect(() => {
     if (!editorRef.current) return;
@@ -79,7 +58,7 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Toolbar
         editorRef={editorRef}
         workflowId={workflowId}
@@ -87,28 +66,43 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
         onSave={onSave}
         onRun={handleRun}
       />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Toolbox />
-        <div
-          style={{ flex: 1, position: 'relative' }}
-          onDrop={handleCanvasDrop}
-          onDragOver={(e) => e.preventDefault()}
-        >
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        <Toolbox editorRef={editorRef} />
+        <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
           <FreeLayoutEditorProvider
             ref={editorRef}
             initialData={initialData}
             nodeRegistries={nodeRegistries}
             nodeEngine={{ enable: true }}
             variableEngine={{ enable: true }}
+            materials={{
+              renderDefaultNode: ({ node }) => (
+                <WorkflowNodeRenderer
+                  node={node}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: 8,
+                    padding: 12,
+                    minWidth: 180,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                    {node.getNodeMeta?.()?.title || node.type}
+                  </div>
+                  <NodeRender node={node} />
+                </WorkflowNodeRenderer>
+              ),
+            }}
             plugins={() => [
               createBackgroundPlugin(),
               createMinimapPlugin(),
               createFreeSnapPlugin(),
             ]}
           >
-            <EditorRenderer style={{ width: '100%', height: '100%' }} />
-            <PropertyPanel editorRef={editorRef} selectedNode={selectedNode} />
+            <EditorRenderer style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
           </FreeLayoutEditorProvider>
+          <PropertyPanel editorRef={editorRef} selectedNode={selectedNode} />
         </div>
       </div>
     </div>

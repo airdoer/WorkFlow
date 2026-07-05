@@ -4,6 +4,7 @@ import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-edit
 export const JsonNodeRegistry: FlowNodeRegistry = {
   type: 'json',
   meta: {
+    title: 'JSON',
     defaultPorts: [{ type: 'output' }, { type: 'input' }],
   },
   formMeta: {
