@@ -10,14 +10,16 @@ services:
       - FLASK_BACKEND_URL=http://work_flow_server:16666
       - NODE_ENV=development
     volumes:
-      # 映射上层目录到容器，实现代码热更新
       - ..:/app
-      # 排除 node_modules，使用容器内已安装的依赖
-      - /app/node_modules
+      - workflow_node_modules:/app/node_modules
     networks:
       - redis-network
+    command: /bin/sh -c "npm install @utoo/pack-linux-x64-gnu --registry=https://registry.npmmirror.com && npm run dev"
     restart: unless-stopped
 
 networks:
   redis-network:
     external: true
+
+volumes:
+  workflow_node_modules:

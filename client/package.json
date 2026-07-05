@@ -55,6 +55,7 @@
     "@flowgram.ai/shortcuts-plugin": "^1.0.12",
     "@rc-component/util": "^1.11.0",
     "@tanstack/react-query": "^5.101.0",
+    "@utoo/pack-linux-x64-gnu": "^1.4.18",
     "antd": "^6.5.0",
     "antd-style": "^4.1.0",
     "china-division": "^2.7.0",
