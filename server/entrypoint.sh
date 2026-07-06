@@ -119,6 +119,12 @@ create_or_update_stream_workspace \
 	"/app/p4MiniWorkSpace/Weekly" \
 	"//C7/Development/Weekly/Server/hotfix/..."
 
+create_or_update_stream_workspace \
+	"hotfix_preonline_mini_workspace" \
+	"//C7/Release/Preonline" \
+	"/app/p4MiniWorkSpace/Preonline" \
+	"//C7/Release/Preonline/Server/hotfix/..."
+
 p4 info
 
 # 执行原始命令，例如 python app.py

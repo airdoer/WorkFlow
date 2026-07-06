@@ -11,6 +11,8 @@ interface PropertyPanelProps {
 
 const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes }) => {
   const [running, setRunning] = useState(false);
+  const [outputResult, setOutputResult] = useState<any>(null);
+  const [outputError, setOutputError] = useState<string | null>(null);
 
   if (!selectedNode) {
     return (
@@ -48,11 +50,21 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes })
 
   const handleRunNode = async () => {
     setRunning(true);
+    setOutputResult(null);
+    setOutputError(null);
     try {
       const result = await FlowApi.runNode(nodeType ?? '', nodeData, {});
-      message.success('节点运行完成');
-      console.log('Node output:', result);
+      // 后端返回 { output: { data: ..., path: ... } } 或 { error: ... }
+      const output = result.output ?? result;
+      if (output?.error) {
+        setOutputError(output.error);
+        message.error(`运行失败: ${output.error}`);
+      } else {
+        setOutputResult(output);
+        message.success('节点运行完成');
+      }
     } catch (err: any) {
+      setOutputError(err.message);
       message.error(`运行失败: ${err.message}`);
     } finally {
       setRunning(false);
@@ -217,6 +229,53 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes })
       <Button type="primary" loading={running} onClick={handleRunNode} block>
         运行节点
       </Button>
+
+      {/* 运行结果展示 */}
+      {outputError && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: 8,
+            background: '#fff2f0',
+            border: '1px solid #ffccc7',
+            borderRadius: 4,
+            fontSize: 12,
+            color: '#cf1322',
+            wordBreak: 'break-all',
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>❌ 运行错误</div>
+          {outputError}
+        </div>
+      )}
+      {outputResult && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: 8,
+            background: '#f6ffed',
+            border: '1px solid #b7eb8f',
+            borderRadius: 4,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>✅ 运行结果</div>
+          <pre
+            style={{
+              margin: 0,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+              maxHeight: 300,
+              overflowY: 'auto',
+              fontSize: 11,
+            }}
+          >
+            {typeof outputResult === 'string'
+              ? outputResult
+              : JSON.stringify(outputResult, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };

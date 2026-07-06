@@ -1,6 +1,7 @@
-import subprocess
 import os
 import re
+import config
+from utility import p4Utils
 from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 
 
@@ -35,27 +36,19 @@ class LuaExecutor(BaseNodeExecutor):
             return {"error": str(e)}
 
     def _p4_sync(self, p4_path: str) -> str:
-        result = subprocess.run(
-            ["p4", "sync", p4_path],
-            capture_output=True, text=True,
-            env={**os.environ, "P4CONFIG": "/app/p4/.p4config"},
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"P4 sync failed: {result.stderr}")
-        client_root = self._get_client_root()
-        relative_path = p4_path.lstrip("/").replace("/", os.sep, 1)
-        return os.path.join(client_root, relative_path)
+        """
+        使用 p4Utils.download_file 将文件同步到本地 P4_WORKSPACE_DIRECTORY。
+        不依赖 p4 client root，直接用 p4 print 下载到指定路径。
+        """
+        p4_path = p4Utils.normalize_p4_path(p4_path)
+        relative_path = p4_path.lstrip("/").replace("//", "")
+        local_path = os.path.join(config.P4_WORKSPACE_DIRECTORY, relative_path)
 
-    def _get_client_root(self) -> str:
-        result = subprocess.run(
-            ["p4", "info"],
-            capture_output=True, text=True,
-            env={**os.environ, "P4CONFIG": "/app/p4/.p4config"},
-        )
-        for line in result.stdout.splitlines():
-            if line.startswith("Client root:"):
-                return line.split(":", 1)[1].strip()
-        return "/app/p4WorkSpace"
+        success = p4Utils.update_file(p4_path, local_path, force=True)
+        if not success:
+            raise RuntimeError(f"Failed to sync P4 file: {p4_path}")
+
+        return local_path
 
     def _extract_function(self, content: str, start: int) -> str:
         depth = 0

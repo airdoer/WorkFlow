@@ -1,36 +1,22 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
+import BaseNode, { NodeField } from '../BaseNode';
 
-function LuaNode({ data, selected }: NodeProps) {
+const LUA_FIELDS: NodeField[] = [
+  { key: 'p4Path', label: 'P4 路径', placeholder: '//C7/.../file.lua' },
+  { key: 'entryFunction', label: '入口函数', placeholder: '函数名（可选）' },
+];
+
+function LuaNode({ data, id, selected }: NodeProps) {
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: selected ? '2px solid #1890ff' : '1px solid #d9d9d9',
-        borderRadius: 8,
-        padding: 12,
-        minWidth: 180,
-      }}
-    >
-      <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-        🌙 Lua
-      </div>
-      {(data?.p4Path as string) && (
-        <div
-          style={{
-            fontSize: 11,
-            color: '#999',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {data.p4Path as string}
-        </div>
-      )}
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <BaseNode
+      data={data as Record<string, unknown>}
+      id={id}
+      selected={!!selected}
+      icon="🌙"
+      label="Lua"
+      fields={LUA_FIELDS}
+    />
   );
 }
 

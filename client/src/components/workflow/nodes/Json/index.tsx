@@ -1,36 +1,22 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
+import BaseNode, { NodeField } from '../BaseNode';
 
-function JsonNode({ data, selected }: NodeProps) {
+const JSON_FIELDS: NodeField[] = [
+  { key: 'p4Path', label: 'P4 路径', placeholder: '//C7/.../file.json' },
+  { key: 'jsonPath', label: 'JSON Path', placeholder: '$.data.items（可选）' },
+];
+
+function JsonNode({ data, id, selected }: NodeProps) {
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: selected ? '2px solid #1890ff' : '1px solid #d9d9d9',
-        borderRadius: 8,
-        padding: 12,
-        minWidth: 180,
-      }}
-    >
-      <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-        📋 JSON
-      </div>
-      {(data?.p4Path as string) && (
-        <div
-          style={{
-            fontSize: 11,
-            color: '#999',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {data.p4Path as string}
-        </div>
-      )}
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <BaseNode
+      data={data as Record<string, unknown>}
+      id={id}
+      selected={!!selected}
+      icon="📋"
+      label="JSON"
+      fields={JSON_FIELDS}
+    />
   );
 }
 

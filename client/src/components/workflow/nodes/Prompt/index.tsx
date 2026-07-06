@@ -1,42 +1,23 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
+import BaseNode, { NodeField } from '../BaseNode';
 
-function PromptNode({ data, selected }: NodeProps) {
+const PROMPT_FIELDS: NodeField[] = [
+  { key: 'prompt', label: '提示词', type: 'textarea', rows: 3, placeholder: '输入提示词，支持 {{nodeId.key}} 变量' },
+  { key: 'model', label: '模型', placeholder: 'qwen-plus' },
+  { key: 'temperature', label: '温度', type: 'number', step: 0.1, placeholder: '0.7' },
+];
+
+function PromptNode({ data, id, selected }: NodeProps) {
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: selected ? '2px solid #1890ff' : '1px solid #d9d9d9',
-        borderRadius: 8,
-        padding: 12,
-        minWidth: 180,
-      }}
-    >
-      <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-        🤖 Prompt
-      </div>
-      {(data?.model as string) && (
-        <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
-          {data.model as string}
-        </div>
-      )}
-      {(data?.prompt as string) && (
-        <div
-          style={{
-            fontSize: 11,
-            color: '#666',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: 160,
-          }}
-        >
-          {(data.prompt as string).slice(0, 50)}...
-        </div>
-      )}
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <BaseNode
+      data={data as Record<string, unknown>}
+      id={id}
+      selected={!!selected}
+      icon="🤖"
+      label="Prompt"
+      fields={PROMPT_FIELDS}
+    />
   );
 }
 
