@@ -1,39 +1,43 @@
-import React from 'react';
-import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-editor';
+import React, { memo } from 'react';
+import { Handle, Position, NodeProps } from 'reactflow';
 
-export const PromptNodeRegistry: FlowNodeRegistry = {
-  type: 'prompt',
-  meta: {
-    title: 'Prompt',
-    defaultPorts: [{ type: 'output' }, { type: 'input' }],
-  },
-  formMeta: {
-    validateTrigger: ValidateTrigger.onChange,
-    validate: {
-      prompt: ({ value }) => (value ? undefined : '提示词必填'),
-    },
-    render: ({ form }) => (
-      <div>
-        <form.Field name="prompt">
-          {(field) => (
-            <textarea
-              {...field.field}
-              placeholder="提示词内容，支持 {{nodeId.outputKey}} 变量插值"
-              rows={4}
-              style={{ width: '100%', marginBottom: 8 }}
-            />
-          )}
-        </form.Field>
-        <form.Field name="temperature">
-          {(field) => <input {...field.field} type="number" step="0.1" placeholder="温度（默认 0.7）" style={{ width: '100%', marginBottom: 8 }} />}
-        </form.Field>
-        <form.Field name="model">
-          {(field) => <input {...field.field} placeholder="模型名（默认 qwen-plus）" style={{ width: '100%', marginBottom: 8 }} />}
-        </form.Field>
-        <form.Field name="maxTokens">
-          {(field) => <input {...field.field} type="number" placeholder="最大 token 数" style={{ width: '100%' }} />}
-        </form.Field>
+function PromptNode({ data, selected }: NodeProps) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: selected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+        borderRadius: 8,
+        padding: 12,
+        minWidth: 180,
+      }}
+    >
+      <Handle type="target" position={Position.Left} />
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+        🤖 Prompt
       </div>
-    ),
-  },
-};
+      {(data?.model as string) && (
+        <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>
+          {data.model as string}
+        </div>
+      )}
+      {(data?.prompt as string) && (
+        <div
+          style={{
+            fontSize: 11,
+            color: '#666',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: 160,
+          }}
+        >
+          {(data.prompt as string).slice(0, 50)}...
+        </div>
+      )}
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+export default memo(PromptNode);

@@ -1,10 +1,7 @@
-import type { WorkflowJSON } from '../types';
+import type { Node, Edge } from 'reactflow';
 
 export class GraphParser {
-  static parse(json: WorkflowJSON): string[] {
-    const nodes = json.nodes || [];
-    const edges = json.edges || [];
-
+  static parse(nodes: Node[], edges: Edge[]): string[] {
     const adj: Record<string, string[]> = {};
     const inDegree: Record<string, number> = {};
     const nodeMap: Record<string, any> = {};
@@ -16,8 +13,8 @@ export class GraphParser {
     }
 
     for (const edge of edges) {
-      const src = edge.sourceNodeID;
-      const tgt = edge.targetNodeID;
+      const src = edge.source;
+      const tgt = edge.target;
       if (adj[src] && inDegree[tgt] !== undefined) {
         adj[src].push(tgt);
         inDegree[tgt]++;

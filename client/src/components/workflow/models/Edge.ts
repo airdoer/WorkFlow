@@ -1,6 +1,7 @@
 export interface EdgeModel {
-  sourceNodeID: string;
-  targetNodeID: string;
-  sourcePortID?: string;
-  targetPortID?: string;
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
 }

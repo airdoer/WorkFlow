@@ -1,26 +1,40 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
+import type { Node, Edge } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 import { Button, Space, message } from 'antd';
-import { SaveOutlined, PlayCircleOutlined, StopOutlined, UndoOutlined, RedoOutlined, ExportOutlined, ImportOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlayCircleOutlined, StopOutlined, ExportOutlined, ImportOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
 
 interface ToolbarProps {
-  editorRef?: any;
+  nodes: Node[];
+  edges: Edge[];
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   workflowId?: string;
   workflowName?: string;
   onSave?: (id: string, name: string) => void;
   onRun?: (json: WorkflowJSON) => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, onSave, onRun }) => {
+const Toolbar: React.FC<ToolbarProps> = ({
+  nodes,
+  edges,
+  setNodes,
+  setEdges,
+  workflowId,
+  workflowName,
+  onSave,
+  onRun,
+}) => {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const reactFlowInstance = useReactFlow();
 
   const handleSave = async () => {
-    if (!editorRef?.current) return;
     setSaving(true);
     try {
-      const json = editorRef.current.document.toJSON();
+      const json = reactFlowInstance.toObject();
       const name = workflowName || '未命名工作流';
       const result = await FlowApi.save(name, json, workflowId);
       onSave?.(result.id, name);
@@ -33,14 +47,14 @@ const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, 
   };
 
   const handleRun = async () => {
-    if (!editorRef?.current) return;
     if (!workflowId) {
       message.warning('请先保存工作流');
       return;
     }
     setRunning(true);
     try {
-      onRun?.(editorRef.current.document.toJSON());
+      const json = reactFlowInstance.toObject();
+      onRun?.(json);
       const result = await FlowApi.runWorkflow(workflowId);
       message.info(`工作流已提交，taskId: ${result.taskId}`);
     } catch (err: any) {
@@ -51,8 +65,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, 
   };
 
   const handleExport = () => {
-    if (!editorRef?.current) return;
-    const json = editorRef.current.document.toJSON();
+    const json = reactFlowInstance.toObject();
     const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -73,8 +86,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, 
       reader.onload = (ev) => {
         try {
           const json = JSON.parse(ev.target?.result as string);
-          if (editorRef?.current) {
-            editorRef.current.document.fromJSON(json);
+          if (json.nodes) setNodes(json.nodes as Node[]);
+          if (json.edges) setEdges(json.edges as Edge[]);
+          if (json.viewport) {
+            reactFlowInstance.setViewport(json.viewport);
           }
           message.success('导入成功');
         } catch {
@@ -84,14 +99,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, 
       reader.readAsText(file);
     };
     input.click();
-  };
-
-  const handleUndo = () => {
-    editorRef?.current?.commandService?.undo?.();
-  };
-
-  const handleRedo = () => {
-    editorRef?.current?.commandService?.redo?.();
   };
 
   return (
@@ -115,12 +122,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ editorRef, workflowId, workflowName, 
         </Button>
         <Button icon={<StopOutlined />} size="small" disabled>
           停止
-        </Button>
-        <Button icon={<UndoOutlined />} onClick={handleUndo} size="small">
-          撤销
-        </Button>
-        <Button icon={<RedoOutlined />} onClick={handleRedo} size="small">
-          重做
         </Button>
         <Button icon={<ImportOutlined />} onClick={handleImport} size="small">
           导入

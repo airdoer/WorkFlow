@@ -1,26 +1,37 @@
-import React from 'react';
-import { FlowNodeRegistry, ValidateTrigger } from '@flowgram.ai/free-layout-editor';
+import React, { memo } from 'react';
+import { Handle, Position, NodeProps } from 'reactflow';
 
-export const LuaNodeRegistry: FlowNodeRegistry = {
-  type: 'lua',
-  meta: {
-    title: 'Lua',
-    defaultPorts: [{ type: 'output' }, { type: 'input' }],
-  },
-  formMeta: {
-    validateTrigger: ValidateTrigger.onChange,
-    validate: {
-      p4Path: ({ value }) => (value ? undefined : 'P4 路径必填'),
-    },
-    render: ({ form }) => (
-      <div>
-        <form.Field name="p4Path">
-          {(field) => <input {...field.field} placeholder="P4 文件路径" style={{ width: '100%', marginBottom: 8 }} />}
-        </form.Field>
-        <form.Field name="entryFunction">
-          {(field) => <input {...field.field} placeholder="入口函数名（可选）" style={{ width: '100%' }} />}
-        </form.Field>
+function LuaNode({ data, selected }: NodeProps) {
+  return (
+    <div
+      style={{
+        background: '#fff',
+        border: selected ? '2px solid #1890ff' : '1px solid #d9d9d9',
+        borderRadius: 8,
+        padding: 12,
+        minWidth: 180,
+      }}
+    >
+      <Handle type="target" position={Position.Left} />
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+        🌙 Lua
       </div>
-    ),
-  },
-};
+      {(data?.p4Path as string) && (
+        <div
+          style={{
+            fontSize: 11,
+            color: '#999',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {data.p4Path as string}
+        </div>
+      )}
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+export default memo(LuaNode);

@@ -1,18 +1,25 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import {
-  FreeLayoutEditorProvider,
-  EditorRenderer,
-  FreeLayoutPluginContext,
-  WorkflowNodeRenderer,
-} from '@flowgram.ai/free-layout-editor';
-import { NodeRender } from '@flowgram.ai/form-core';
-import { createBackgroundPlugin } from '@flowgram.ai/background-plugin';
-import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin';
-import { createFreeSnapPlugin } from '@flowgram.ai/free-snap-plugin';
+import React, { useCallback, useState } from 'react';
+import ReactFlow, {
+  Node,
+  Edge,
+  OnNodesChange,
+  OnEdgesChange,
+  OnConnect,
+  addEdge,
+  Background,
+  Controls,
+  MiniMap,
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  NodeMouseHandler,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import Toolbox from './Toolbox';
 import PropertyPanel from './PropertyPanel';
 import Toolbar from './Toolbar';
-import { nodeRegistries } from './NodeRegistry';
+import { nodeTypes } from './NodeRegistry';
 import type { WorkflowJSON } from './types';
 
 interface FlowEditorProps {
@@ -22,90 +29,78 @@ interface FlowEditorProps {
   onSave?: (id: string, name: string) => void;
 }
 
-const FlowEditor: React.FC<FlowEditorProps> = ({
+function FlowEditorInner({
   initialData,
   workflowId,
   workflowName,
   onSave,
-}) => {
-  const editorRef = useRef<FreeLayoutPluginContext | null>(null);
-  const [selectedNode, setSelectedNode] = useState<any>(null);
+}: FlowEditorProps) {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  const handleRun = useCallback((json: WorkflowJSON) => {
-    console.log('Run workflow:', json);
+  const onConnect: OnConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges],
+  );
+
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
+    setSelectedNode(node);
   }, []);
 
-  // 监听节点选择变化
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const editor = editorRef.current;
-    
-    // 监听选择变化事件
-    const handleSelectionChange = () => {
-      const selected = editor.document?.getSelectedWorkflowNodes?.() || [];
-      setSelectedNode(selected[0] || null);
-    };
-
-    // 订阅文档变化事件
-    const unsubscribe = editor.document?.addEventListener?.('selectionChange', handleSelectionChange);
-
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
   }, []);
+
+  const handleRun = useCallback(
+    (json: WorkflowJSON) => {
+      console.log('Run workflow:', json);
+    },
+    [],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Toolbar
-        editorRef={editorRef}
+        nodes={nodes}
+        edges={edges}
+        setNodes={setNodes}
+        setEdges={setEdges}
         workflowId={workflowId}
         workflowName={workflowName}
         onSave={onSave}
         onRun={handleRun}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <Toolbox editorRef={editorRef} />
-        <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
-          <FreeLayoutEditorProvider
-            ref={editorRef}
-            initialData={initialData}
-            nodeRegistries={nodeRegistries}
-            nodeEngine={{ enable: true }}
-            variableEngine={{ enable: true }}
-            materials={{
-              renderDefaultNode: ({ node }) => (
-                <WorkflowNodeRenderer
-                  node={node}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #d9d9d9',
-                    borderRadius: 8,
-                    padding: 12,
-                    minWidth: 180,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
-                    {node.getNodeMeta?.()?.title || node.type}
-                  </div>
-                  <NodeRender node={node} />
-                </WorkflowNodeRenderer>
-              ),
-            }}
-            plugins={() => [
-              createBackgroundPlugin(),
-              createMinimapPlugin(),
-              createFreeSnapPlugin(),
-            ]}
+        <Toolbox nodes={nodes} setNodes={setNodes} />
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            fitView
           >
-            <EditorRenderer style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
-          </FreeLayoutEditorProvider>
-          <PropertyPanel editorRef={editorRef} selectedNode={selectedNode} />
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
         </div>
+        <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} />
       </div>
     </div>
+  );
+}
+
+const FlowEditor: React.FC<FlowEditorProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <FlowEditorInner {...props} />
+    </ReactFlowProvider>
   );
 };
 

@@ -1,52 +1,29 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import type { Node } from 'reactflow';
 import { nodeRegistryList } from './NodeRegistry';
 
 interface ToolboxProps {
-  editorRef: React.RefObject<any>;
+  nodes: Node[];
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
 }
 
-const Toolbox: React.FC<ToolboxProps> = ({ editorRef }) => {
-  const handleNodeClick = (nodeType: string) => {
-    if (!editorRef.current) {
-      console.error('Editor not initialized');
-      return;
-    }
-
-    const editor = editorRef.current;
-    
-    // 使用 operation.addNode 创建节点
-    try {
-      if (editor.operation && typeof editor.operation.addNode === 'function') {
-        // 从注册表中获取节点配置
-        const registry = nodeRegistryList.find(r => r.type === nodeType);
-        if (!registry) {
-          console.error('Node registry not found for type:', nodeType);
-          return;
-        }
-
-        const nodeConfig = {
-          id: `${nodeType}_${Date.now()}`,
-          type: nodeType,
-          meta: { 
-            position: { x: 300, y: 200 },
-            ...(registry.registry.meta || {})
-          },
-          data: {},
-          blocks: [],
-          edges: [],
-        };
-        
-        console.log('Creating node with registry:', registry);
-        console.log('Node config:', nodeConfig);
-        editor.operation.addNode(nodeConfig);
-        console.log('Node created successfully');
-      } else {
-        console.error('operation.addNode not available');
-      }
-    } catch (error) {
-      console.error('Failed to create node:', error);
-    }
-  };
+const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes }) => {
+  const handleNodeClick = useCallback(
+    (nodeType: string) => {
+      const id = `${nodeType}_${Date.now()}`;
+      const newNode: Node = {
+        id,
+        type: nodeType,
+        position: {
+          x: Math.random() * 300 + 100,
+          y: Math.random() * 200 + 100,
+        },
+        data: {},
+      };
+      setNodes((nds) => [...nds, newNode]);
+    },
+    [setNodes],
+  );
 
   return (
     <div

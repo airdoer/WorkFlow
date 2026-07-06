@@ -1,51 +1,46 @@
 import React, { useState } from 'react';
+import type { Node } from 'reactflow';
 import { getNodeRegistry } from './NodeRegistry';
 import { Button, message } from 'antd';
 import { FlowApi } from './services/FlowApi';
 
 interface PropertyPanelProps {
-  editorRef: React.RefObject<any>;
-  selectedNode: any;
+  selectedNode: Node | null;
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
 }
 
-const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }) => {
+const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes }) => {
   const [running, setRunning] = useState(false);
 
   if (!selectedNode) {
     return (
-      <div style={{ 
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 280, 
-        borderLeft: '1px solid #e8e8e8', 
-        padding: 16, 
-        background: '#fafafa',
-        zIndex: 10
-      }}>
+      <div
+        style={{
+          width: 280,
+          borderLeft: '1px solid #e8e8e8',
+          padding: 16,
+          background: '#fafafa',
+        }}
+      >
         <div style={{ color: '#999' }}>选择节点查看属性</div>
       </div>
     );
   }
 
-  const nodeType = selectedNode.type;
-  const nodeData = selectedNode.data || {};
+  const nodeType = selectedNode.type ?? '';
+  const nodeData = (selectedNode.data || {}) as Record<string, unknown>;
   const entry = getNodeRegistry(nodeType);
 
   if (!entry) {
     return (
-      <div style={{ 
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 280, 
-        borderLeft: '1px solid #e8e8e8', 
-        padding: 16, 
-        background: '#fafafa',
-        zIndex: 10
-      }}>
+      <div
+        style={{
+          width: 280,
+          borderLeft: '1px solid #e8e8e8',
+          padding: 16,
+          background: '#fafafa',
+        }}
+      >
         <div style={{ color: '#999' }}>未知节点类型: {nodeType}</div>
       </div>
     );
@@ -54,7 +49,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
   const handleRunNode = async () => {
     setRunning(true);
     try {
-      const result = await FlowApi.runNode(nodeType, nodeData, {});
+      const result = await FlowApi.runNode(nodeType ?? '', nodeData, {});
       message.success('节点运行完成');
       console.log('Node output:', result);
     } catch (err: any) {
@@ -65,32 +60,23 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
   };
 
   const handleFieldChange = (fieldName: string, value: any) => {
-    if (selectedNode && editorRef.current?.document) {
-      // 更新节点数据
-      const updatedNode = {
-        ...selectedNode,
-        data: {
-          ...selectedNode.data,
-          [fieldName]: value,
-        },
-      };
-      editorRef.current.document.updateWorkflowNode(selectedNode.id, updatedNode);
-    }
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === selectedNode.id
+          ? { ...n, data: { ...n.data, [fieldName]: value } }
+          : n,
+      ),
+    );
   };
 
   return (
     <div
       style={{
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
         width: 280,
         borderLeft: '1px solid #e8e8e8',
         padding: 16,
         background: '#fff',
         overflowY: 'auto',
-        zIndex: 10
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
@@ -99,7 +85,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        {/* 简化的表单渲染 */}
         {nodeType === 'excel' && (
           <>
             <div style={{ marginBottom: 12 }}>
@@ -108,7 +93,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.p4Path || ''}
+                value={(nodeData.p4Path as string) || ''}
                 onChange={(e) => handleFieldChange('p4Path', e.target.value)}
                 placeholder="P4 文件路径"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -120,7 +105,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.sheet || ''}
+                value={(nodeData.sheet as string) || ''}
                 onChange={(e) => handleFieldChange('sheet', e.target.value)}
                 placeholder="工作表名"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -136,7 +121,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.p4Path || ''}
+                value={(nodeData.p4Path as string) || ''}
                 onChange={(e) => handleFieldChange('p4Path', e.target.value)}
                 placeholder="P4 文件路径"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -148,7 +133,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.entryFunction || ''}
+                value={(nodeData.entryFunction as string) || ''}
                 onChange={(e) => handleFieldChange('entryFunction', e.target.value)}
                 placeholder="入口函数名"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -164,7 +149,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.p4Path || ''}
+                value={(nodeData.p4Path as string) || ''}
                 onChange={(e) => handleFieldChange('p4Path', e.target.value)}
                 placeholder="P4 文件路径"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -176,7 +161,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.jsonPath || ''}
+                value={(nodeData.jsonPath as string) || ''}
                 onChange={(e) => handleFieldChange('jsonPath', e.target.value)}
                 placeholder="如 $.data.items"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -191,7 +176,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
                 提示词
               </label>
               <textarea
-                value={nodeData.prompt || ''}
+                value={(nodeData.prompt as string) || ''}
                 onChange={(e) => handleFieldChange('prompt', e.target.value)}
                 placeholder="输入提示词，支持 {{nodeId.outputKey}} 变量"
                 rows={6}
@@ -204,7 +189,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="text"
-                value={nodeData.model || 'qwen-plus'}
+                value={(nodeData.model as string) || 'qwen-plus'}
                 onChange={(e) => handleFieldChange('model', e.target.value)}
                 placeholder="模型名称"
                 style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 2 }}
@@ -216,7 +201,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ editorRef, selectedNode }
               </label>
               <input
                 type="number"
-                value={nodeData.temperature || 0.7}
+                value={(nodeData.temperature as number) || 0.7}
                 onChange={(e) => handleFieldChange('temperature', parseFloat(e.target.value))}
                 placeholder="0.0 - 1.0"
                 step="0.1"
