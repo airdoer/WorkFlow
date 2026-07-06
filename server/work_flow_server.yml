@@ -2,6 +2,7 @@ version: '3.7'
 services:
   work_flow_server:
     image: work_flow_server:latest
+    container_name: work_flow_server_container
     deploy:
       resources:
         limits:

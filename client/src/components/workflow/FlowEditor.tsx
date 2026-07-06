@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -37,7 +37,13 @@ function FlowEditorInner({
 }: FlowEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Always read the latest node data from nodes state, not a stale snapshot
+  const selectedNode = useMemo(
+    () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
+    [selectedNodeId, nodes],
+  );
 
   const onConnect: OnConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -45,12 +51,21 @@ function FlowEditorInner({
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
-    setSelectedNode(node);
+    setSelectedNodeId(node.id);
   }, []);
 
   const onPaneClick = useCallback(() => {
-    setSelectedNode(null);
+    setSelectedNodeId(null);
   }, []);
+
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => {
+      if (deleted.some((n) => n.id === selectedNodeId)) {
+        setSelectedNodeId(null);
+      }
+    },
+    [selectedNodeId],
+  );
 
   const handleRun = useCallback(
     (json: WorkflowJSON) => {
@@ -82,8 +97,10 @@ function FlowEditorInner({
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
+            onNodesDelete={onNodesDelete}
             nodeTypes={nodeTypes}
             fitView
+            deleteKeyCode={['Delete', 'Backspace']}
           >
             <Background />
             <Controls />
