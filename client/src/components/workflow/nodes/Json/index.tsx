@@ -15,6 +15,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
       selected={!!selected}
       icon="📋"
       label="JSON"
+      nodeType="json"
       fields={JSON_FIELDS}
     />
   );

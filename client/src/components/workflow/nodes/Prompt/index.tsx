@@ -16,6 +16,7 @@ function PromptNode({ data, id, selected }: NodeProps) {
       selected={!!selected}
       icon="🤖"
       label="Prompt"
+      nodeType="prompt"
       fields={PROMPT_FIELDS}
     />
   );

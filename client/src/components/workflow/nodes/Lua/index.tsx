@@ -15,6 +15,7 @@ function LuaNode({ data, id, selected }: NodeProps) {
       selected={!!selected}
       icon="🌙"
       label="Lua"
+      nodeType="lua"
       fields={LUA_FIELDS}
     />
   );

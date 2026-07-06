@@ -15,6 +15,7 @@ function ExcelNode({ data, id, selected }: NodeProps) {
       selected={!!selected}
       icon="📊"
       label="Excel"
+      nodeType="excel"
       fields={EXCEL_FIELDS}
     />
   );

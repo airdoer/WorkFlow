@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Handle, Position, useReactFlow } from 'reactflow';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 
@@ -10,8 +10,8 @@ export interface NodeField {
   label: string;
   placeholder?: string;
   type?: 'text' | 'textarea' | 'number';
-  rows?: number; // for textarea
-  step?: number; // for number
+  rows?: number;
+  step?: number;
 }
 
 interface BaseNodeProps {
@@ -20,49 +20,8 @@ interface BaseNodeProps {
   selected: boolean;
   icon: string;
   label: string;
+  nodeType: string;
   fields: NodeField[];
-  summaryFields?: string[]; // fields to show in collapsed summary
-}
-
-export function useNodeRun(nodeId: string, nodeType: string, data: Record<string, unknown>) {
-  const { setNodes } = useReactFlow();
-  const [running, setRunning] = useState(false);
-
-  const run = useCallback(async () => {
-    setRunning(true);
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, _runStatus: 'running' } } : n,
-      ),
-    );
-
-    try {
-      const result = await FlowApi.runNode(nodeType, data, {});
-      const output = result.output ?? result;
-      const status = output?.error ? 'error' : 'success';
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: status, _runOutput: output } }
-            : n,
-        ),
-      );
-      setRunning(false);
-      return output;
-    } catch (err: any) {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-            : n,
-        ),
-      );
-      setRunning(false);
-      return null;
-    }
-  }, [nodeId, nodeType, data, setNodes]);
-
-  return { running, run };
 }
 
 const STATUS_CONFIG = {
@@ -78,6 +37,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   selected,
   icon,
   label,
+  nodeType,
   fields,
 }) => {
   const { setNodes } = useReactFlow();
@@ -105,12 +65,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       setRunning(true);
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running' } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
         ),
       );
 
       try {
-        const nodeType = (data as any).__nodeType || label.toLowerCase();
         const result = await FlowApi.runNode(nodeType, data, {});
         const output = result.output ?? result;
         const newStatus = output?.error ? 'error' : 'success';
@@ -139,7 +98,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       }
       setRunning(false);
     },
-    [id, label, data, setNodes],
+    [id, nodeType, data, setNodes],
   );
 
   const borderColor =
@@ -161,6 +120,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         borderRadius: 8,
         padding: 10,
         minWidth: 200,
+        maxWidth: 260,
         fontSize: 12,
       }}
       onDoubleClick={(e) => {
@@ -170,7 +130,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     >
       <Handle type="target" position={Position.Left} />
 
-      {/* Header row: icon + label + run button */}
+      {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <div style={{ fontWeight: 600, fontSize: 13 }}>
           {icon} {label}
@@ -235,6 +195,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     placeholder={f.placeholder}
                     rows={f.rows || 3}
                     onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                     style={{
                       width: '100%',
                       fontSize: 11,
@@ -259,6 +220,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     placeholder={f.placeholder}
                     step={f.step}
                     onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                     style={{
                       width: '100%',
                       fontSize: 11,
@@ -280,6 +242,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   onChange={(e) => handleFieldChange(f.key, e.target.value)}
                   placeholder={f.placeholder}
                   onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   style={{
                     width: '100%',
                     fontSize: 11,
@@ -301,22 +264,37 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         </div>
       )}
 
-      {/* Run output hint (error only, on node) */}
-      {runStatus === 'error' && runOutput?.error && (
+      {/* Run output on node */}
+      {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
         <div
           style={{
-            marginTop: 4,
-            padding: '3px 6px',
-            background: '#fff2f0',
-            borderRadius: 3,
+            marginTop: 6,
+            background: runStatus === 'error' ? '#fff2f0' : '#f6ffed',
+            border: `1px solid ${runStatus === 'error' ? '#ffccc7' : '#b7eb8f'}`,
+            borderRadius: 4,
             fontSize: 10,
-            color: '#cf1322',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
           }}
         >
-          {String(runOutput.error).slice(0, 50)}
+          <div style={{ padding: '3px 6px', fontWeight: 600, color: runStatus === 'error' ? '#cf1322' : '#389e0d' }}>
+            {runStatus === 'error' ? '❌ 错误' : '✅ 结果'}
+          </div>
+          <pre
+            style={{
+              margin: 0,
+              padding: '2px 6px',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+              maxHeight: 120,
+              overflowY: 'auto',
+              fontSize: 9,
+              color: '#333',
+              borderTop: `1px solid ${runStatus === 'error' ? '#ffccc7' : '#b7eb8f'}`,
+            }}
+          >
+            {typeof runOutput === 'string'
+              ? runOutput
+              : JSON.stringify(runOutput, null, 2)}
+          </pre>
         </div>
       )}
 
