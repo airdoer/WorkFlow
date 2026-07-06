@@ -12,7 +12,7 @@
 export default {
   dev: {
     '/api/workflow/': {
-      target: 'http://localhost:16666',
+      target: process.env.FLASK_BACKEND_URL || 'http://localhost:16666',
       changeOrigin: true,
     },
   },
