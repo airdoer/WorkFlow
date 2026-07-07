@@ -53,6 +53,9 @@ interface PropertyPanelProps {
 const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes }) => {
   // ALL hooks must be called before any conditional return
   const [outputModalOpen, setOutputModalOpen] = useState(false);
+  const [inputModalOpen, setInputModalOpen] = useState(false);
+  const [modalContent, setModalContent] = useState('');
+  const [modalTitle, setModalTitle] = useState('');
 
   const nodeType = selectedNode?.type ?? '';
   const nodeData = (selectedNode?.data || {}) as Record<string, unknown>;
@@ -372,6 +375,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   ) : (
                     <Tag style={{ fontSize: 9, margin: 0 }} color="orange">未接收</Tag>
                   )}
+                  {u.hasData && u.preview && (
+                    <Button
+                      size="small"
+                      icon={<ExpandOutlined />}
+                      style={{ fontSize: 10, padding: '0 6px', height: 20 }}
+                      onClick={() => { setModalContent(u.preview || ''); setModalTitle(`输入内容 - ${u.tgtPortLabel}`); setInputModalOpen(true); }}
+                    >
+                      弹窗查看
+                    </Button>
+                  )}
                 </div>
                 <div style={{ fontSize: 10, color: '#999', marginBottom: 4 }}>
                   来自 {u.sourceId} → {u.srcHandle || '全部输出'}
@@ -384,7 +397,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                       background: '#fff',
                       border: '1px solid #e8e8e8',
                       borderRadius: 3,
-                      maxHeight: 120,
+                      maxHeight: 80,
                       overflowY: 'auto',
                       fontSize: 9,
                       color: '#333',
@@ -392,7 +405,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                       wordBreak: 'break-all',
                     }}
                   >
-                    {u.preview.length > 2000 ? u.preview.slice(0, 2000) + '\n...(内容过长，点击输出内容弹窗查看完整)' : u.preview}
+                    {u.preview}
                   </pre>
                 )}
               </div>
@@ -440,22 +453,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+            <div style={{ marginBottom: 8 }}>
               <Button
                 size="small"
                 icon={<ExpandOutlined />}
-                onClick={() => setOutputModalOpen(true)}
+                onClick={() => { setModalContent(outputText); setModalTitle('输出内容'); setOutputModalOpen(true); }}
                 disabled={!outputText}
               >
                 弹窗查看
-              </Button>
-              <Button
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={() => copyToClipboard(outputText)}
-                disabled={!outputText}
-              >
-                复制
               </Button>
             </div>
             <pre
@@ -479,17 +484,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         )}
       </Section>
 
-      {/* Output Modal for long content */}
+      {/* Shared Modal for long content (input or output) */}
       <Modal
-        title="输出内容"
-        open={outputModalOpen}
-        onCancel={() => setOutputModalOpen(false)}
+        title={modalTitle}
+        open={inputModalOpen || outputModalOpen}
+        onCancel={() => { setInputModalOpen(false); setOutputModalOpen(false); }}
         width={800}
         footer={[
-          <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(outputText)}>
+          <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(modalContent)}>
             复制
           </Button>,
-          <Button key="close" type="primary" onClick={() => setOutputModalOpen(false)}>
+          <Button key="close" type="primary" onClick={() => { setInputModalOpen(false); setOutputModalOpen(false); }}>
             关闭
           </Button>,
         ]}
@@ -509,7 +514,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             border: '1px solid #e8e8e8',
           }}
         >
-          {outputText}
+          {modalContent}
         </pre>
       </Modal>
     </div>
