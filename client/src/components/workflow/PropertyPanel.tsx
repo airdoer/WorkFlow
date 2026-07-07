@@ -47,9 +47,10 @@ interface PropertyPanelProps {
   selectedNode: Node | null;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   edges: Edge[];
+  nodes: Node[];
 }
 
-const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges }) => {
+const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes }) => {
   // ALL hooks must be called before any conditional return
   const [outputModalOpen, setOutputModalOpen] = useState(false);
 
@@ -68,14 +69,38 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   const incomingEdges = selectedNode ? edges.filter((e) => e.target === selectedNode.id) : [];
   const outgoingEdges = selectedNode ? edges.filter((e) => e.source === selectedNode.id) : [];
 
-  const upstreamNodes = incomingEdges
-    .map((e) => ({
-      sourceId: e.source,
-      srcHandle: e.sourceHandle,
-      tgtHandle: e.targetHandle,
-      matchStatus: e.data?.matchStatus,
-    }))
-    .filter((e) => e.matchStatus === 'matched');
+  // Collect upstream data per input port — includes actual output preview
+  const upstreamData = incomingEdges
+    .filter((e) => e.data?.matchStatus === 'matched')
+    .map((e) => {
+      const srcHandle = e.sourceHandle;
+      const tgtHandle = e.targetHandle;
+      const tgtPort = inputPorts.find((p) => p.key === tgtHandle);
+      // Read upstream node's actual output
+      const srcNode = nodes.find((n) => n.id === e.source);
+      const srcOutput = (srcNode?.data as any)?._runOutput;
+      // Extract the value for this specific port handle
+      let previewValue: any = undefined;
+      if (srcOutput && !srcOutput.error) {
+        if (srcHandle && srcOutput[srcHandle] !== undefined) {
+          previewValue = srcOutput[srcHandle];
+        } else {
+          // Whole output object
+          previewValue = srcOutput;
+        }
+      }
+      return {
+        sourceId: e.source,
+        srcHandle,
+        tgtHandle,
+        tgtPortLabel: tgtPort?.label || tgtHandle || '',
+        tgtPortType: tgtPort?.type || '',
+        hasData: previewValue !== undefined,
+        preview: previewValue !== undefined
+          ? (typeof previewValue === 'string' ? previewValue : JSON.stringify(previewValue, null, 2))
+          : null,
+      };
+    });
 
   const handleFieldChange = useCallback(
     (fieldName: string, value: any) => {
@@ -115,7 +140,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
     });
 
     try {
-      const result = await FlowApi.runNode(nodeType, nodeData, upstreamInput);
+      // Build clean config — strip internal state keys (_runStatus, _runOutput, etc.)
+      const cleanConfig: Record<string, any> = {};
+      for (const [k, v] of Object.entries(nodeData)) {
+        if (!k.startsWith('_') && v !== undefined && v !== null && String(v).trim() !== '') {
+          cleanConfig[k] = v;
+        }
+      }
+      const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
       const output = result.output ?? result;
       const newStatus = output?.error ? 'error' : 'success';
       setNodes((nds) =>
@@ -151,6 +183,24 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   };
 
   const outputText = runOutput ? formatOutput(runOutput) : '';
+
+  // Clipboard helper — navigator.clipboard requires HTTPS, fallback for HTTP (Docker IP)
+  const copyToClipboard = useCallback((text: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => message.success('已复制'));
+    } else {
+      // Fallback for non-HTTPS contexts
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      message.success('已复制');
+    }
+  }, []);
 
   // Now safe to do conditional rendering
   if (!selectedNode) {
@@ -300,13 +350,51 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
 
       {/* === Section 3: Input Content === */}
       <Section title="输入内容" defaultOpen={inputPorts.length > 0}>
-        {upstreamNodes.length > 0 ? (
+        {inputPorts.length === 0 ? (
+          <div style={{ fontSize: 11, color: '#999' }}>此节点无输入端口</div>
+        ) : upstreamData.length > 0 ? (
           <div style={{ fontSize: 11, color: '#333' }}>
-            {upstreamNodes.map((u) => (
-              <div key={u.sourceId + u.srcHandle} style={{ marginBottom: 4, padding: '4px 6px', background: '#f5f5f5', borderRadius: 3 }}>
-                <span style={{ color: '#1890ff' }}>{u.sourceId}</span>
-                <span style={{ color: '#999' }}> → </span>
-                <Tag style={{ fontSize: 9, margin: 0 }} color="green">已连接</Tag>
+            {upstreamData.map((u) => (
+              <div key={u.tgtHandle} style={{ marginBottom: 8, padding: '4px 6px', background: '#f5f5f5', borderRadius: 3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: PORT_COLORS[u.tgtPortType] || '#d9d9d9',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span style={{ fontWeight: 600 }}>{u.tgtPortLabel}</span>
+                  {u.hasData ? (
+                    <Tag style={{ fontSize: 9, margin: 0 }} color="green">已接收</Tag>
+                  ) : (
+                    <Tag style={{ fontSize: 9, margin: 0 }} color="orange">未接收</Tag>
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: '#999', marginBottom: 4 }}>
+                  来自 {u.sourceId} → {u.srcHandle || '全部输出'}
+                </div>
+                {u.hasData && u.preview && (
+                  <pre
+                    style={{
+                      margin: 0,
+                      padding: '4px 6px',
+                      background: '#fff',
+                      border: '1px solid #e8e8e8',
+                      borderRadius: 3,
+                      maxHeight: 120,
+                      overflowY: 'auto',
+                      fontSize: 9,
+                      color: '#333',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {u.preview.length > 2000 ? u.preview.slice(0, 2000) + '\n...(内容过长，点击输出内容弹窗查看完整)' : u.preview}
+                  </pre>
+                )}
               </div>
             ))}
           </div>
@@ -364,10 +452,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               <Button
                 size="small"
                 icon={<CopyOutlined />}
-                onClick={() => {
-                  navigator.clipboard.writeText(outputText);
-                  message.success('已复制到剪贴板');
-                }}
+                onClick={() => copyToClipboard(outputText)}
                 disabled={!outputText}
               >
                 复制
@@ -401,7 +486,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         onCancel={() => setOutputModalOpen(false)}
         width={800}
         footer={[
-          <Button key="copy" icon={<CopyOutlined />} onClick={() => { navigator.clipboard.writeText(outputText); message.success('已复制'); }}>
+          <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(outputText)}>
             复制
           </Button>,
           <Button key="close" type="primary" onClick={() => setOutputModalOpen(false)}>

@@ -26,9 +26,8 @@ class ExcelExecutor(BaseNodeExecutor):
         row_filter = config.get("rowFilter")  # list of row numbers (1-based strings)
         column_filter = config.get("columnFilter")  # list of column names
 
-        # Validate content format
+        # Validate content format — reject JSON input for Excel
         if file_type == "json" or (not local_path and file_content and not file_content.startswith("PK")):
-            # If content is JSON (not Excel binary), reject it
             try:
                 json.loads(file_content[:500] if file_content else "{}")
                 return {"error": "Input content is JSON format, not Excel. Use the JSON node instead."}
@@ -45,7 +44,10 @@ class ExcelExecutor(BaseNodeExecutor):
             elif file_content:
                 # Try to load from content bytes (for xlsx binary)
                 try:
-                    wb = openpyxl.load_workbook(io.BytesIO(file_content.encode('latin-1') if isinstance(file_content, str) else file_content), data_only=True)
+                    wb = openpyxl.load_workbook(
+                        io.BytesIO(file_content.encode('latin-1') if isinstance(file_content, str) else file_content),
+                        data_only=True,
+                    )
                 except Exception:
                     # Try CSV parsing
                     return self._parse_csv(file_content, row_filter, column_filter)
@@ -60,8 +62,9 @@ class ExcelExecutor(BaseNodeExecutor):
             else:
                 ws = wb.active
 
-            # Extract all data
-            columns = [cell.value for cell in ws[1]]
+            # Extract all data — replace None column headers with empty string
+            raw_columns = [cell.value for cell in ws[1]]
+            columns = [str(c) if c is not None else f"Col{i+1}" for i, c in enumerate(raw_columns)]
             rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
                 rows.append(dict(zip(columns, row)))
@@ -71,11 +74,11 @@ class ExcelExecutor(BaseNodeExecutor):
                 row_indices = [int(r) - 1 for r in row_filter if r.isdigit() and int(r) <= len(rows)]
                 rows = [rows[i] for i in row_indices if 0 <= i < len(rows)]
 
-            # Apply column filter
+            # Apply column filter — use set for safe membership test
             if column_filter and len(column_filter) > 0:
-                filtered_columns = [c for c in columns if c in column_filter]
-                rows = [{k: v for k, v in row.items() if k in column_filter} for row in rows]
-                columns = filtered_columns
+                column_set = set(column_filter)
+                columns = [c for c in columns if c in column_set]
+                rows = [{k: v for k, v in row.items() if k in column_set} for row in rows]
 
             return {"columns": columns, "rows": rows, "sheetNames": wb.sheetnames}
         except Exception as e:
@@ -93,7 +96,8 @@ class ExcelExecutor(BaseNodeExecutor):
             rows = [rows[i] for i in row_indices if 0 <= i < len(rows)]
 
         if column_filter and len(column_filter) > 0:
-            columns = [c for c in columns if c in column_filter]
-            rows = [{k: v for k, v in row.items() if k in column_filter} for row in rows]
+            column_set = set(column_filter)
+            columns = [c for c in columns if c in column_set]
+            rows = [{k: v for k, v in row.items() if k in column_set} for row in rows]
 
         return {"columns": columns, "rows": rows}

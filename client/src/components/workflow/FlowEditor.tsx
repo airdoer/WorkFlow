@@ -256,7 +256,7 @@ function FlowEditorInner({
             <MiniMap />
           </ReactFlow>
         </div>
-        <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} edges={edges} />
+        <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} edges={edges} nodes={nodes} />
       </div>
     </div>
   );

@@ -68,18 +68,18 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
 
-  // Collect upstream input data from connected nodes
-  const upstreamInput = useMemo(() => {
+  // Collect upstream input data from connected nodes — computed on demand, not memoized
+  // (getNodes/getEdges are stable refs so useMemo won't recompute when node data changes)
+  const collectUpstreamInput = useCallback(() => {
     const edges = getEdges();
-    const incomingEdges = edges.filter((e) => e.target === id && e.targetHandle);
+    const incoming = edges.filter((e) => e.target === id && e.targetHandle);
     const nodes = getNodes();
     const input: Record<string, any> = {};
-    for (const edge of incomingEdges) {
+    for (const edge of incoming) {
       const srcNode = nodes.find((n) => n.id === edge.source);
       if (!srcNode) continue;
       const srcOutput = (srcNode.data as any)?._runOutput;
       if (!srcOutput || srcOutput.error) continue;
-      // Map source handle → target handle
       if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
         input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
       } else {
@@ -129,7 +129,15 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       );
 
       try {
-        const result = await FlowApi.runNode(nodeType, data, upstreamInput);
+        const upstreamInput = collectUpstreamInput();
+        // Build clean config — only include actual field values, not internal state
+        const cleanConfig: Record<string, any> = {};
+        for (const f of fields) {
+          if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
+            cleanConfig[f.key] = data[f.key];
+          }
+        }
+        const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
         const output = result.output ?? result;
         const newStatus = output?.error ? 'error' : 'success';
         setNodes((nds) =>
@@ -160,7 +168,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         );
       }
     },
-    [id, nodeType, data, setNodes, canRun, upstreamInput],
+    [id, nodeType, data, setNodes, canRun, collectUpstreamInput],
   );
 
   const borderColor =
