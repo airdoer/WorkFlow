@@ -2,7 +2,7 @@
 
 ## 一、项目概述
 
-基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 Excel、Lua、JSON、Prompt 四类节点，实现文件获取、解析、AI 处理等操作的流程化编排。
+基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理等操作的流程化编排。
 
 ### 技术选型
 
@@ -10,7 +10,8 @@
 |------|------|------|
 | 前端画布 | `reactflow` ^11.11.0 | 基于 React 的节点/边图编辑器，节点可任意放置，自由连线 |
 | 前端表单 | `antd` + `@ant-design/icons` | 项目已有，节点属性面板 + 节点运行状态图标 |
-| 前端运行时 | 自实现 Runtime | 前端 DAG 调度（预览/调试） |
+| 前端渲染 | `antd Table` + `highlight.js` | Excel 表格渲染 / Lua 语法高亮 / JSON 自定义树 |
+| 前端运行时 | 自实现 Runtime + Event Bus | 前端 DAG 调度 + 节点成功后级联触发下游 |
 | 后端框架 | Flask (Python) + gevent | 项目已有服务端，gevent WSGIServer 运行 |
 | 通信协议 | HTTP REST | REST 负责 CRUD + 节点执行 |
 | P4 集成 | `p4Utils` (项目已有) | 使用 `p4 print -q` 下载文件，不依赖 client root |
@@ -30,11 +31,13 @@ client/
     │
     └── components/
         └── workflow/
-            ├── FlowEditor.tsx               // ReactFlow 初始化 + 选中节点管理
+            ├── FlowEditor.tsx               // ReactFlow 初始化 + 选中节点管理 + 级联执行
             ├── Toolbar.tsx                  // 保存 / 导入 / 导出 / 运行
-            ├── PropertyPanel.tsx             // 右侧属性面板 + 运行按钮 + 结果展示
-            ├── Toolbox.tsx                  // 左侧节点工具箱（点击创建节点）
-            ├── NodeRegistry.tsx             // 注册所有节点类型 → NodeComponent / Icon
+            ├── PropertyPanel.tsx             // 右侧属性面板（五段式）+ 运行按钮 + 弹窗查看
+            ├── Toolbox.tsx                  // 左侧节点工具箱（分类 + 点击创建节点）
+            ├── NodeRegistry.tsx             // 注册所有节点类型 → NodeComponent / Icon / Category
+            ├── PortTypes.ts                 // 端口类型系统 + 兼容性矩阵
+            ├── NodeEventBus.ts              // 节点事件总线（级联执行通信）
             ├── types.ts                     // 全局类型定义
             │
             ├── services/
@@ -46,34 +49,30 @@ client/
             │   ├── ExecutorManager.ts        // 根据 node.type 获取对应执行器
             │   └── Context.ts               // 节点运行上下文（变量、输出缓存）
             │
-            ├── models/
-            │   ├── Node.ts                  // 节点数据模型
-            │   ├── Edge.ts                  // 连边数据模型
-            │   ├── Workflow.ts              // 工作流整体模型
-            │   └── ExecutionResult.ts       // 执行结果模型
-            │
             └── nodes/
-                ├── BaseNode.tsx              // 通用节点基座组件（内联编辑 + 运行按钮 + 结果展示）
+                ├── BaseNode.tsx              // 通用节点基座组件（三段式布局 + 端口 Handle + 必填校验）
+                ├── FlowingEdge.tsx           // 自定义边组件（三种视觉状态）
+                │
+                ├── P4File/
+                │   ├── index.tsx             // P4File 节点（数据源）
+                │   ├── executor.ts           // （仅类型导出）
+                │   └── icon.tsx              // Toolbox 图标
                 │
                 ├── Excel/
                 │   ├── index.tsx             // 基于 BaseNode，定义 fields 配置
-                │   ├── schema.ts             // ExcelConfig 类型
-                │   └── icon.tsx              // Toolbox 图标
+                │   └── ExcelRenderer.tsx      // antd Table 渲染器
                 │
                 ├── Lua/
                 │   ├── index.tsx
-                │   ├── schema.ts
-                │   └── icon.tsx
+                │   └── LuaRenderer.tsx        // highlight.js 语法高亮渲染器
                 │
                 ├── Json/
                 │   ├── index.tsx
-                │   ├── schema.ts
-                │   └── icon.tsx
+                │   └── JsonRenderer.tsx        // 自定义 JSON 树渲染器
                 │
                 └── Prompt/
                     ├── index.tsx
-                    ├── schema.ts
-                    └── icon.tsx
+                    └── executor.ts
 ```
 
 ### 2.2 后端
@@ -86,11 +85,12 @@ server/
 ├── Implement/
 │   └── workflowImpl/
 │       ├── __init__.py
-│       ├── workflowImp.py                   // 工作流 CRUD 实现
+│       ├── workflowImp.py                   // 工作流 CRUD 实现 + DAG 运行时
 │       ├── nodeExecutor.py                  // 节点执行器基类 + 分发
-│       ├── excelExecutor.py                 // Excel 节点执行（p4Utils + openpyxl）
-│       ├── luaExecutor.py                   // Lua 节点执行（p4Utils + 内容读取）
-│       ├── jsonExecutor.py                  // JSON 节点执行（p4Utils + json 解析）
+│       ├── p4FileExecutor.py                // P4File 节点执行（p4Utils 下载 + 文件类型检测）
+│       ├── excelExecutor.py                 // Excel 节点执行（接收上游 fileContent / localPath）
+│       ├── luaExecutor.py                   // Lua 节点执行（接收上游 fileContent）
+│       ├── jsonExecutor.py                  // JSON 节点执行（接收上游 fileContent + jsonPath 过滤）
 │       └── promptExecutor.py                // Prompt 节点执行（调用 LLM API）
 │
 ├── utility/
@@ -125,83 +125,142 @@ class BaseNodeExecutor(ABC):
         pass
 ```
 
-### 3.2 Excel 节点
+### 3.2 P4File 节点（数据源）
+
+**设计原则：** P4File 是独立的数据源节点，负责同步 P4 文件并输出文件内容。下游渲染器节点（Excel / JSON / Lua）不再内置 P4 路径，而是通过端口连线接收上游输出。
+
+**Schema:**
+
+```typescript
+interface P4FileConfig {
+  p4Path: string;       // P4 文件路径，如 //C7/Development/Mainline/Server/config/c7_video.json（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| output | fileContent | 文件内容 | file-content |
+
+**执行流程:**
+
+```
+1. 接收 config.p4Path
+2. 调用 p4Utils.update_file 下载文件到 P4_WORKSPACE_DIRECTORY
+3. 读取文件内容
+4. 检测文件类型（json → "json", .xlsx → "excel", .lua → "lua" 等）
+5. 返回 { filePath, localPath, fileType, fileContent, size }
+```
+
+**输出:** `{ filePath: string, localPath: string, fileType: string, fileContent: string, size: number }`
+
+### 3.3 Excel 节点（渲染器）
 
 **Schema:**
 
 ```typescript
 interface ExcelConfig {
-  p4Path: string;       // P4 文件路径，如 //C7/Development/Mainline/Server/Data/Excel/角色表.xlsx
-  sheet?: string;        // 工作表名（可选，默认第一个）
+  sheet?: string;            // 工作表名（可选，默认第一个）
+  rowFilter?: string[];      // 行筛选（可选，1-based 行号列表）
+  columnFilter?: string[];   // 列筛选（可选，列名列表）
 }
 ```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | fileContent | 文件内容 | file-content |
+| output | tableData | 表格数据 | table-data |
 
 **执行流程:**
 
 ```
-1. 接收 p4Path 配置
-2. 调用后端 API /api/workflow/node/run
-3. 后端: p4Utils.update_file 下载文件到 P4_WORKSPACE_DIRECTORY → openpyxl 解析指定 sheet
-4. 返回解析后的结构化数据
+1. 从 input_data 获取 localPath（优先，用于 xlsx 二进制）或 fileContent
+2. 格式校验：如果输入是 JSON 格式，返回错误提示"请使用 JSON 节点"
+3. localPath 存在 → openpyxl.load_workbook 解析
+4. 仅 fileContent → 尝试 BytesIO 加载，失败则尝试 CSV 解析
+5. 按 sheet / rowFilter / columnFilter 过滤
+6. None 列头替换为 "Col{i+1}"，避免类型比较错误
+7. 返回 { columns, rows, sheetNames }
 ```
 
-**输出:** `{ columns: string[], rows: Record<string, any>[] }`
+**输出:** `{ columns: string[], rows: Record<string, any>[], sheetNames: string[] }`
 
-### 3.3 Lua 节点
-
-**Schema:**
-
-```typescript
-interface LuaConfig {
-  p4Path: string;          // P4 文件路径
-  entryFunction?: string;  // 入口函数名（可选）
-}
-```
-
-**执行流程:**
-
-```
-1. 接收 p4Path 配置
-2. 调用后端 API
-3. 后端: p4Utils.update_file 下载文件 → 读取内容 → 返回源码文本
-4. 如指定 entryFunction，提取该函数内容
-```
-
-**输出:** `{ content: string, functionName?: string, functionContent?: string }`
-
-### 3.4 JSON 节点
+### 3.4 JSON 节点（渲染器）
 
 **Schema:**
 
 ```typescript
 interface JsonConfig {
-  p4Path: string;      // P4 文件路径
   jsonPath?: string;   // JSON Path 过滤（可选，如 $.data.items）
 }
 ```
 
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | fileContent | 文件内容 | file-content |
+| output | jsonData | JSON 数据 | json-data |
+
 **执行流程:**
 
 ```
-1. 接收 p4Path 配置
-2. 调用后端 API
-3. 后端: p4Utils.update_file 下载文件 → json.loads 解析 → 按 jsonPath 过滤 → 返回
+1. 从 input_data 获取 fileContent
+2. json.loads 解析
+3. 如指定 jsonPath → 按 dot notation 过滤
+4. 如未指定 jsonPath → 返回完整解析数据
 ```
 
 **输出:** `{ data: any, path?: string }`
 
-### 3.5 Prompt 节点
+### 3.5 Lua 节点（渲染器）
+
+**Schema:**
+
+```typescript
+interface LuaConfig {
+  entryFunction?: string;  // 入口函数名（可选）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | fileContent | 文件内容 | file-content |
+| output | textOutput | 文本输出 | text |
+
+**执行流程:**
+
+```
+1. 从 input_data 获取 fileContent
+2. 返回内容
+3. 如指定 entryFunction → 提取该函数体
+```
+
+**输出:** `{ content: string, functionName?: string, functionContent?: string }`
+
+### 3.6 Prompt 节点
 
 **Schema:**
 
 ```typescript
 interface PromptConfig {
-  prompt: string;           // 提示词内容，支持 {{nodeId.outputKey}} 变量插值
+  prompt: string;           // 提示词内容，支持 {{nodeId.outputKey}} 变量插值（必填）
   temperature?: number;     // 温度，默认 0.7
   model?: string;           // 模型名称，默认由后端配置
-  maxTokens?: number;       // 最大 token 数
 }
 ```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | context | 上下文 | any |
+| output | result | 结果 | text |
 
 **执行流程:**
 
@@ -216,9 +275,93 @@ interface PromptConfig {
 
 ---
 
-## 四、React Flow 集成方案
+## 四、端口类型系统
 
-### 4.1 npm 包
+### 4.1 端口定义
+
+```typescript
+// PortTypes.ts
+interface PortDefinition {
+  key: string;        // 端口唯一标识，如 'fileContent'
+  label: string;      // 显示名称，如 '文件内容'
+  type: string;       // 端口类型，如 'file-content'
+  direction: 'input' | 'output';
+}
+```
+
+### 4.2 端口兼容性矩阵
+
+```typescript
+const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
+  'file-content': ['file-content', 'any'],     // file-content 可连接到自身或 any
+  'table-data':   ['table-data', 'any'],
+  'json-data':    ['json-data', 'any'],
+  'text':         ['text', 'any'],
+  'any':          ['file-content', 'table-data', 'json-data', 'text', 'any'],
+};
+```
+
+### 4.3 各节点端口定义
+
+| 节点 | Input Ports | Output Ports |
+|------|-------------|-------------|
+| P4File | — | fileContent (file-content) |
+| Excel | fileContent (file-content) | tableData (table-data) |
+| JSON | fileContent (file-content) | jsonData (json-data) |
+| Lua | fileContent (file-content) | textOutput (text) |
+| Prompt | context (any) | result (text) |
+
+### 4.4 端口颜色
+
+| type | 颜色 | Hex |
+|------|------|-----|
+| file-content | 蓝色 | #1890ff |
+| file-path | 紫色 | #722ed1 |
+| any | 灰色 | #8c8c8c |
+| text | 橙色 | #fa8c16 |
+| table-data | 绿色 | #52c41a |
+| json-data | 青色 | #13c2c2 |
+
+---
+
+## 五、边（Edge）视觉状态
+
+### 5.1 FlowingEdge 自定义边
+
+| 状态 | 视觉效果 | 触发条件 |
+|------|----------|----------|
+| **mismatched** | 红色虚线 + ✗ 标记 | 端口类型不兼容 |
+| **matched_idle** | 灰色实线 | 端口类型匹配，上游未运行 |
+| **activated** | 绿色实线 + 流动圆点动画 + ✓ 标记 | 上游节点执行成功，数据已流过 |
+
+### 5.2 边数据结构
+
+```typescript
+interface EdgeData {
+  sourcePortType: string;     // 源端口类型
+  targetPortType: string;     // 目标端口类型
+  matchStatus: 'matched' | 'mismatched' | 'unknown';
+  activated: boolean;         // 上游节点执行成功后设为 true
+}
+```
+
+### 5.3 状态流转
+
+```
+连接时 → onConnect 计算 matchStatus → matched/mismatched
+         ↓
+上游节点执行成功 → NodeEventBus.emit → FlowEditor 标记 activated: true
+         ↓
+边缘视觉变化 → matched_idle (灰) → activated (绿+流动+✓)
+         ↓
+级联触发 → 自动运行下游节点
+```
+
+---
+
+## 六、React Flow 集成方案
+
+### 6.1 npm 包
 
 ```json
 {
@@ -228,188 +371,63 @@ interface PromptConfig {
 }
 ```
 
-React Flow v11 为单一包，内置以下能力（无需额外安装）：
+### 6.2 BaseNode 三段式布局
 
-| 能力 | 对应组件 | 说明 |
-|------|----------|------|
-| 画布背景 | `<Background />` | 网格/点状背景 |
-| 小地图 | `<MiniMap />` | 缩略导航 |
-| 控制面板 | `<Controls />` | 缩放/居中按钮 |
-| 键盘删除 | `deleteKeyCode` | 支持 Delete/Backspace 删除节点 |
-| 导入/导出 | `instance.toObject()` / `initialState` | JSON 序列化/反序列化 |
-
-**.npmrc 配置:**
+节点采用固定的三段式布局，不支持折叠：
 
 ```
-legacy-peer-deps=true
+┌─────────────────────────────────────┐
+│ Section 1: Header                    │
+│  [icon] [label]          [run ▶]     │
+├─────────────────────────────────────┤
+│ Section 2: Port Row                  │
+│  ● 文件内容          文件内容 ●       │  ← input 左 / output 右
+│  (Handle在端口点)    (Handle在端口点) │
+├─────────────────────────────────────┤
+│ Section 3: Content                   │
+│  [字段编辑]                           │
+│  [运行结果/渲染器]                     │
+└─────────────────────────────────────┘
 ```
 
-### 4.2 Editor 初始化
+**关键设计：**
 
-```tsx
-// FlowEditor.tsx
-import ReactFlow, {
-  Node, Edge,
-  ReactFlowProvider,
-  useNodesState, useEdgesState,
-  Background, Controls, MiniMap,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+- **Handle 定位**：Handle 绝对定位于每个端口行的左侧/右侧边缘，与端口彩色圆点重合
+- **端口间距**：左右列 padding 22px，label 与 Handle 间 margin 4px，确保 Handle 不与文字重叠
+- **必填字段**：`NodeField.required: boolean` — 必填且为空时红色边框 + 红色 `*` 标记，运行按钮禁用
+- **不可折叠**：始终显示所有字段和结果，无双击编辑/折叠行为
 
-function FlowEditorInner({ initialData }: { initialData?: WorkflowJSON }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+### 6.3 NodeField 接口
 
-  // 通过 selectedNodeId + useMemo 从 nodes 数组实时获取最新节点数据
-  // 避免 onNodeClick 快照导致的数据过期问题
-  const selectedNode = useMemo(
-    () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
-    [selectedNodeId, nodes],
-  );
-
-  const onNodeClick = useCallback((_, node) => setSelectedNodeId(node.id), []);
-
-  const onNodesDelete = useCallback(
-    (deleted: Node[]) => {
-      if (deleted.some((n) => n.id === selectedNodeId)) {
-        setSelectedNodeId(null);
-      }
-    },
-    [selectedNodeId],
-  );
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <Toolbar nodes={nodes} edges={edges} setNodes={setNodes} setEdges={setEdges} />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <Toolbox nodes={nodes} setNodes={setNodes} />
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={() => setSelectedNodeId(null)}
-            onNodesDelete={onNodesDelete}
-            nodeTypes={nodeTypes}
-            deleteKeyCode={['Delete', 'Backspace']}
-            fitView
-          >
-            <Background />
-            <Controls />
-            <MiniMap />
-          </ReactFlow>
-        </div>
-        <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} />
-      </div>
-    </div>
-  );
-}
-
-function FlowEditor({ initialData }: { initialData?: WorkflowJSON }) {
-  return (
-    <ReactFlowProvider>
-      <FlowEditorInner initialData={initialData} />
-    </ReactFlowProvider>
-  );
-}
-```
-
-**关键设计决策:**
-
-- **选中节点用 ID 而非快照**：`onNodeClick` 只记录 `selectedNodeId`，通过 `useMemo` 从 `nodes` 数组实时查找最新节点数据，解决了编辑属性后数据不同步的问题
-- **Delete 键支持**：通过 `deleteKeyCode` 和 `onNodesDelete` 回调实现，删除后自动清除选中状态
-
-### 4.3 BaseNode 通用节点组件
-
-所有节点共享 `BaseNode` 组件，统一提供内联编辑、运行按钮和结果展示：
-
-```tsx
-// nodes/BaseNode.tsx
-interface BaseNodeProps {
-  data: Record<string, unknown>;
-  id: string;
-  selected: boolean;
-  icon: string;          // 如 "📊"
-  label: string;         // 如 "Excel"
-  nodeType: string;      // 如 "excel"，用于调用后端 API
-  fields: NodeField[];   // 节点属性字段定义
-}
-
+```typescript
 interface NodeField {
   key: string;
   label: string;
   placeholder?: string;
-  type?: 'text' | 'textarea' | 'number';
-  rows?: number;    // textarea 行数
-  step?: number;    // number 步长
+  type?: 'text' | 'textarea' | 'number' | 'select' | 'multiselect';
+  rows?: number;          // textarea 行数
+  step?: number;          // number 步长
+  options?: { label: string; value: string }[];  // select/multiselect 选项
+  required?: boolean;     // 是否必填（必填且为空时禁用运行按钮）
 }
 ```
 
-**BaseNode 功能:**
+### 6.4 各节点 fields 定义
 
-| 功能 | 交互方式 | 说明 |
-|------|----------|------|
-| 字段摘要 | 默认折叠 | 显示各字段值，末尾提示"双击编辑" |
-| 内联编辑 | 双击节点 | 展开编辑表单，点击"收起"关闭 |
-| 运行按钮 | 点击右上角按钮 | 调用 `FlowApi.runNode` 执行节点 |
-| 运行状态 | 按钮图标 + 边框颜色 | idle=灰 / running=蓝旋转 / success=绿 / error=红 |
-| 结果展示 | 节点底部面板 | 成功=绿色背景 / 失败=红色背景，maxHeight 120px + 滚动 |
+| 节点 | icon | category | fields |
+|------|------|----------|--------|
+| P4File | 📁 | 数据源 | p4Path(text, **required**) |
+| Excel | 📊 | 渲染器 | sheet(text), rowFilter(multiselect), columnFilter(multiselect) |
+| JSON | 📋 | 渲染器 | jsonPath(text) |
+| Lua | 🌙 | 渲染器 | entryFunction(text) |
+| Prompt | 🤖 | AI | prompt(textarea, **required**), model(text), temperature(number,0.1) |
 
-**运行状态图标（@ant-design/icons）:**
-
-| 状态 | 图标 | 颜色 | 边框 |
-|------|------|------|------|
-| idle | `PlayCircleOutlined` | 灰 `#8c8c8c` | 默认 |
-| running | `LoadingOutlined` (spin) | 蓝 `#1890ff` | 蓝 |
-| success | `CheckCircleOutlined` | 绿 `#52c41a` | 绿 |
-| error | `CloseCircleOutlined` | 红 `#ff4d4f` | 红 |
-
-**运行数据存储:** 运行状态和结果存储在 `node.data` 的内部字段中，实现节点间数据隔离：
-
-```typescript
-node.data._runStatus: 'idle' | 'running' | 'success' | 'error'
-node.data._runOutput: any  // 运行结果或错误信息
-```
-
-### 4.4 具体节点实现
-
-每种节点只需定义 `fields` 配置数组，然后调用 `BaseNode`：
-
-```tsx
-// nodes/Excel/index.tsx
-const EXCEL_FIELDS: NodeField[] = [
-  { key: 'p4Path', label: 'P4 路径', placeholder: '//C7/.../file.xlsx' },
-  { key: 'sheet', label: '工作表', placeholder: '工作表名（可选）' },
-];
-
-function ExcelNode({ data, id, selected }: NodeProps) {
-  return (
-    <BaseNode
-      data={data} id={id} selected={!!selected}
-      icon="📊" label="Excel" nodeType="excel" fields={EXCEL_FIELDS}
-    />
-  );
-}
-```
-
-各节点 fields 定义:
-
-| 节点 | icon | fields |
-|------|------|--------|
-| Excel | 📊 | p4Path(text), sheet(text) |
-| Lua | 🌙 | p4Path(text), entryFunction(text) |
-| JSON | 📋 | p4Path(text), jsonPath(text) |
-| Prompt | 🤖 | prompt(textarea,3), model(text), temperature(number,0.1) |
-
-### 4.5 节点类型注册
+### 6.5 节点类型注册
 
 ```tsx
 // NodeRegistry.tsx
 export const nodeTypes: NodeTypes = {
+  p4file: P4FileNode,
   excel: ExcelNode,
   lua: LuaNode,
   json: JsonNode,
@@ -417,117 +435,274 @@ export const nodeTypes: NodeTypes = {
 };
 
 export const nodeRegistryList: NodeRegistryEntry[] = [
-  { type: 'excel', label: 'Excel', icon: <ExcelIcon /> },
-  { type: 'lua', label: 'Lua', icon: <LuaIcon /> },
-  { type: 'json', label: 'JSON', icon: <JsonIcon /> },
-  { type: 'prompt', label: 'Prompt', icon: <PromptIcon /> },
+  { type: 'p4file', label: 'P4 文件', icon: <P4FileIcon />, category: '数据源' },
+  { type: 'excel', label: 'Excel', icon: <ExcelIcon />, category: '渲染器' },
+  { type: 'json', label: 'JSON', icon: <JsonIcon />, category: '渲染器' },
+  { type: 'lua', label: 'Lua', icon: <LuaIcon />, category: '渲染器' },
+  { type: 'prompt', label: 'Prompt', icon: <PromptIcon />, category: 'AI' },
 ];
 ```
 
-### 4.6 数据流序列化
+### 6.6 运行数据存储
+
+运行状态和结果存储在 `node.data` 的内部字段中：
 
 ```typescript
-// WorkflowJSON 结构（React Flow 原生格式）
-interface WorkflowJSON {
-  nodes: Node[];    // React Flow Node 类型
-  edges: Edge[];    // React Flow Edge 类型
-  viewport?: { x: number; y: number; zoom: number };
-}
+node.data._runStatus: 'idle' | 'running' | 'success' | 'error'
+node.data._runOutput: any  // 运行结果或错误信息
+```
 
-// React Flow Node 结构
-interface Node {
-  id: string;
-  type: string;       // 'excel' | 'lua' | 'json' | 'prompt'
-  position: { x: number; y: number };
-  data: Record<string, unknown>;  // 节点配置数据 + 运行状态字段（_runStatus, _runOutput）
-}
+**运行按钮禁用逻辑：**
 
-// React Flow Edge 结构
-interface Edge {
-  id: string;
-  source: string;       // 源节点 ID
-  target: string;       // 目标节点 ID
-  sourceHandle?: string;
-  targetHandle?: string;
+```typescript
+const canRun = fields
+  .filter((f) => f.required)
+  .every((f) => data[f.key] !== undefined && String(data[f.key]).trim() !== '');
+```
+
+---
+
+## 七、级联执行机制
+
+### 7.1 NodeEventBus
+
+节点间通过事件总线通信，实现上游成功后自动触发下游：
+
+```typescript
+// NodeEventBus.ts
+export const NodeEventBus = {
+  subscribe(fn: (nodeId: string, output: any) => void): () => void;
+  emit(nodeId: string, output: any): void;
+};
+```
+
+### 7.2 级联流程
+
+```
+1. 用户点击节点运行按钮 → BaseNode.handleRun()
+2. 调用 FlowApi.runNode(nodeType, cleanConfig, upstreamInput)
+3. 运行成功 → NodeEventBus.emit(id, output)
+4. FlowEditor 订阅 → handleNodeSuccess(succeededNodeId, output)
+   a. 标记出边 activated: true
+   b. 查找下游节点 → 收集输入 → 自动运行
+   c. 下游成功 → 继续 emit → 继续级联
+```
+
+### 7.3 上游输入收集
+
+BaseNode 和 PropertyPanel 在运行时通过 `getNodes()` + `getEdges()` 读取当前节点状态：
+
+```typescript
+const collectUpstreamInput = () => {
+  const edges = getEdges();
+  const incoming = edges.filter((e) => e.target === id && e.targetHandle);
+  const nodes = getNodes();
+  const input: Record<string, any> = {};
+  for (const edge of incoming) {
+    const srcNode = nodes.find((n) => n.id === edge.source);
+    const srcOutput = srcNode?.data?._runOutput;
+    if (!srcOutput || srcOutput.error) continue;
+    if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
+      input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
+    } else {
+      Object.assign(input, srcOutput);
+    }
+  }
+  return input;
+};
+```
+
+### 7.4 Config 清理
+
+发送到后端的 config 只包含字段值，过滤掉内部状态键（`_runStatus`、`_runOutput` 等）：
+
+```typescript
+const cleanConfig: Record<string, any> = {};
+for (const [k, v] of Object.entries(nodeData)) {
+  if (!k.startsWith('_') && v !== undefined) {
+    cleanConfig[k] = v;
+  }
 }
 ```
 
 ---
 
-## 五、PropertyPanel 设计
+## 八、PropertyPanel 五段式设计
 
-### 5.1 数据源
+### 8.1 面板结构
 
-PropertyPanel **直接从 `selectedNode.data` 读取运行状态和结果**，不使用独立的本地 state：
+| Section | 标题 | 内容 |
+|---------|------|------|
+| **1. 端口信息** | 端口信息 | Input/Output 端口列表 + 类型 Tag + 连接匹配状态 |
+| **2. 参数** | 参数 | 节点类型对应的字段输入框 |
+| **3. 输入内容** | 输入内容 | 按端口显示上游数据：端口标签 + 数据状态 + 内容预览 + 弹窗查看 |
+| **4. 运行信息** | 运行信息 | 运行状态（idle/running/success/error）+ 错误提示 |
+| **5. 输出内容** | 输出内容 | 格式化输出 + 弹窗查看 |
+
+### 8.2 Section 组件
+
+每个 Section 支持折叠/展开，标题行显示 ▼/▶ 切换图标：
 
 ```tsx
-const runStatus = (nodeData._runStatus as RunStatus) || 'idle';
-const runOutput = nodeData._runOutput as any;
+function Section({ title, children, defaultOpen = true }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  // ... 渲染标题 + 折叠内容
+}
 ```
 
-**设计决策:** 运行结果存储在节点 `data` 上而非 PropertyPanel 组件 state 中，原因：
-1. **节点间隔离** — 每个节点的 `_runStatus` / `_runOutput` 独立存储在自己的 `node.data` 中，切换选中节点时自然显示对应节点的结果
-2. **节点与面板同步** — 无论从节点上点击运行还是从面板点击运行，结果写入同一个 `node.data`，两边始终一致
-3. **数据持久化** — 保存工作流时运行结果随节点数据一起持久化
+### 8.3 输入内容详情
 
-### 5.2 功能清单
+每个输入端口显示：
 
-| 功能 | 说明 |
-|------|------|
-| 属性编辑 | 根据节点类型显示对应的输入字段，修改后通过 `setNodes` 更新 |
-| 运行按钮 | 点击调用 `FlowApi.runNode`，将 `_runStatus` / `_runOutput` 写入节点 data |
-| 结果展示 | 从 `node.data._runOutput` 读取，成功=绿色面板，失败=红色面板 |
-| 高度限制 | 结果面板 maxHeight: 400px，超出用滚动条 |
+```
+● 文件内容 [已接收] [弹窗查看]
+来自 p4file_xxx → fileContent
+┌──────────────────────┐
+│ {                    │  ← 预览（maxHeight: 80px）
+│   "key": "value",    │
+│   ...                │
+└──────────────────────┘
+```
+
+- **Tag 状态**：`已接收`（绿色，有数据）/ `未接收`（橙色，上游未运行）
+- **内容预览**：`<pre>` 块，maxHeight 80px，可滚动
+- **弹窗查看**：点击按钮打开 Modal，800px 宽，70vh 高度，支持复制
+
+### 8.4 弹窗查看
+
+统一的 Modal 组件，用于输入内容和输出内容的完整查看：
+
+```tsx
+<Modal
+  title={modalTitle}          // "输入内容 - 文件内容" 或 "输出内容"
+  open={inputModalOpen || outputModalOpen}
+  width={800}
+  footer={[
+    <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(modalContent)}>复制</Button>,
+    <Button type="primary" onClick={close}>关闭</Button>,
+  ]}
+>
+  <pre>{modalContent}</pre>   // maxHeight: 70vh, 可滚动，可搜索
+</Modal>
+```
+
+### 8.5 剪贴板兼容
+
+`navigator.clipboard.writeText` 需要 HTTPS（Docker HTTP 访问不支持），使用 fallback：
+
+```typescript
+const copyToClipboard = (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text);
+  } else {
+    // Fallback: textarea + execCommand
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+};
+```
 
 ---
 
-## 六、API 设计
+## 九、前端渲染器
 
-### 6.1 前端 API 封装
+### 9.1 JSON 渲染器（自定义树）
+
+- 递归可折叠 JSON 树
+- Object → `Object{keyCount}` 展开显示子键
+- Array → `Array[length]` 展开显示元素
+- 字符串值、数值、布尔值、null 各有颜色区分
+
+### 9.2 Excel 渲染器（antd Table）
+
+- 使用 `antd` 的 `Table` 组件
+- 支持列筛选和行筛选
+- 从上游 `runOutput.columns` / `runOutput.rows` 获取数据
+
+### 9.3 Lua 渲染器（highlight.js）
+
+- 使用 `highlight.js` 进行 Lua 语法高亮
+- 暗色背景主题
+- 支持入口函数提取显示
+
+### 9.4 延迟加载
+
+渲染器使用 `React.lazy` + `Suspense` 按需加载：
+
+```tsx
+const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
+const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
+const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
+```
+
+---
+
+## 十、API 设计
+
+### 10.1 前端 API 封装
 
 ```typescript
 // services/FlowApi.ts
 const API_BASE = (typeof window !== 'undefined' && (window as any).FLASK_BACKEND_URL) || '';
 
-// 开发环境：API_BASE 为空，请求走 UMI proxy（config/proxy.ts → localhost:16666）
-// 生产环境：API_BASE 由 env-config.js 注入 window.FLASK_BACKEND_URL
+// 开发环境（localhost）：API_BASE 为空，请求走 UMI proxy
+// Docker 开发（172.28.x.x）：public/env-config.js 自动检测 hostname，注入 http://{host}:16666
+// 生产环境：deploy/dist/env-config.js 注入 window.FLASK_BACKEND_URL
 ```
 
-**UMI Proxy 配置:**
+**环境自动检测（public/env-config.js）：**
+
+```javascript
+(function() {
+  if (window.FLASK_BACKEND_URL) return;
+  var hostname = window.location.hostname;
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    window.FLASK_BACKEND_URL = 'http://' + hostname + ':16666';
+  }
+})();
+```
+
+### 10.2 UMI Proxy 配置
 
 ```typescript
 // config/proxy.ts
 export default {
   dev: {
     '/api/workflow/': {
-      target: 'http://localhost:16666',
+      target: process.env.FLASK_BACKEND_URL || 'http://localhost:16666',
       changeOrigin: true,
     },
   },
 };
 ```
 
-### 6.2 REST API
+### 10.3 REST API
 
 | Method | Path | 说明 | 请求体 | 响应 |
 |--------|------|------|--------|------|
-| POST | `/api/workflow/save` | 保存工作流 | `{ name, json: WorkflowJSON }` | `{ id, name }` |
-| GET | `/api/workflow/<id>` | 获取工作流 | - | `{ id, name, json }` |
-| GET | `/api/workflow/list` | 工作流列表 | - | `{ list: [{ id, name, updatedAt }] }` |
+| POST | `/api/workflow/save` | 保存工作流 | `{ name, json, id?, author?, description? }` | `{ id, name }` |
+| GET | `/api/workflow/<id>` | 获取工作流 | - | `{ id, name, json, ... }` |
+| GET | `/api/workflow/list` | 工作流列表 | - | `{ list: [...] }` |
 | DELETE | `/api/workflow/<id>` | 删除工作流 | - | `{ success }` |
 | POST | `/api/workflow/node/run` | 运行单个节点 | `{ type, config, input }` | `{ output }` |
 | POST | `/api/workflow/run` | 运行整个工作流 | `{ workflowId }` | `{ taskId }` |
-| GET | `/api/workflow/run/<taskId>/status` | 查询运行状态 | - | `{ status, nodes: { [nodeId]: status } }` |
+| GET | `/api/workflow/run/<taskId>/status` | 查询运行状态 | - | `{ status, nodes }` |
 | POST | `/api/workflow/run/<taskId>/cancel` | 取消运行 | - | `{ success }` |
+| GET | `/api/workflow/executors` | 列出注册的执行器 | - | `{ executors: [{ type, class }] }` |
 
 ---
 
-## 七、后端执行器设计
+## 十一、后端执行器设计
 
-### 7.1 执行器基类
+### 11.1 执行器基类
 
 ```python
-# Implement/workflowImpl/nodeExecutor.py
 class BaseNodeExecutor(ABC):
     @property
     @abstractmethod
@@ -539,15 +714,11 @@ class BaseNodeExecutor(ABC):
         pass
 
 class ExecutorManager:
-    _executors: dict[str, BaseNodeExecutor] = {}
+    _executors: dict = {}
 
     @classmethod
-    def register(cls, executor: BaseNodeExecutor):
+    def register(cls, executor):
         cls._executors[executor.type] = executor
-
-    @classmethod
-    def get(cls, node_type: str) -> BaseNodeExecutor:
-        return cls._executors.get(node_type)
 
     @classmethod
     async def run_node(cls, node_type: str, config: dict, input_data: dict) -> dict:
@@ -557,263 +728,194 @@ class ExecutorManager:
         return await executor.execute(config, input_data)
 ```
 
-### 7.2 P4 文件同步（统一实现）
-
-所有 P4 节点执行器（Excel / Lua / JSON）使用相同的 `_p4_sync` 方法，基于项目已有的 `p4Utils.update_file`：
+### 11.2 P4File 执行器
 
 ```python
-def _p4_sync(self, p4_path: str) -> str:
-    """
-    使用 p4Utils.download_file 将文件同步到本地 P4_WORKSPACE_DIRECTORY。
-    不依赖 p4 client root，直接用 p4 print 下载到指定路径。
-    """
-    p4_path = p4Utils.normalize_p4_path(p4_path)
-    relative_path = p4_path.lstrip("/").replace("//", "")
-    local_path = os.path.join(config.P4_WORKSPACE_DIRECTORY, relative_path)
+class P4FileExecutor(BaseNodeExecutor):
+    type = "p4file"
 
-    success = p4Utils.update_file(p4_path, local_path, force=True)
-    if not success:
-        raise RuntimeError(f"Failed to sync P4 file: {p4_path}")
-
-    return local_path
+    async def execute(self, config: dict, input_data: dict) -> dict:
+        p4_path = config.get("p4Path", "")
+        local_path = self._p4_sync(p4_path)
+        content = open(local_path, 'r', encoding='utf-8', errors='replace').read()
+        file_type = self._detect_file_type(p4_path, content)
+        return {
+            "filePath": p4_path,
+            "localPath": local_path,
+            "fileType": file_type,
+            "fileContent": content,
+            "size": os.path.getsize(local_path),
+        }
 ```
 
-**设计决策:** 不使用 `p4 sync` + `p4 info` 获取 client root 的方式，原因：
-1. Docker 容器内 `p4 info` 可能返回宿主机的 client root（如 `C:\p4ws\...`）而非容器内路径
-2. `p4 print -q` 直接下载文件内容，不依赖 client root，与项目中其他路由（configTool、hotfixTool）保持一致
-3. `p4Utils.update_file` 自动创建目录、支持版本号、支持 force 强制重新下载
+### 11.3 Excel 执行器
 
-### 7.3 Excel 执行器
+关键设计：接收上游 `input_data` 而非内置 P4 路径；格式校验拒绝 JSON 输入；None 列头安全处理。
 
 ```python
 class ExcelExecutor(BaseNodeExecutor):
     type = "excel"
 
     async def execute(self, config: dict, input_data: dict) -> dict:
-        p4_path = config.get("p4Path", "")
-        sheet_name = config.get("sheet")
+        local_path = input_data.get("localPath", "")
+        file_content = input_data.get("fileContent", "")
+        file_type = input_data.get("fileType", "")
 
-        local_path = self._p4_sync(p4_path)
-        wb = openpyxl.load_workbook(local_path, data_only=True)
-        ws = wb[sheet_name] if sheet_name else wb.active
+        # Format validation: reject JSON input
+        if file_type == "json" or (not local_path and file_content and not file_content.startswith("PK")):
+            try:
+                json.loads(file_content[:500])
+                return {"error": "Input content is JSON format, not Excel. Use the JSON node instead."}
+            except (json.JSONDecodeError, ValueError):
+                pass
 
-        columns = [cell.value for cell in ws[1]]
-        rows = []
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            rows.append(dict(zip(columns, row)))
-
-        return {"columns": columns, "rows": rows}
+        # Parse: localPath (xlsx binary) > fileContent (bytes/CSV)
+        # Column safety: None headers → "Col{i+1}", filter uses set() for membership test
+        ...
 ```
 
-### 7.4 JSON 执行器
+### 11.4 JSON 执行器
 
 ```python
 class JsonExecutor(BaseNodeExecutor):
     type = "json"
 
     async def execute(self, config: dict, input_data: dict) -> dict:
-        p4_path = config.get("p4Path", "")
-        json_path = config.get("jsonPath")
+        file_content = input_data.get("fileContent", "")
+        json_path = config.get("jsonPath", "")
 
-        local_path = self._p4_sync(p4_path)
-        with open(local_path, 'r', encoding='utf-8', errors='replace') as f:
-            data = json.load(f)
+        if not file_content:
+            return {"error": "No input content. Connect an upstream node or provide content."}
 
+        data = json.loads(file_content)
         if json_path:
             data = self._query_json_path(data, json_path)
 
-        return {"data": data, "path": json_path}
-
-    def _query_json_path(self, data, path: str):
-        parts = path.lstrip("$").lstrip(".").split(".")
-        current = data
-        for part in parts:
-            if isinstance(current, dict):
-                current = current.get(part)
-            elif isinstance(current, list) and part.isdigit():
-                current = current[int(part)]
-            else:
-                return None
-            if current is None:
-                return None
-        return current
+        return {"data": data, "path": json_path or None}
 ```
 
-### 7.5 Lua 执行器
+### 11.5 Lua 执行器
 
 ```python
 class LuaExecutor(BaseNodeExecutor):
     type = "lua"
 
     async def execute(self, config: dict, input_data: dict) -> dict:
-        p4_path = config.get("p4Path", "")
-        entry_function = config.get("entryFunction")
+        file_content = input_data.get("fileContent", "")
+        entry_function = config.get("entryFunction", "")
 
-        local_path = self._p4_sync(p4_path)
-        with open(local_path, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read()
+        if not file_content:
+            return {"error": "No input content. Connect an upstream node or provide content."}
 
-        result = {"content": content}
+        result = {"content": file_content, "filePath": input_data.get("filePath", "")}
         if entry_function:
-            pattern = rf'(?:function|local\s+function)\s+{re.escape(entry_function)}\s*\('
-            match = re.search(pattern, content)
-            if match:
-                start = match.start()
-                func_content = self._extract_function(content, start)
-                result["functionName"] = entry_function
-                result["functionContent"] = func_content
-
+            # Extract function body by regex
+            ...
         return result
 ```
 
 ---
 
-## 八、运行时设计（Runtime）
+## 十二、运行时设计（Runtime）
 
-### 8.1 整体流程
+### 12.1 后端 WorkflowRuntime
 
-```
-用户点击"运行"
-    │
-    ▼
-Toolbar → Runtime.run(workflowJSON)
-    │
-    ▼
-GraphParser.parse(nodes, edges)
-    │
-    ▼
-拓扑排序 → 得到执行顺序 [nodeA, nodeB, nodeC, ...]
-    │
-    ▼
-ExecutorManager.getExecutor(node.type)
-    │
-    ▼
-按顺序执行每个节点:
-  - Excel → 调用 POST /api/workflow/node/run { type: "excel", config, input }
-  - Lua   → 调用 POST /api/workflow/node/run { type: "lua", config, input }
-  - Json  → 调用 POST /api/workflow/node/run { type: "json", config, input }
-  - Prompt→ 调用 POST /api/workflow/node/run { type: "prompt", config, input }
-    │
-    ▼
-Context 缓存每个节点输出
-    │
-    ▼
-下游节点从 Context 获取输入
-    │
-    ▼
-全部完成 → 返回最终结果
-```
-
-### 8.2 GraphParser（DAG 解析）
-
-```typescript
-class GraphParser {
-  static parse(nodes: Node[], edges: Edge[]): string[] {
-    // 1. 构建 DAG（邻接表）— 从 edges 中提取 source → target 关系
-    // 2. 检测环路（有环则报错）
-    // 3. 拓扑排序（Kahn 算法）
-    // 4. 返回有序节点 ID 列表
-  }
-}
-```
-
-### 8.3 Runtime
-
-```typescript
-class Runtime {
-  async run(nodes: Node[], edges: Edge[]): Promise<ExecutionResult> {
-    const order = GraphParser.parse(nodes, edges);
-    const context = new Context();
-
-    for (const nodeId of order) {
-      const node = nodes.find(n => n.id === nodeId);
-      const inputEdges = edges.filter(e => e.target === nodeId);
-
-      const input = {};
-      for (const edge of inputEdges) {
-        const upstreamOutput = context.getOutput(edge.source);
-        Object.assign(input, upstreamOutput);
-      }
-
-      const output = await FlowApi.runNode(node.type, node.data, input);
-      context.setOutput(nodeId, output);
-    }
-
-    return context.getAllOutputs();
-  }
-}
+```python
+class WorkflowRuntime:
+    @classmethod
+    async def run(cls, workflow_json, task_id):
+        # 1. DAG 构建 + 拓扑排序
+        # 2. 按序执行每个节点
+        # 3. 端口映射：edge.sourceHandle → edge.targetHandle
+        # 4. 上下文传递：上游输出 → 下游 input_data
+        for nid in order:
+            node = node_map[nid]
+            input_edges = [e for e in edges if e.get('target') == nid]
+            input_data = {}
+            for edge in input_edges:
+                src_output = context.get(edge['source'], {})
+                if edge.get('targetHandle') and edge.get('sourceHandle'):
+                    if edge['sourceHandle'] in src_output:
+                        input_data[edge['targetHandle']] = src_output[edge['sourceHandle']]
+                else:
+                    input_data.update(src_output)
+            output = await ExecutorManager.run_node(node['type'], node['data'], input_data)
+            context[nid] = output
 ```
 
 ---
 
-## 九、整体数据流架构
+## 十三、整体数据流架构
 
 ```
 ┌──────────────────────────────────────────────────┐
-│              React + React Flow                  │
-│                                                  │
-│  ReactFlowProvider                               │
+│              React + React Flow                   │
+│                                                   │
+│  ReactFlowProvider                                │
 │       ├── ReactFlow (Canvas)                     │
-│       │     ├── Background / Controls / MiniMap   │
-│       │     └── deleteKeyCode: Delete/Backspace   │
-│       ├── Toolbox (点击创建节点)                   │
-│       ├── BaseNode (内联编辑 + 运行按钮 + 结果)    │
-│       ├── PropertyPanel (属性面板 + 运行 + 结果)    │
+│       │     ├── nodeTypes: 5 种节点               │
+│       │     ├── edgeTypes: FlowingEdge            │
+│       │     ├── Background / Controls / MiniMap    │
+│       │     └── onConnect: 端口类型匹配 → 边 data  │
+│       ├── Toolbox (分类: 数据源/渲染器/AI)          │
+│       ├── BaseNode (三段式布局 + 端口Handle)        │
+│       │     ├── Section1: Header + 运行按钮        │
+│       │     ├── Section2: Port Row (Handle=端口点) │
+│       │     └── Section3: Fields + Renderer       │
+│       ├── PropertyPanel (五段式: 端口/参数/输入/运行/输出)│
+│       │     └── 弹窗查看 (输入+输出, 复制按钮在弹窗内) │
 │       ├── Toolbar (保存/导入/导出/运行)              │
-│       └── Runtime (前端 DAG 调度)                 │
-│            ├── GraphParser (DAG + 拓扑排序)       │
-│            ├── ExecutorManager (分发)             │
-│            └── Context (缓存输出)                 │
-│                                                  │
-│  运行状态数据流:                                   │
-│    FlowApi.runNode → node.data._runStatus         │
-│                    → node.data._runOutput         │
-│                    → BaseNode 按钮图标 + 结果面板   │
-│                    → PropertyPanel 结果面板         │
-│                                                  │
-└──────────┬───────────────────────────────────────┘
+│       ├── NodeEventBus (级联执行通信)               │
+│       └── FlowEditor (订阅事件 → 标记边activated → 触发下游)│
+│                                                   │
+│  数据流:                                          │
+│    P4File(fileContent) ──matched edge──→ JSON     │
+│         │                                         │
+│         └──matched edge──→ Excel / Lua            │
+│                                                   │
+│  运行状态:                                        │
+│    上游成功 → NodeEventBus.emit                    │
+│           → FlowEditor.handleNodeSuccess           │
+│           → edges[activated=true] + 级联触发下游     │
+│                                                   │
+└──────────┬────────────────────────────────────────┘
            │
-     HTTP REST (UMI proxy → localhost:16666)
+     HTTP REST (UMI proxy / env-config.js auto-detect)
            │
            ▼
 ┌──────────────────────────────────────────────────┐
-│         Flask + gevent (Python)                   │
+│         Flask + gevent (Python)                  │
 │                                                  │
-│  routers/WorkFlow.py                            │
-│       ├── POST /api/workflow/save                │
-│       ├── GET  /api/workflow/<id>                 │
+│  routers/WorkFlow.py                             │
+│       ├── CRUD: save / get / list / delete       │
 │       ├── POST /api/workflow/node/run             │
-│       └── POST /api/workflow/run                  │
+│       └── POST /api/workflow/run + status         │
 │                                                  │
 │  Implement/workflowImpl/                         │
-│       ├── ExecutorManager                        │
-│       ├── ExcelExecutor (p4Utils + openpyxl)      │
-│       ├── LuaExecutor   (p4Utils + 读取)          │
-│       ├── JsonExecutor  (p4Utils + json)          │
-│       └── PromptExecutor (变量插值 + LLM)         │
-│                                                  │
-│  utility/p4Utils.py                              │
-│       ├── update_file (p4 print -q 下载)          │
-│       ├── download_file (直接下载)                │
-│       └── list_dir / get_latest_changelist       │
+│       ├── ExecutorManager (5 个执行器注册)         │
+│       ├── P4FileExecutor (数据源: p4 sync + 输出)  │
+│       ├── ExcelExecutor (渲染器: 接收上游内容)       │
+│       ├── JsonExecutor  (渲染器: 接收上游内容)       │
+│       ├── LuaExecutor   (渲染器: 接收上游内容)       │
+│       └── PromptExecutor (AI: LLM 调用)            │
 │                                                  │
 └──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 十、依赖清单
+## 十四、依赖清单
 
-### 10.1 前端 npm 依赖
+### 14.1 前端 npm 依赖
 
 | 包名 | 版本 | 说明 |
 |------|------|------|
 | `reactflow` | ^11.11.0 | React Flow 画布编辑器 |
-| `@ant-design/icons` | 项目已有 | 节点运行状态图标（PlayCircle / Loading / CheckCircle / CloseCircle） |
-| `antd` | ^6.5.0 | 属性面板 Button / message 等组件 |
-| `socket.io-client` | ^4.x | Socket.IO 客户端（Phase 3） |
+| `@ant-design/icons` | 项目已有 | 节点运行状态图标 |
+| `antd` | ^6.5.0 | 属性面板 Button / Modal / Tag / Table 等组件 |
+| `highlight.js` | ^11.x | Lua 语法高亮渲染 |
 
-### 10.2 后端 Python 依赖
+### 14.2 后端 Python 依赖
 
 | 包名 | 版本 | 说明 |
 |------|------|------|
@@ -822,38 +924,58 @@ class Runtime {
 
 ---
 
-## 十一、实施阶段
+## 十五、实施阶段
 
 ### Phase 1: 基础框架搭建 ✅（已完成）
 1. ~~安装 ReactFlow 依赖包~~ ✅
 2. ~~创建 Workflow 页面入口~~ ✅
 3. ~~初始化 ReactFlowProvider + useNodesState / useEdgesState~~ ✅
-4. ~~实现 Toolbox（4 种节点点击创建）~~ ✅
-5. ~~实现 PropertyPanel（属性编辑 + 运行 + 结果展示）~~ ✅
+4. ~~实现 Toolbox（5 种节点分类创建）~~ ✅
+5. ~~实现 PropertyPanel（五段式属性面板）~~ ✅
 6. ~~实现 Toolbar（保存/加载/导入/导出 JSON）~~ ✅
-7. ~~实现 FlowApi（后端 API 封装 + proxy 配置）~~ ✅
-8. ~~实现 NodeRegistry（4 种节点类型注册）~~ ✅
+7. ~~实现 FlowApi（后端 API 封装 + proxy 配置 + env-config.js 自动检测）~~ ✅
+8. ~~实现 NodeRegistry（5 种节点类型注册 + 分类）~~ ✅
 
 ### Phase 2: 节点组件 ✅（已完成）
-1. ~~实现 BaseNode 通用组件（内联编辑 + 运行按钮 + 状态图标 + 结果面板）~~ ✅
-2. ~~实现 4 种节点（Excel / Lua / JSON / Prompt）基于 BaseNode~~ ✅
-3. ~~Delete 键删除节点支持~~ ✅
-4. ~~选中节点 ID 而非快照（解决数据过期问题）~~ ✅
-5. ~~运行结果存储在 node.data（节点间隔离）~~ ✅
+1. ~~实现 BaseNode 三段式布局（Header / Port Row / Content）~~ ✅
+2. ~~端口 Handle 内联定位于端口点（左侧 input / 右侧 output）~~ ✅
+3. ~~实现 5 种节点（P4File / Excel / Lua / JSON / Prompt）~~ ✅
+4. ~~必填字段校验 + 运行按钮禁用~~ ✅
+5. ~~选中节点 ID 而非快照（解决数据过期问题）~~ ✅
+6. ~~运行结果存储在 node.data（节点间隔离）~~ ✅
 
-### Phase 3: 节点执行 ✅（已完成）
+### Phase 3: 端口类型系统与连线 ✅（已完成）
+1. ~~实现 PortTypes.ts（端口定义 + 兼容性矩阵 + isPortTypeCompatible）~~ ✅
+2. ~~实现 FlowingEdge 自定义边（三状态：mismatched / matched_idle / activated）~~ ✅
+3. ~~onConnect 自动计算 matchStatus → 存入边 data~~ ✅
+4. ~~上游节点成功 → 标记出边 activated: true → 边变绿+流动+✓~~ ✅
+
+### Phase 4: 节点执行与级联 ✅（已完成）
 1. ~~实现后端 BaseNodeExecutor + ExecutorManager~~ ✅
-2. ~~实现 Excel / Lua / JSON / Prompt 执行器~~ ✅
-3. ~~统一使用 p4Utils.update_file 下载文件（不依赖 client root）~~ ✅
-4. ~~实现 `/api/workflow/node/run` 路由~~ ✅
+2. ~~实现 P4File / Excel / Lua / JSON / Prompt 执行器~~ ✅
+3. ~~P4File 独立数据源节点（p4 sync + 文件类型检测 + 输出）~~ ✅
+4. ~~渲染器节点接收上游 input_data（非内置 P4 路径）~~ ✅
+5. ~~Excel 格式校验（拒绝 JSON 输入）~~ ✅
+6. ~~前端级联执行：NodeEventBus + FlowEditor 订阅 → 自动触发下游~~ ✅
+7. ~~上游输入实时收集（collectUpstreamInput 在运行时读取最新状态）~~ ✅
+8. ~~Config 清理（过滤内部 `_` 前缀键，不发送到后端）~~ ✅
 
-### Phase 4: 整体运行（待实现）
+### Phase 5: 前端渲染与面板 ✅（已完成）
+1. ~~JSON 渲染器（自定义可折叠树）~~ ✅
+2. ~~Excel 渲染器（antd Table + 行列筛选）~~ ✅
+3. ~~Lua 渲染器（highlight.js 语法高亮）~~ ✅
+4. ~~PropertyPanel 五段式（端口信息/参数/输入内容/运行信息/输出内容）~~ ✅
+5. ~~输入内容：按端口显示上游数据预览 + 弹窗查看~~ ✅
+6. ~~输出内容：格式化显示 + 弹窗查看（复制按钮在弹窗内）~~ ✅
+7. ~~剪贴板 HTTP fallback（textarea + execCommand）~~ ✅
+
+### Phase 6: 整体运行（待实现）
 1. 实现 GraphParser（DAG 解析 + 拓扑排序 + 环检测）
 2. 实现前端 Runtime（按拓扑序调度节点）
-3. 实现 `/api/workflow/run` 路由
-4. 实现 Socket.IO 运行状态推送（如需要）
+3. 完善 `/api/workflow/run` 路由 + 端口映射
+4. Socket.IO 运行状态推送（如需要）
 
-### Phase 5: 增强（待实现）
+### Phase 7: 增强（待实现）
 1. 节点拖拽排序（React Flow dnd 支持）
 2. 运行历史记录
 3. 错误处理与重试
