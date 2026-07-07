@@ -3,9 +3,9 @@ import { EdgeProps, getBezierPath } from 'reactflow';
 
 /**
  * Custom edge with three visual states:
- * - mismatched: red dashed
- * - matched: green solid line (types compatible, but no data flowing yet)
- * - activated: green solid + flowing dot animation + checkmark
+ * - mismatched: red dashed + ✗
+ * - matched (not activated): gray line (types compatible but no data flowing yet)
+ * - activated: green solid + flowing dot animation + ✓
  *   (upstream node executed successfully and data flowed through)
  */
 const FlowingEdge: React.FC<EdgeProps> = ({
@@ -28,16 +28,18 @@ const FlowingEdge: React.FC<EdgeProps> = ({
     targetPosition,
   });
 
-  // Three possible states: 'mismatched' | 'matched' | 'activated'
   const matchStatus: 'matched' | 'mismatched' | 'unknown' =
     (data?.matchStatus as any) || 'unknown';
   const activated: boolean = (data?.activated as boolean) || false;
 
-  // Visual state: matched+activated → show flow; matched only → green solid; mismatched → red dashed
+  // Visual state determination:
+  // mismatched → always red dashed
+  // matched + NOT activated → gray (neutral, types match but no data flow)
+  // matched + activated → green with flow
   const visualState = useMemo(() => {
     if (matchStatus === 'mismatched') return 'mismatched' as const;
     if (matchStatus === 'matched' && activated) return 'activated' as const;
-    if (matchStatus === 'matched') return 'matched' as const;
+    if (matchStatus === 'matched') return 'matched_idle' as const;
     return 'unknown' as const;
   }, [matchStatus, activated]);
 
@@ -45,8 +47,9 @@ const FlowingEdge: React.FC<EdgeProps> = ({
     switch (visualState) {
       case 'activated':
         return { stroke: '#52c41a', strokeWidth: 2.5 };
-      case 'matched':
-        return { stroke: '#52c41a', strokeWidth: 2, opacity: 0.6 };
+      case 'matched_idle':
+        // Types match but no data flowing yet — neutral gray
+        return { stroke: '#bfbfbf', strokeWidth: 1.5 };
       case 'mismatched':
         return { stroke: '#ff4d4f', strokeWidth: 2, strokeDasharray: '6 3' };
       default:
@@ -85,7 +88,7 @@ const FlowingEdge: React.FC<EdgeProps> = ({
           </circle>
         </>
       )}
-      {/* Checkmark indicator at midpoint — only for activated edges */}
+      {/* Checkmark at midpoint — only for activated edges */}
       {visualState === 'activated' && (
         <g transform={`translate(${labelX}, ${labelY})`}>
           <rect
@@ -109,7 +112,7 @@ const FlowingEdge: React.FC<EdgeProps> = ({
           </text>
         </g>
       )}
-      {/* Mismatch indicator */}
+      {/* Mismatch indicator — only for mismatched edges */}
       {visualState === 'mismatched' && (
         <g transform={`translate(${labelX}, ${labelY})`}>
           <rect

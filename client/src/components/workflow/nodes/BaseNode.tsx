@@ -215,17 +215,17 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           }}
         >
           {/* Left column: input ports with inline Handles */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 16, position: 'relative' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 22, position: 'relative' }}>
             {inputPorts.map((p) => (
               <div
                 key={p.key}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
                   fontSize: 10,
                   color: PORT_COLORS[p.type] || '#999',
                   position: 'relative',
+                  height: 20,
                 }}
               >
                 <Handle
@@ -234,32 +234,22 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   id={p.key}
                   style={{
                     position: 'absolute',
-                    left: -5,
+                    left: -15,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: 8,
-                    height: 8,
+                    width: 10,
+                    height: 10,
                     background: PORT_COLORS[p.type] || '#d9d9d9',
                     border: '2px solid #fff',
                     boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
                   }}
                 />
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: PORT_COLORS[p.type] || '#d9d9d9',
-                    display: 'inline-block',
-                    flexShrink: 0,
-                  }}
-                />
-                <span>{p.label}</span>
+                <span style={{ marginLeft: 0 }}>{p.label}</span>
               </div>
             ))}
           </div>
           {/* Right column: output ports with inline Handles */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 16, textAlign: 'right', position: 'relative' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 22, textAlign: 'right', position: 'relative' }}>
             {outputPorts.map((p) => (
               <div
                 key={p.key}
@@ -267,34 +257,24 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'flex-end',
-                  gap: 4,
                   fontSize: 10,
                   color: PORT_COLORS[p.type] || '#999',
                   position: 'relative',
+                  height: 20,
                 }}
               >
-                <span>{p.label}</span>
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: PORT_COLORS[p.type] || '#d9d9d9',
-                    display: 'inline-block',
-                    flexShrink: 0,
-                  }}
-                />
+                <span style={{ marginRight: 0 }}>{p.label}</span>
                 <Handle
                   type="source"
                   position={Position.Right}
                   id={p.key}
                   style={{
                     position: 'absolute',
-                    right: -5,
+                    right: -15,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: 8,
-                    height: 8,
+                    width: 10,
+                    height: 10,
                     background: PORT_COLORS[p.type] || '#d9d9d9',
                     border: '2px solid #fff',
                     boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
