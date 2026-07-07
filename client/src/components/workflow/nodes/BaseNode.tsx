@@ -58,7 +58,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   nodeType,
   fields,
 }) => {
-  const { setNodes } = useReactFlow();
+  const { setNodes, getNodes, getEdges } = useReactFlow();
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
   const runOutput = data._runOutput as any;
@@ -67,6 +67,27 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const ports = getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
+
+  // Collect upstream input data from connected nodes
+  const upstreamInput = useMemo(() => {
+    const edges = getEdges();
+    const incomingEdges = edges.filter((e) => e.target === id && e.targetHandle);
+    const nodes = getNodes();
+    const input: Record<string, any> = {};
+    for (const edge of incomingEdges) {
+      const srcNode = nodes.find((n) => n.id === edge.source);
+      if (!srcNode) continue;
+      const srcOutput = (srcNode.data as any)?._runOutput;
+      if (!srcOutput || srcOutput.error) continue;
+      // Map source handle → target handle
+      if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
+        input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
+      } else {
+        Object.assign(input, srcOutput);
+      }
+    }
+    return input;
+  }, [id, getEdges, getNodes]);
 
   // Check if all required fields are filled
   const canRun = useMemo(() => {
@@ -108,7 +129,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       );
 
       try {
-        const result = await FlowApi.runNode(nodeType, data, {});
+        const result = await FlowApi.runNode(nodeType, data, upstreamInput);
         const output = result.output ?? result;
         const newStatus = output?.error ? 'error' : 'success';
         setNodes((nds) =>
@@ -139,7 +160,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         );
       }
     },
-    [id, nodeType, data, setNodes, canRun],
+    [id, nodeType, data, setNodes, canRun, upstreamInput],
   );
 
   const borderColor =
@@ -477,7 +498,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             >
               {runStatus === 'error' ? (
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {typeof runOutput === 'string' ? runOutput : JSON.stringify(runOutput, null, 2)}
+                  {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(runOutput, null, 2)}
                 </pre>
               ) : nodeType === 'excel' && runOutput.columns ? (
                 <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(runOutput, null, 2).slice(0, 100)}...</pre>}>
@@ -491,9 +512,17 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 <Suspense fallback={<pre style={{ margin: 0 }}>{runOutput.content?.slice(0, 100)}...</pre>}>
                   <LuaRenderer content={runOutput.content} functionName={runOutput.functionName} functionContent={runOutput.functionContent} />
                 </Suspense>
+              ) : typeof runOutput === 'string' ? (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {runOutput}
+                </pre>
+              ) : runOutput.fileContent && typeof runOutput.fileContent === 'string' ? (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 160, overflowY: 'auto' }}>
+                  {runOutput.fileContent}
+                </pre>
               ) : (
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {typeof runOutput === 'string' ? runOutput : JSON.stringify(runOutput, null, 2)}
+                  {JSON.stringify(runOutput, null, 2)}
                 </pre>
               )}
             </div>

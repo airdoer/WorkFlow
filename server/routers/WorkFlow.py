@@ -32,6 +32,7 @@ from Implement.workflowImpl.excelExecutor import ExcelExecutor
 from Implement.workflowImpl.luaExecutor import LuaExecutor
 from Implement.workflowImpl.jsonExecutor import JsonExecutor
 from Implement.workflowImpl.promptExecutor import PromptExecutor
+from Implement.workflowImpl.p4FileExecutor import P4FileExecutor
 
 # region init
 
@@ -40,6 +41,7 @@ ExecutorManager.register(ExcelExecutor())
 ExecutorManager.register(LuaExecutor())
 ExecutorManager.register(JsonExecutor())
 ExecutorManager.register(PromptExecutor())
+ExecutorManager.register(P4FileExecutor())
 
 # endregion
 

@@ -8,21 +8,21 @@ class LuaExecutor(BaseNodeExecutor):
 
     async def execute(self, config: dict, input_data: dict) -> dict:
         """
-        Lua renderer: receives file content from upstream P4File node.
+        Lua renderer: receives content from upstream node.
         - input_data['fileContent']: raw file content (string)
-        - input_data['filePath']: original P4 path
+        - input_data['filePath']: original file path (optional)
         - config['entryFunction']: optional function name to extract
         """
         file_content = input_data.get("fileContent", "")
-        p4_path = input_data.get("filePath", "")
+        file_path = input_data.get("filePath", "")
 
-        entry_function = config.get("entryFunction")
+        entry_function = config.get("entryFunction", "")
 
         if not file_content:
-            return {"error": "No file content provided. Connect a P4 File node to this Lua renderer."}
+            return {"error": "No input content. Connect an upstream node or provide content."}
 
         try:
-            result = {"content": file_content, "filePath": p4_path}
+            result = {"content": file_content, "filePath": file_path}
 
             if entry_function:
                 pattern = rf'(?:function|local\s+function)\s+{re.escape(entry_function)}\s*\('
