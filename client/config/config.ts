@@ -188,8 +188,8 @@ export default defineConfig({
   headScripts: [
     // 解决首次加载时白屏的问题
     { src: join(PUBLIC_PATH, 'scripts/loading.js'), async: true },
-    // 注入环境变量配置（仅在生产环境）
-    process.env.NODE_ENV === 'production' && { src: join(PUBLIC_PATH, 'env-config.js') },
+    // 注入环境变量配置（Docker 开发/生产环境）
+    { src: join(PUBLIC_PATH, 'env-config.js') },
   ].filter(Boolean),
 
   //================ pro 插件配置 =================
