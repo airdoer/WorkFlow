@@ -1,7 +1,6 @@
 import os
+import json
 import openpyxl
-import config
-from utility import p4Utils
 from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 
 
@@ -9,37 +8,60 @@ class ExcelExecutor(BaseNodeExecutor):
     type = "excel"
 
     async def execute(self, config: dict, input_data: dict) -> dict:
-        p4_path = config.get("p4Path", "")
-        sheet_name = config.get("sheet")
+        """
+        Excel renderer: receives file content from upstream P4File node.
+        - input_data['fileContent'] or input_data['localPath']: raw file content or local path
+        - input_data['filePath']: original P4 path
+        - config['sheet']: optional sheet name
+        - config['rowFilter']: optional list of row indices (1-based)
+        - config['columnFilter']: optional list of column names
+        """
+        # Get file path from upstream P4File node
+        local_path = input_data.get("localPath", "")
+        p4_path = input_data.get("filePath", "")
+        file_type = input_data.get("fileType", "")
+        file_content = input_data.get("fileContent", "")
 
-        if not p4_path:
-            return {"error": "p4Path is required"}
+        sheet_name = config.get("sheet")
+        row_filter = config.get("rowFilter")  # list of row numbers (1-based strings)
+        column_filter = config.get("columnFilter")  # list of column names
+
+        if not local_path and not file_content:
+            return {"error": "No file content provided. Connect a P4 File node to this Excel renderer."}
 
         try:
-            local_path = self._p4_sync(p4_path)
-            wb = openpyxl.load_workbook(local_path, data_only=True)
-            ws = wb[sheet_name] if sheet_name else wb.active
+            # Use local path if available (from P4File node), otherwise try to read content
+            if local_path and os.path.exists(local_path):
+                wb = openpyxl.load_workbook(local_path, data_only=True)
+            else:
+                # If we only have raw content, we can't parse Excel binary directly
+                return {"error": "Excel requires a local file path. Ensure P4 File node is connected."}
 
+            # Select sheet
+            if sheet_name:
+                if sheet_name not in wb.sheetnames:
+                    return {"error": f"Sheet '{sheet_name}' not found. Available: {', '.join(wb.sheetnames)}"}
+                ws = wb[sheet_name]
+            else:
+                ws = wb.active
+
+            # Extract all data
             columns = [cell.value for cell in ws[1]]
             rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
                 rows.append(dict(zip(columns, row)))
 
-            return {"columns": columns, "rows": rows}
+            # Apply row filter
+            if row_filter and len(row_filter) > 0:
+                row_indices = [int(r) - 1 for r in row_filter if r.isdigit() and int(r) <= len(rows)]
+                rows = [rows[i] for i in row_indices if 0 <= i < len(rows)]
+
+            # Apply column filter
+            if column_filter and len(column_filter) > 0:
+                filtered_columns = [c for c in columns if c in column_filter]
+                rows = [{k: v for k, v in row.items() if k in column_filter} for row in rows]
+                columns = filtered_columns
+
+            return {"columns": columns, "rows": rows, "sheetNames": wb.sheetnames, "filePath": p4_path}
         except Exception as e:
             return {"error": str(e)}
-
-    def _p4_sync(self, p4_path: str) -> str:
-        """
-        使用 p4Utils.download_file 将文件同步到本地 P4_WORKSPACE_DIRECTORY。
-        不依赖 p4 client root，直接用 p4 print 下载到指定路径。
-        """
-        p4_path = p4Utils.normalize_p4_path(p4_path)
-        relative_path = p4_path.lstrip("/").replace("//", "")
-        local_path = os.path.join(config.P4_WORKSPACE_DIRECTORY, relative_path)
-
-        success = p4Utils.update_file(p4_path, local_path, force=True)
-        if not success:
-            raise RuntimeError(f"Failed to sync P4 file: {p4_path}")
-
-        return local_path

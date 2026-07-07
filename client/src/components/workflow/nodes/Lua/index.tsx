@@ -3,7 +3,6 @@ import { NodeProps } from 'reactflow';
 import BaseNode, { NodeField } from '../BaseNode';
 
 const LUA_FIELDS: NodeField[] = [
-  { key: 'p4Path', label: 'P4 路径', placeholder: '//C7/.../file.lua' },
   { key: 'entryFunction', label: '入口函数', placeholder: '函数名（可选）' },
 ];
 

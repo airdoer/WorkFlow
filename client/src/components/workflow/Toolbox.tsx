@@ -25,6 +25,14 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes }) => {
     [setNodes],
   );
 
+  // Group by category
+  const grouped = nodeRegistryList.reduce<Record<string, typeof nodeRegistryList>>((acc, entry) => {
+    const cat = entry.category || '其他';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(entry);
+    return acc;
+  }, {});
+
   return (
     <div
       style={{
@@ -36,25 +44,34 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes }) => {
       }}
     >
       <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>节点工具箱</div>
-      {nodeRegistryList.map((entry) => (
-        <div
-          key={entry.type}
-          onClick={() => handleNodeClick(entry.type)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 12px',
-            marginBottom: 6,
-            background: '#fff',
-            border: '1px solid #d9d9d9',
-            borderRadius: 6,
-            cursor: 'pointer',
-            fontSize: 13,
-          }}
-        >
-          {entry.icon}
-          <span>{entry.label}</span>
+      {Object.entries(grouped).map(([category, entries]) => (
+        <div key={category} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: '#999', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>
+            {category}
+          </div>
+          {entries.map((entry) => (
+            <div
+              key={entry.type}
+              onClick={() => handleNodeClick(entry.type)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                marginBottom: 4,
+                background: '#fff',
+                border: '1px solid #d9d9d9',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+                transition: 'border-color 0.2s',
+              }}
+              title={entry.description}
+            >
+              {entry.icon}
+              <span>{entry.label}</span>
+            </div>
+          ))}
         </div>
       ))}
     </div>

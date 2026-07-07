@@ -23,28 +23,5 @@ export default [
     path: '/workflow/fullscreen',
     component: './FlowDemo',
     layout: false,
-  },
-  {
-    name: 'result',
-    icon: 'checkCircle',
-    path: '/result',
-    routes: [
-      {
-        path: '/result',
-        redirect: '/result/success',
-      },
-      {
-        name: 'success',
-        icon: 'checkCircle',
-        path: '/result/success',
-        component: './result/success',
-      },
-      {
-        name: 'fail',
-        icon: 'closeCircle',
-        path: '/result/fail',
-        component: './result/fail',
-      },
-    ],
-  },
+  }
 ];

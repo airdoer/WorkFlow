@@ -3,7 +3,6 @@ import { NodeProps } from 'reactflow';
 import BaseNode, { NodeField } from '../BaseNode';
 
 const JSON_FIELDS: NodeField[] = [
-  { key: 'p4Path', label: 'P4 路径', placeholder: '//C7/.../file.json' },
   { key: 'jsonPath', label: 'JSON Path', placeholder: '$.data.items（可选）' },
 ];
 

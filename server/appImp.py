@@ -113,12 +113,6 @@ def init_kdip():
     KdipServer.init_schedule()
 
 
-def init_hotfix_dir_watcher():
-    from Implement.hotfixImpl.hotfixDirWatcher import init_hotfix_dir_watcher as _init_watcher
-    _init_watcher()
-
-
 init_routers()
 init_kdip()
 init_cron()
-init_hotfix_dir_watcher()

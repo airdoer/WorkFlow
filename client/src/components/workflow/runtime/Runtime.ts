@@ -17,11 +17,27 @@ export class Runtime {
       const node = nodes.find((n) => n.id === nodeId);
       if (!node) continue;
 
+      // Gather input data from connected edges, keyed by targetHandle (port key)
       const inputEdges = edges.filter((e) => e.target === nodeId);
       const input: Record<string, any> = {};
+
       for (const edge of inputEdges) {
         const upstream = context.getOutput(edge.source);
-        if (upstream) Object.assign(input, upstream);
+        if (upstream) {
+          // If targetHandle is specified, map upstream output to that port key
+          // Otherwise, merge all upstream output
+          if (edge.targetHandle) {
+            // Map the relevant upstream port data
+            if (edge.sourceHandle && upstream[edge.sourceHandle] !== undefined) {
+              input[edge.targetHandle] = upstream[edge.sourceHandle];
+            } else {
+              // Merge all upstream data under the target port key
+              Object.assign(input, upstream);
+            }
+          } else {
+            Object.assign(input, upstream);
+          }
+        }
       }
 
       const output = await ExecutorManager.runNode(node.type!, node.data || {}, input);

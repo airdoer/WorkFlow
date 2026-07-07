@@ -18,11 +18,13 @@ export const ExecutorManager = {
   },
 };
 
+import P4FileExecutor from '../nodes/P4File/executor';
 import ExcelExecutor from '../nodes/Excel/executor';
 import LuaExecutor from '../nodes/Lua/executor';
 import JsonExecutor from '../nodes/Json/executor';
 import PromptExecutor from '../nodes/Prompt/executor';
 
+ExecutorManager.register('p4file', P4FileExecutor);
 ExecutorManager.register('excel', ExcelExecutor);
 ExecutorManager.register('lua', LuaExecutor);
 ExecutorManager.register('json', JsonExecutor);

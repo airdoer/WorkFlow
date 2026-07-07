@@ -128,7 +128,16 @@ class WorkflowRuntime:
             for edge in input_edges:
                 src = edge.get('source') or edge.get('sourceNodeID')
                 src_output = context.get(src, {})
-                input_data.update(src_output)
+                # Map port-keyed input: if targetHandle specified, map from sourceHandle
+                target_handle = edge.get('targetHandle')
+                source_handle = edge.get('sourceHandle')
+                if target_handle and source_handle and source_handle in src_output:
+                    input_data[target_handle] = src_output[source_handle]
+                elif target_handle:
+                    # Merge all upstream data under the target port key
+                    input_data.update(src_output)
+                else:
+                    input_data.update(src_output)
 
             output = await ExecutorManager.run_node(node.get('type', ''), node.get('data', {}), input_data)
             context[nid] = output

@@ -7,7 +7,7 @@ if 'ROUTER_LIST' in os.environ:
     routerListStr = os.environ.get('ROUTER_LIST')[1:]
     routerList = routerListStr.split(',')
 else:
-    routerList = ['battle', 'battleExternal', 'heatmap', 'xlsx', 'gameServerRoute', 'battleServerRoute', 'serverInfoRoute', 'hotfixTool', 'hotfixMongoRoute']
+    routerList = ['battle', 'battleExternal', 'heatmap', 'xlsx', 'gameServerRoute', 'battleServerRoute', 'serverInfoRoute', 'hotfixMongoRoute']
     routerList = ['WorkFlow']
 
 print('--- use router list: ', routerList)
@@ -28,7 +28,7 @@ mongo_password = "mongopwd"
 
 # telnet console
 TELNET_IP = "0.0.0.0"
-TELNET_PORT = 6668
+TELNET_PORT = 6666
 
 # MySQL
 HOSTNAME = "my_mysql"
