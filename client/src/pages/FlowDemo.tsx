@@ -13,13 +13,11 @@ const WorkflowPage: React.FC = () => {
   }>({});
 
   useEffect(() => {
-    // Check URL parameters for workflow ID or import data
     const params = new URLSearchParams(window.location.search);
     const workflowId = params.get('id');
     const importData = params.get('import');
 
     if (workflowId) {
-      // Load workflow by ID
       setLoading(true);
       FlowApi.get(workflowId)
         .then((workflow) => {
@@ -36,7 +34,6 @@ const WorkflowPage: React.FC = () => {
           setLoading(false);
         });
     } else if (importData) {
-      // Import workflow from JSON
       try {
         const json = JSON.parse(decodeURIComponent(importData));
         setWorkflowData({ json });
@@ -59,14 +56,15 @@ const WorkflowPage: React.FC = () => {
   }
 
   return (
-    <FlowEditor
-      initialData={workflowData.json}
-      workflowId={workflowData.id}
-      workflowName={workflowData.name}
-      onSave={handleSave}
-    />
+    <div style={{ height: '100vh', overflow: 'hidden' }}>
+      <FlowEditor
+        initialData={workflowData.json}
+        workflowId={workflowData.id}
+        workflowName={workflowData.name}
+        onSave={handleSave}
+      />
+    </div>
   );
 };
 
 export default WorkflowPage;
-

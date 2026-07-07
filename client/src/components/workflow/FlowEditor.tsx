@@ -75,7 +75,7 @@ function FlowEditorInner({
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar
         nodes={nodes}
         edges={edges}
@@ -88,7 +88,7 @@ function FlowEditorInner({
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} />
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}

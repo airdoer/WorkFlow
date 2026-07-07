@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Node, Edge } from 'reactflow';
 import { useReactFlow } from 'reactflow';
 import { Button, Space, message } from 'antd';
-import { SaveOutlined, PlayCircleOutlined, StopOutlined, ExportOutlined, ImportOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlayCircleOutlined, StopOutlined, ExportOutlined, ImportOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
 
@@ -29,6 +29,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const reactFlowInstance = useReactFlow();
 
   const handleSave = async () => {
@@ -101,6 +102,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
     input.click();
   };
 
+  const handleFullscreen = () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => setFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setFullscreen(false)).catch(() => {});
+    }
+  };
+
+  // Sync state when user presses Esc to exit fullscreen
+  React.useEffect(() => {
+    const handler = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
   return (
     <div
       style={{
@@ -128,6 +145,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </Button>
         <Button icon={<ExportOutlined />} onClick={handleExport} size="small">
           导出
+        </Button>
+        <Button
+          icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={handleFullscreen}
+          size="small"
+          type={fullscreen ? 'primary' : 'default'}
+        >
+          {fullscreen ? '退出全屏' : '全屏'}
         </Button>
       </Space>
       {workflowName && (

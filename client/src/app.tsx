@@ -111,7 +111,7 @@ export const layout: RunTimeLayoutConfig = ({
     // waterMarkProps: {
     //   content: initialState?.currentUser?.name,
     // },
-    footerRender: () => <Footer />,
+    footerRender: () => null,
     onPageChange: () => {
       // 禁用鉴权：不做任何登录检查
     },

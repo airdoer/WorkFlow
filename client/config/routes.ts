@@ -39,5 +39,6 @@ export default [
     name: 'flowDemo',
     icon: 'bulb',
     component: './FlowDemo',
+    layout: false,
   }
 ];
