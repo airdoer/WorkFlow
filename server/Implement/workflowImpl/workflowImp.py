@@ -16,15 +16,25 @@ def _workflow_path(workflow_id):
 
 class WorkflowManager:
     @staticmethod
-    def save(name, workflow_json, workflow_id=None):
+    def save(name, workflow_json, workflow_id=None, author=None, description=None):
         _ensure_dir()
+        is_new = not workflow_id
         if not workflow_id:
             workflow_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
+
+        # Load existing record to preserve createdAt if updating
+        existing = None
+        if not is_new:
+            existing = WorkflowManager.get(workflow_id)
+
         record = {
             'id': workflow_id,
             'name': name,
             'json': workflow_json,
+            'author': author or (existing.get('author', '') if existing else ''),
+            'description': description or (existing.get('description', '') if existing else ''),
+            'createdAt': existing.get('createdAt', now) if existing else now,
             'updatedAt': now,
         }
         with open(_workflow_path(workflow_id), 'w') as f:
@@ -50,7 +60,10 @@ class WorkflowManager:
                     result.append({
                         'id': data.get('id'),
                         'name': data.get('name'),
-                        'updatedAt': data.get('updatedAt'),
+                        'author': data.get('author', ''),
+                        'description': data.get('description', ''),
+                        'createdAt': data.get('createdAt', ''),
+                        'updatedAt': data.get('updatedAt', ''),
                     })
         result.sort(key=lambda x: x.get('updatedAt', ''), reverse=True)
         return result
@@ -80,8 +93,8 @@ class WorkflowRuntime:
         node_map = {n['id']: n for n in nodes}
 
         for edge in edges:
-            src = edge.get('sourceNodeID')
-            tgt = edge.get('targetNodeID')
+            src = edge.get('source') or edge.get('sourceNodeID')
+            tgt = edge.get('target') or edge.get('targetNodeID')
             if src in adj and tgt in in_degree:
                 adj[src].append(tgt)
                 in_degree[tgt] += 1
@@ -110,10 +123,11 @@ class WorkflowRuntime:
             node = node_map[nid]
             cls._tasks[task_id]['nodes'][nid] = 'processing'
 
-            input_edges = [e for e in edges if e.get('targetNodeID') == nid]
+            input_edges = [e for e in edges if (e.get('target') or e.get('targetNodeID')) == nid]
             input_data = {}
             for edge in input_edges:
-                src_output = context.get(edge.get('sourceNodeID'), {})
+                src = edge.get('source') or edge.get('sourceNodeID')
+                src_output = context.get(src, {})
                 input_data.update(src_output)
 
             output = await ExecutorManager.run_node(node.get('type', ''), node.get('data', {}), input_data)

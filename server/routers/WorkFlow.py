@@ -54,11 +54,13 @@ def workflow_save():
         name = data.get('name')
         workflow_json = data.get('json')
         workflow_id = data.get('id')  # Optional for updates
+        author = data.get('author', '')
+        description = data.get('description', '')
         
         if not name or not workflow_json:
             return jsonify({'error': 'name and json are required'}), 400
         
-        result = WorkflowManager.save(name, workflow_json, workflow_id)
+        result = WorkflowManager.save(name, workflow_json, workflow_id, author=author, description=description)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

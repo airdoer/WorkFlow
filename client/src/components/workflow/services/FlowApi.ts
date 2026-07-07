@@ -25,11 +25,11 @@ async function handleResponse<T = any>(res: Response): Promise<T> {
 }
 
 export const FlowApi = {
-  async save(name: string, json: any, id?: string) {
+  async save(name: string, json: any, id?: string, meta?: { author?: string; description?: string }) {
     const res = await fetch(`${API_BASE}/api/workflow/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, json, id }),
+      body: JSON.stringify({ name, json, id, author: meta?.author || '', description: meta?.description || '' }),
     });
     return handleResponse(res);
   },

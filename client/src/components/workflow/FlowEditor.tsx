@@ -26,6 +26,12 @@ interface FlowEditorProps {
   initialData?: WorkflowJSON;
   workflowId?: string;
   workflowName?: string;
+  workflowAuthor?: string;
+  workflowDescription?: string;
+  workflowCreatedAt?: string;
+  workflowUpdatedAt?: string;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
 }
 
@@ -33,13 +39,18 @@ function FlowEditorInner({
   initialData,
   workflowId,
   workflowName,
+  workflowAuthor,
+  workflowDescription,
+  workflowCreatedAt,
+  workflowUpdatedAt,
+  isFullscreen,
+  onFullscreenToggle,
   onSave,
 }: FlowEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialData?.edges || []);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  // Always read the latest node data from nodes state, not a stale snapshot
   const selectedNode = useMemo(
     () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
     [selectedNodeId, nodes],
@@ -83,6 +94,12 @@ function FlowEditorInner({
         setEdges={setEdges}
         workflowId={workflowId}
         workflowName={workflowName}
+        workflowAuthor={workflowAuthor}
+        workflowDescription={workflowDescription}
+        workflowCreatedAt={workflowCreatedAt}
+        workflowUpdatedAt={workflowUpdatedAt}
+        isFullscreen={isFullscreen}
+        onFullscreenToggle={onFullscreenToggle}
         onSave={onSave}
         onRun={handleRun}
       />

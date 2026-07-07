@@ -62,7 +62,35 @@ body,
 }
 
 /* ========== Always hide footer ========== */
-/* Footer has been removed in app.tsx (footerRender: () => null) */
+/* Footer removed in app.tsx: footerRender: () => null */
+
+/* ========== Workflow page: make content fill available space ========== */
+.ant-pro-layout .ant-layout {
+  height: 100vh;
+}
+.ant-pro-layout .ant-pro-sider + .ant-layout,
+.ant-pro-layout .ant-layout-has-sider > .ant-pro-layout-container {
+  height: 100vh;
+  overflow: hidden;
+}
+.ant-pro-layout .ant-layout-content {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ant-pro-layout .ant-pro-page-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ant-pro-layout .ant-pro-page-container-children-content {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
 
 .ant-pro-sider-collapsed .ant-pro-sider-link span:not([role='img']) {
   display: none;

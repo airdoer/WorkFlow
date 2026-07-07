@@ -50,5 +50,7 @@ export default {
   'menu.editor.mind': 'Mind Editor',
   'menu.editor.koni': 'Koni Editor',
   'menu.chatbot': 'AI Assistant',
-  'menu.flowDemo': 'Workflow',
+  'menu.workflow': 'Workflow',
+  'menu.workflow.history': 'History',
+  'menu.workflow.editor': 'Editor',
 };

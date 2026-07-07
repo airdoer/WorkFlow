@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import type { Node, Edge } from 'reactflow';
 import { useReactFlow } from 'reactflow';
-import { Button, Space, message } from 'antd';
-import { SaveOutlined, PlayCircleOutlined, StopOutlined, ExportOutlined, ImportOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
+import { Button, Space, Input, Popover, message } from 'antd';
+import {
+  SaveOutlined,
+  PlayCircleOutlined,
+  StopOutlined,
+  ExportOutlined,
+  ImportOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
 
@@ -13,6 +22,12 @@ interface ToolbarProps {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   workflowId?: string;
   workflowName?: string;
+  workflowAuthor?: string;
+  workflowDescription?: string;
+  workflowCreatedAt?: string;
+  workflowUpdatedAt?: string;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
   onRun?: (json: WorkflowJSON) => void;
 }
@@ -23,21 +38,28 @@ const Toolbar: React.FC<ToolbarProps> = ({
   setNodes,
   setEdges,
   workflowId,
-  workflowName,
+  workflowName: initialName,
+  workflowAuthor: initialAuthor,
+  workflowDescription: initialDesc,
+  workflowCreatedAt,
+  workflowUpdatedAt,
+  isFullscreen,
+  onFullscreenToggle,
   onSave,
   onRun,
 }) => {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [name, setName] = useState(initialName || '未命名工作流');
+  const [author, setAuthor] = useState(initialAuthor || '');
+  const [description, setDescription] = useState(initialDesc || '');
   const reactFlowInstance = useReactFlow();
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const json = reactFlowInstance.toObject();
-      const name = workflowName || '未命名工作流';
-      const result = await FlowApi.save(name, json, workflowId);
+      const result = await FlowApi.save(name, json, workflowId, { author, description });
       onSave?.(result.id, name);
       message.success('保存成功');
     } catch (err: any) {
@@ -71,7 +93,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${workflowName || 'workflow'}.json`;
+    a.download = `${name}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -102,21 +124,29 @@ const Toolbar: React.FC<ToolbarProps> = ({
     input.click();
   };
 
-  const handleFullscreen = () => {
-    const el = document.documentElement;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => setFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setFullscreen(false)).catch(() => {});
-    }
-  };
+  const formatTime = (t?: string) =>
+    t ? new Date(t).toLocaleString('zh-CN') : '-';
 
-  // Sync state when user presses Esc to exit fullscreen
-  React.useEffect(() => {
-    const handler = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
+  const metaContent = (
+    <div style={{ width: 280 }}>
+      <div style={{ marginBottom: 8 }}>
+        <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 2 }}>名称</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} size="small" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 2 }}>作者</label>
+        <Input value={author} onChange={(e) => setAuthor(e.target.value)} size="small" placeholder="可选" />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 2 }}>描述</label>
+        <Input.TextArea value={description} onChange={(e) => setDescription(e.target.value)} size="small" rows={2} placeholder="可选" />
+      </div>
+      <div style={{ fontSize: 11, color: '#999' }}>
+        <div>创建时间: {formatTime(workflowCreatedAt)}</div>
+        <div>最后更新: {formatTime(workflowUpdatedAt)}</div>
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -131,6 +161,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
       }}
     >
       <Space>
+        <Popover content={metaContent} title="工作流信息" trigger="click">
+          <Button icon={<InfoCircleOutlined />} size="small">
+            信息
+          </Button>
+        </Popover>
         <Button icon={<SaveOutlined />} loading={saving} onClick={handleSave} size="small">
           保存
         </Button>
@@ -147,17 +182,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
           导出
         </Button>
         <Button
-          icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-          onClick={handleFullscreen}
+          icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={onFullscreenToggle}
           size="small"
-          type={fullscreen ? 'primary' : 'default'}
+          type={isFullscreen ? 'primary' : 'default'}
         >
-          {fullscreen ? '退出全屏' : '全屏'}
+          {isFullscreen ? '退出全屏' : '全屏'}
         </Button>
       </Space>
-      {workflowName && (
-        <span style={{ marginLeft: 16, color: '#666', fontSize: 13 }}>{workflowName}</span>
-      )}
+      <span style={{ marginLeft: 16, color: '#666', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {name}
+      </span>
     </div>
   );
 };
