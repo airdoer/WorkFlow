@@ -23,10 +23,14 @@ export interface PortDefinition {
 export const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
   'file-content': ['file-content', 'any'],
   'file-path': ['file-path', 'any'],
-  'any': ['file-content', 'file-path', 'any', 'text', 'table-data', 'json-data'],
-  'text': ['text', 'any'],
+  'any': ['file-content', 'file-path', 'any', 'text', 'table-data', 'json-data', 'boolean', 'string', 'number', 'json-path'],
+  'text': ['text', 'any', 'string'],
   'table-data': ['table-data', 'any'],
   'json-data': ['json-data', 'any'],
+  'boolean': ['boolean', 'any'],
+  'string': ['string', 'any', 'text'],
+  'number': ['number', 'any'],
+  'json-path': ['json-path', 'string', 'any'],
 };
 
 /**
@@ -65,6 +69,7 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   ],
   json: [
     { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'input' },
+    { key: 'jsonPath', label: 'JSON Path', type: 'json-path', direction: 'input' },
     { key: 'jsonData', label: 'JSON 数据', type: 'json-data', direction: 'output' },
   ],
   lua: [
@@ -74,6 +79,19 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   prompt: [
     { key: 'context', label: '上下文', type: 'any', direction: 'input' },
     { key: 'result', label: '结果', type: 'text', direction: 'output' },
+  ],
+  // Basic type nodes
+  bool: [
+    { key: 'valueIn', label: '输入值', type: 'boolean', direction: 'input', maxConnections: 1 },
+    { key: 'value', label: '布尔值', type: 'boolean', direction: 'output' },
+  ],
+  string: [
+    { key: 'valueIn', label: '输入值', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'value', label: '字符串', type: 'string', direction: 'output' },
+  ],
+  number: [
+    { key: 'valueIn', label: '输入值', type: 'number', direction: 'input', maxConnections: 1 },
+    { key: 'value', label: '数值', type: 'number', direction: 'output' },
   ],
 };
 

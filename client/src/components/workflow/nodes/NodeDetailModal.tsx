@@ -505,7 +505,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
 
                 // Determine renderer based on port type
                 const isExcel = p.type === 'table-data' && displayValue?.columns;
-                const isJson = p.type === 'json-data' && displayValue?.data;
+                const isJson = p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
                 const isFileContent = typeof displayValue === 'string';
                 const isPre = !isExcel && !isJson && !isLua && typeof displayValue === 'object';
@@ -526,7 +526,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                           </Suspense>
                         ) : isJson ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
-                            <JsonRenderer data={displayValue.data} jsonPath={displayValue.path} />
+                            <JsonRenderer data={displayValue} />
                           </Suspense>
                         ) : isLua ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{displayValue.content?.slice(0, 200)}...</pre>}>

@@ -48,6 +48,10 @@ const PORT_COLORS: Record<string, string> = {
   'text': '#fa8c16',
   'table-data': '#52c41a',
   'json-data': '#13c2c2',
+  'boolean': '#eb2f96',
+  'string': '#fa8c16',
+  'number': '#13c2c2',
+  'json-path': '#722ed1',
 };
 
 const BaseNode: React.FC<BaseNodeProps> = ({
@@ -528,9 +532,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
                             <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
                           </Suspense>
-                        ) : p.type === 'json-data' && displayValue?.data ? (
+                        ) : p.type === 'json-data' ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
-                            <JsonRenderer data={displayValue.data} jsonPath={displayValue.path} />
+                            <JsonRenderer data={displayValue} />
                           </Suspense>
                         ) : p.type === 'text' && typeof displayValue === 'object' && displayValue?.content ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{displayValue.content?.slice(0, 80)}...</pre>}>

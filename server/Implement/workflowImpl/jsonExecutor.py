@@ -37,7 +37,7 @@ class JsonExecutor(BaseNodeExecutor):
                 if data is None:
                     return {"error": f"JSON path '{json_path}' returned no results"}
 
-            return {"data": data, "path": json_path or None}
+            return {"jsonData": data}
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON content: {str(e)}"}
         except Exception as e:
