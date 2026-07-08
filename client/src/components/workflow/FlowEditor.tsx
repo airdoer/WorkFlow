@@ -132,9 +132,12 @@ function FlowEditorInner({
   /**
    * When a node succeeds, mark its outgoing matched edges as activated
    * and cascade-trigger connected downstream nodes.
+   *
+   * A downstream node is only triggered when ALL its matched incoming edges
+   * have a successful upstream output — preventing partial-input runs.
    */
   const handleNodeSuccess = useCallback(
-    (succeededNodeId: string, output: any) => {
+    (succeededNodeId: string, _output: any) => {
       // Mark outgoing matched edges as activated
       setEdges((eds) =>
         eds.map((e) => {
@@ -145,22 +148,54 @@ function FlowEditorInner({
         }),
       );
 
-      // Cascade: find downstream nodes connected via matched edges and trigger them
+      // Cascade: find all downstream nodes connected from this node (all edges, not just matched)
       const currentEdges = getEdges();
       const downstreamEdges = currentEdges.filter(
-        (e) => e.source === succeededNodeId && e.data?.matchStatus === 'matched',
+        (e) => e.source === succeededNodeId,
       );
 
+      // Deduplicate downstream targets (a node may have multiple edges from this node)
+      const triggeredTargets = new Set<string>();
+
       for (const edge of downstreamEdges) {
+        if (triggeredTargets.has(edge.target)) continue;
+        triggeredTargets.add(edge.target);
+
         const targetNode = getNode(edge.target);
         if (!targetNode) continue;
 
-        // Gather input from the succeeded node's output
+        // Collect ALL upstream inputs for this downstream node
+        const allIncomingEdges = currentEdges.filter((e) => e.target === edge.target);
+
+        // Check: ALL incoming edges must have a successful upstream output (regardless of matchStatus).
+        // If any upstream hasn't completed yet, skip — it will trigger again when that upstream finishes.
+        const allUpstreamsReady = allIncomingEdges
+          .every((inEdge) => {
+            const srcNode = getNode(inEdge.source);
+            if (!srcNode) return false;
+            const srcOutput = (srcNode.data as any)?._runOutput;
+            return srcOutput && !srcOutput.error;
+          });
+
+        if (!allUpstreamsReady) {
+          // Not all upstreams done yet — this node will be triggered by the other upstream when it finishes
+          continue;
+        }
+
         const input: Record<string, any> = {};
-        if (edge.sourceHandle && output[edge.sourceHandle] !== undefined) {
-          input[edge.targetHandle || edge.sourceHandle] = output[edge.sourceHandle];
-        } else {
-          Object.assign(input, output);
+        for (const inEdge of allIncomingEdges) {
+          const srcNode = getNode(inEdge.source);
+          if (!srcNode) continue;
+          const srcOutput = (srcNode.data as any)?._runOutput;
+          if (!srcOutput || srcOutput.error) continue;
+          if (inEdge.sourceHandle && srcOutput[inEdge.sourceHandle] !== undefined) {
+            input[inEdge.targetHandle || inEdge.sourceHandle] = srcOutput[inEdge.sourceHandle];
+          } else if (inEdge.sourceHandle && srcOutput.value !== undefined) {
+            // Basic type nodes output { value: ... } — map to target handle
+            input[inEdge.targetHandle || inEdge.sourceHandle] = srcOutput.value;
+          } else {
+            Object.assign(input, srcOutput);
+          }
         }
 
         // Set downstream node to running
@@ -172,8 +207,16 @@ function FlowEditorInner({
           ),
         );
 
+        // Build clean config (strip internal keys)
+        const cleanConfig: Record<string, any> = {};
+        for (const [k, v] of Object.entries(targetNode.data as Record<string, any>)) {
+          if (!k.startsWith('_') && v !== undefined && v !== null && String(v).trim() !== '') {
+            cleanConfig[k] = v;
+          }
+        }
+
         // Run the downstream node
-        FlowApi.runNode(targetNode.type || '', targetNode.data || {}, input)
+        FlowApi.runNode(targetNode.type || '', cleanConfig, input)
           .then((result) => {
             const out = result.output ?? result;
             const newStatus = out?.error ? 'error' : 'success';

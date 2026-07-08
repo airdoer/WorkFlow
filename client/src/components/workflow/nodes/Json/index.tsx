@@ -108,8 +108,6 @@ function JsonNode({ data, id, selected }: NodeProps) {
   const collectUpstreamInput = useCallback(() => {
     const edges = getEdges();
     const incoming = edges.filter((e) => e.target === id && e.targetHandle);
-    const nodes_list: any[] = [];
-    // 需要 getNodes，但这里通过 getNode 逐个取
     const input: Record<string, any> = {};
     for (const edge of incoming) {
       const srcNode = getNode(edge.source);
@@ -187,7 +185,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
             : '#d9d9d9';
 
   const fields: NodeField[] = [
-    { key: 'jsonPath', label: 'JSON Path', placeholder: '$.data.items（可选）' },
+    { key: 'jsonPath', label: 'JSON Path', placeholder: '$.data.items（可选）', linkedPortKey: 'jsonPath' },
   ];
 
   return (

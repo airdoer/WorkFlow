@@ -13,17 +13,25 @@ class JsonExecutor(BaseNodeExecutor):
         - input_data: full upstream output dict (used as fallback)
         - config['jsonPath']: optional JSON path expression to filter data
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Get content from upstream — fileContent port, or raw input_data
         file_content = input_data.get("fileContent", "")
-        if not file_content and isinstance(input_data, dict):
-            # If upstream output was a full dict without fileContent key,
-            # try to use the whole dict as data
-            if input_data:
-                # Check if the entire input_data is the data to process
-                # (e.g. from another JSON node or a prompt node)
-                file_content = json.dumps(input_data, ensure_ascii=False)
 
-        json_path = config.get("jsonPath", "")
+        # jsonPath can come from config (manual input) or input_data (wired from upstream String node)
+        json_path = config.get("jsonPath", "") or input_data.get("jsonPath", "")
+
+        logger.warning(f"[JsonExecutor] input_data keys={list(input_data.keys())}, json_path={repr(json_path)}, file_content type={type(file_content)}, file_content[:80]={repr(str(file_content)[:80])}")
+
+        # Strip the known control keys so they don't get treated as data in fallback
+        _control_keys = {"fileContent", "jsonPath"}
+
+        if not file_content and isinstance(input_data, dict):
+            # If upstream output has no fileContent key, try remaining data fields as the source
+            data_fields = {k: v for k, v in input_data.items() if k not in _control_keys}
+            if data_fields:
+                file_content = json.dumps(data_fields, ensure_ascii=False)
 
         if not file_content:
             return {"error": "No input content. Connect an upstream node or provide content."}

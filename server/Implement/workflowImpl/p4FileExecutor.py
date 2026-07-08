@@ -42,9 +42,27 @@ class P4FileExecutor(BaseNodeExecutor):
         """
         Sync P4 file to local workspace using p4Utils.
         """
+        import subprocess as _sp
+        import os as _os
+
         p4_path = p4Utils.normalize_p4_path(p4_path)
         relative_path = p4_path.lstrip("/").replace("//", "")
-        local_path = os.path.join(config.P4_WORKSPACE_DIRECTORY, relative_path)
+        local_path = _os.path.join(config.P4_WORKSPACE_DIRECTORY, relative_path)
+
+        # Debug: test p4 connectivity inline
+        test_result = _sp.run(
+            ["p4", "files", p4_path.split("#")[0]],
+            stdout=_sp.PIPE, stderr=_sp.PIPE, check=False
+        )
+        test_out = test_result.stdout.decode("utf-8", errors="ignore").strip()
+        test_err = test_result.stderr.decode("utf-8", errors="ignore").strip()
+
+        if not test_out:
+            raise RuntimeError(
+                f"P4 check failed for {p4_path}: stdout={test_out!r} stderr={test_err!r} "
+                f"returncode={test_result.returncode} cwd={_os.getcwd()!r} "
+                f"P4CONFIG={_os.environ.get('P4CONFIG','NOT_SET')!r}"
+            )
 
         success = p4Utils.update_file(p4_path, local_path, force=True)
         if not success:

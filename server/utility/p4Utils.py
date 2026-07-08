@@ -1,8 +1,15 @@
 import re
 import os
-import subprocess
-from data.ClientSplitConfig import data as split_config
+import subprocess as _stdlib_subprocess
 from typing import List, Dict
+
+# Use gevent.subprocess if available so child-watchers work correctly under gevent
+try:
+    import gevent.subprocess as subprocess
+except ImportError:
+    import subprocess  # type: ignore
+
+from data.ClientSplitConfig import data as split_config
 
 import logging
 logger = logging.getLogger(__name__)
@@ -150,11 +157,22 @@ def get_latest_revision(p4FilePath: str) -> str:
     # 移除可能存在的版本号后缀，确保查询的是最新状态
     base_path = p4FilePath.split('#')[0]
     
-    # 使用 p4 files 命令获取文件信息
-    p4Cmd = f"p4 files {base_path}"
     try:
-        p4Result = os.popen(p4Cmd).read().strip()
-        
+        result = subprocess.run(
+            ["p4", "files", base_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False
+        )
+        p4Result = result.stdout.decode("utf-8", errors="ignore").strip()
+        stderr_out = result.stderr.decode("utf-8", errors="ignore").strip()
+
+        logger.warning(f"[p4Utils.get_latest_revision] path={base_path!r} returncode={result.returncode} stdout={p4Result!r} stderr={stderr_out!r}")
+
+        if not p4Result and stderr_out:
+            logger.warning(f"[p4Utils.get_latest_revision] no stdout, stderr: {stderr_out!r}")
+            return ""
+
         # 检查错误
         error_keywords = [
             "no such file",
@@ -162,10 +180,12 @@ def get_latest_revision(p4FilePath: str) -> str:
             "no file",
             "must refer",
             "not in client view",
-            "delete" # 如果文件被删除了，通常也会显示 delete
         ]
-        p4ResultLower = p4Result.lower()
-        if any(err in p4ResultLower for err in error_keywords):
+        combined = (p4Result + " " + stderr_out).lower()
+        if any(err in combined for err in error_keywords):
+            return ""
+        # 如果文件被删除了，不返回
+        if "delete" in p4Result.lower() and "#" in p4Result:
             return ""
 
         # 解析输出中的版本号
@@ -175,6 +195,7 @@ def get_latest_revision(p4FilePath: str) -> str:
             return f"{base_path}{match.group(1)}"
             
     except Exception as e:
+        logger.warning(f"[p4Utils.get_latest_revision] exception: {e}")
         print(f"获取最新版本号出错: {e}")
         
     return ""
@@ -404,6 +425,7 @@ def download_file(p4FilePath: str, targetPath: str) -> bool:
         # 判断是否报错
         if result.returncode != 0:
             errMsg = result.stderr.decode("utf-8", errors="ignore").lower()
+            logger.warning(f"[p4Utils.download_file] p4 print failed, returncode={result.returncode}, stderr={errMsg!r}")
             error_keywords = [
                 "no such file",
                 "no file",
@@ -416,9 +438,15 @@ def download_file(p4FilePath: str, targetPath: str) -> bool:
                 return False
             # 如果 returncode != 0 但 stderr 没有这些关键字，可能是其他原因
             return False
+        # Check file actually has content
+        file_size = os.path.getsize(targetPath)
+        if file_size == 0:
+            logger.warning(f"[p4Utils.download_file] p4 print succeeded but file is empty: {targetPath}")
+            return False
         return True
 
     except Exception as e:
+        logger.warning(f"[p4Utils.download_file] exception: {e}")
         print(f"下载文件出错: {e}")
         return False
 

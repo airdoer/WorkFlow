@@ -1,5 +1,5 @@
 import React, { useCallback, useState, lazy, Suspense, useMemo } from 'react';
-import { Handle, Position, useReactFlow } from 'reactflow';
+import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts } from '../PortTypes';
@@ -22,6 +22,10 @@ export interface NodeField {
   step?: number;
   options?: { label: string; value: string }[];
   required?: boolean;
+  /** If set, this field is driven by an input port with this key.
+   *  When that port has an active connection, the field is locked (read-only).
+   */
+  linkedPortKey?: string;
 }
 
 interface BaseNodeProps {
@@ -70,6 +74,22 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const runOutput = data._runOutput as any;
   const statusCfg = STATUS_CONFIG[runStatus];
 
+  // Reactively track which input ports are connected via edges
+  const connectedInputPorts = useStore(
+    useCallback(
+      (s) => {
+        const result: Record<string, boolean> = {};
+        for (const e of s.edges) {
+          if (e.target === id && e.targetHandle) {
+            result[e.targetHandle] = true;
+          }
+        }
+        return result;
+      },
+      [id],
+    ),
+  );
+
   const ports = getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
@@ -96,20 +116,22 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   }, [id, getEdges, getNodes]);
 
   // Check if all required fields are filled
+  // A required field is satisfied if: it has a value, OR its linkedPortKey is connected via an edge
   const canRun = useMemo(() => {
     if (runStatus === 'running') return false;
     return fields
       .filter((f) => f.required)
       .every((f) => {
+        if (f.linkedPortKey && connectedInputPorts[f.linkedPortKey]) return true;
         const val = data[f.key];
         if (f.type === 'multiselect') return Array.isArray(val) && val.length > 0;
         return val !== undefined && val !== null && String(val).trim() !== '';
       });
-  }, [fields, data, runStatus]);
+  }, [fields, data, runStatus, connectedInputPorts]);
 
   const missingRequired = useMemo(
-    () => fields.filter((f) => f.required && !data[f.key]),
-    [fields, data],
+    () => fields.filter((f) => f.required && !data[f.key] && !(f.linkedPortKey && connectedInputPorts[f.linkedPortKey])),
+    [fields, data, connectedInputPorts],
   );
 
   const handleFieldChange = useCallback(
@@ -333,29 +355,39 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       {/* ===== Section 3: Content — fields + output ===== */}
       <div style={{ padding: '8px 10px' }}>
         {fields.map((f) => {
+          const locked = !!(f.linkedPortKey && connectedInputPorts[f.linkedPortKey]);
           const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
+
+          const lockedStyle: React.CSSProperties = {
+            width: '100%', fontSize: 11, padding: '3px 6px',
+            border: '1px solid #d9d9d9', borderRadius: 3, boxSizing: 'border-box',
+            background: '#f5f5f5', color: '#bbb', cursor: 'not-allowed',
+          };
+
+          const fieldLabel = (
+            <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
+              {f.label}
+              {f.required && !locked && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
+              {locked && <span style={{ color: '#2f54eb', marginLeft: 4, fontSize: 9 }}>🔗连线</span>}
+            </label>
+          );
 
           if (f.type === 'textarea') {
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
-                <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
-                  {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
-                </label>
+                {fieldLabel}
                 <textarea
                   value={val}
-                  onChange={(e) => handleFieldChange(f.key, e.target.value)}
-                  placeholder={f.placeholder}
+                  disabled={locked}
+                  onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                  placeholder={locked ? '由连线提供' : f.placeholder}
                   rows={f.rows || 3}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: '100%',
-                    fontSize: 11,
-                    padding: '3px 6px',
+                  style={locked ? { ...lockedStyle, resize: 'vertical' } : {
+                    width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                    borderRadius: 3,
-                    resize: 'vertical',
-                    boxSizing: 'border-box',
+                    borderRadius: 3, resize: 'vertical', boxSizing: 'border-box',
                   }}
                 />
               </div>
@@ -365,24 +397,20 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           if (f.type === 'number') {
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
-                <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
-                  {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
-                </label>
+                {fieldLabel}
                 <input
                   type="number"
                   value={val}
-                  onChange={(e) => handleFieldChange(f.key, parseFloat(e.target.value) || 0)}
-                  placeholder={f.placeholder}
+                  disabled={locked}
+                  onChange={(e) => !locked && handleFieldChange(f.key, parseFloat(e.target.value) || 0)}
+                  placeholder={locked ? '由连线提供' : f.placeholder}
                   step={f.step}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: '100%',
-                    fontSize: 11,
-                    padding: '3px 6px',
+                  style={locked ? lockedStyle : {
+                    width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                    borderRadius: 3,
-                    boxSizing: 'border-box',
+                    borderRadius: 3, boxSizing: 'border-box',
                   }}
                 />
               </div>
@@ -392,22 +420,17 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           if (f.type === 'select' && f.options) {
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
-                <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
-                  {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
-                </label>
+                {fieldLabel}
                 <select
                   value={val}
-                  onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                  disabled={locked}
+                  onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: '100%',
-                    fontSize: 11,
-                    padding: '3px 6px',
+                  style={locked ? lockedStyle : {
+                    width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                    borderRadius: 3,
-                    boxSizing: 'border-box',
-                    background: '#fff',
+                    borderRadius: 3, boxSizing: 'border-box', background: '#fff',
                   }}
                 >
                   <option value="">-- 选择 --</option>
@@ -420,17 +443,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           }
 
           if (f.type === 'multiselect' && f.options) {
-            const selected: string[] = Array.isArray(val) ? val : [];
+            const selectedVals: string[] = Array.isArray(val) ? val : [];
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
-                <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
-                  {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
-                  {selected.length > 0 && (
-                    <span style={{ color: '#1890ff', marginLeft: 4 }}>({selected.length})</span>
-                  )}
-                </label>
+                {fieldLabel}
                 <div
-                  style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 100, overflowY: 'auto' }}
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 100, overflowY: 'auto', opacity: locked ? 0.5 : 1 }}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -438,25 +456,25 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     <span style={{ fontSize: 10, color: '#999' }}>运行后加载选项</span>
                   )}
                   {f.options.map((opt) => {
-                    const isSelected = selected.includes(opt.value);
+                    const isSelected = selectedVals.includes(opt.value);
                     return (
                       <span
                         key={opt.value}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (locked) return;
                           const next = isSelected
-                            ? selected.filter((s) => s !== opt.value)
-                            : [...selected, opt.value];
+                            ? selectedVals.filter((s) => s !== opt.value)
+                            : [...selectedVals, opt.value];
                           handleFieldChange(f.key, next);
                         }}
                         style={{
-                          padding: '2px 8px',
-                          fontSize: 10,
+                          padding: '2px 8px', fontSize: 10,
                           border: `1px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
                           borderRadius: 3,
                           background: isSelected ? '#e6f7ff' : '#fff',
                           color: isSelected ? '#1890ff' : '#666',
-                          cursor: 'pointer',
+                          cursor: locked ? 'not-allowed' : 'pointer',
                           userSelect: 'none',
                         }}
                       >
@@ -472,23 +490,19 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           // Default: text input
           return (
             <div key={f.key} style={{ marginBottom: 6 }}>
-              <label style={{ display: 'block', fontSize: 10, color: '#888', marginBottom: 2 }}>
-                {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>}
-              </label>
+              {fieldLabel}
               <input
                 type="text"
                 value={val}
-                onChange={(e) => handleFieldChange(f.key, e.target.value)}
-                placeholder={f.placeholder}
+                disabled={locked}
+                onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                placeholder={locked ? '由连线提供' : f.placeholder}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  width: '100%',
-                  fontSize: 11,
-                  padding: '3px 6px',
+                style={locked ? lockedStyle : {
+                  width: '100%', fontSize: 11, padding: '3px 6px',
                   border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                  borderRadius: 3,
-                  boxSizing: 'border-box',
+                  borderRadius: 3, boxSizing: 'border-box',
                 }}
               />
             </div>

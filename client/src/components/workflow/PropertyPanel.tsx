@@ -340,7 +340,43 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
           <FieldInput label="入口函数（可选）" value={(nodeData.entryFunction as string) || ''} onChange={(v) => handleFieldChange('entryFunction', v)} placeholder="入口函数名" />
         )}
         {nodeType === 'json' && (
-          <FieldInput label="JSON Path（可选）" value={(nodeData.jsonPath as string) || ''} onChange={(v) => handleFieldChange('jsonPath', v)} placeholder="如 $.data.items" />
+          (() => {
+            const jsonPathLocked = incomingEdges.some((e) => e.targetHandle === 'jsonPath');
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontSize: 11, color: '#666' }}>
+                  JSON Path（可选）
+                  {jsonPathLocked && (
+                    <span style={{
+                      marginLeft: 8, fontSize: 10, fontWeight: 400,
+                      color: '#2f54eb', background: '#f0f5ff', border: '1px solid #adc6ff',
+                      borderRadius: 3, padding: '1px 6px',
+                    }}>
+                      🔗 由连线提供
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={(nodeData.jsonPath as string) || ''}
+                  disabled={jsonPathLocked}
+                  onChange={(e) => !jsonPathLocked && handleFieldChange('jsonPath', e.target.value)}
+                  placeholder={jsonPathLocked ? '由连线提供' : '如 $.data.items'}
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    boxSizing: 'border-box',
+                    background: jsonPathLocked ? '#f5f5f5' : '#fff',
+                    color: jsonPathLocked ? '#aaa' : '#333',
+                    cursor: jsonPathLocked ? 'not-allowed' : 'text',
+                  }}
+                />
+              </div>
+            );
+          })()
         )}
         {nodeType === 'prompt' && (
           <>
