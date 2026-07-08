@@ -125,34 +125,8 @@ def workflow_node_run():
         if not node_type:
             return jsonify({'error': 'type is required'}), 400
         
-        # gevent environment: executors are `async def` but gevent subprocess requires
-        # running on the default hub loop. We run the async coroutine directly on the
-        # gevent hub using gevent's own async bridge (no asyncio event loop needed).
-        import gevent
-        from gevent import monkey as _monkey
-
-        result_holder = {}
-
-        def _run_executor():
-            """Run inside a gevent greenlet so gevent.subprocess works correctly."""
-            import asyncio as _asyncio
-            coro = ExecutorManager.run_node(node_type, config, input_data)
-            # In gevent greenlet, we can run asyncio coroutine by creating a new loop
-            # only if asyncio is not already patched. Since monkey.patch_all(thread=False)
-            # doesn't patch asyncio, a new loop here is safe within this greenlet.
-            loop = _asyncio.new_event_loop()
-            try:
-                result_holder['output'] = loop.run_until_complete(coro)
-            finally:
-                loop.close()
-
-        g = gevent.spawn(_run_executor)
-        g.join(timeout=120)
-
-        if g.exception:
-            return jsonify({'error': str(g.exception)}), 500
-
-        output = result_holder.get('output', {'error': 'No output returned'})
+        # Executors are now synchronous — call directly, no asyncio/threading needed
+        output = ExecutorManager.run_node(node_type, config, input_data)
         return jsonify({'output': output})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

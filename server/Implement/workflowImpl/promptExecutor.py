@@ -6,7 +6,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class PromptExecutor(BaseNodeExecutor):
     type = "prompt"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         prompt = config.get("prompt", "")
         temperature = config.get("temperature", 0.7)
         model = config.get("model", "qwen-plus")
@@ -20,12 +20,13 @@ class PromptExecutor(BaseNodeExecutor):
 
         try:
             import openai
-            client = openai.AsyncOpenAI(
+            # Use synchronous openai client (compatible with gevent)
+            client = openai.OpenAI(
                 api_key=os.getenv("DASHSCOPE_API_KEY", ""),
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
 
-            response = await client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,

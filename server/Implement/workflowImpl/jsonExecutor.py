@@ -6,7 +6,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class JsonExecutor(BaseNodeExecutor):
     type = "json"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         """
         JSON renderer: receives content from upstream node.
         - input_data['fileContent']: raw file content (string) — from P4File or any node

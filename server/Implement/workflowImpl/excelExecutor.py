@@ -8,7 +8,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class ExcelExecutor(BaseNodeExecutor):
     type = "excel"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         """
         Excel renderer: receives content from upstream node.
         - input_data['localPath']: local file path (from P4File node for binary files)

@@ -8,7 +8,8 @@ class BaseNodeExecutor(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
+        """Synchronous execution — no asyncio, compatible with gevent."""
         pass
 
 
@@ -24,11 +25,11 @@ class ExecutorManager:
         return cls._executors.get(node_type)
 
     @classmethod
-    async def run_node(cls, node_type: str, config: dict, input_data: dict) -> dict:
+    def run_node(cls, node_type: str, config: dict, input_data: dict) -> dict:
         executor = cls.get(node_type)
         if not executor:
             raise ValueError(f"Unknown node type: {node_type}")
-        return await executor.execute(config, input_data)
+        return executor.execute(config, input_data)
 
     @classmethod
     def list_executors(cls):

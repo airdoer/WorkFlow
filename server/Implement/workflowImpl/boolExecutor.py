@@ -4,7 +4,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class BoolExecutor(BaseNodeExecutor):
     type = "bool"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         """
         Bool node: outputs a boolean value.
         - If connected via valueIn port, use upstream value

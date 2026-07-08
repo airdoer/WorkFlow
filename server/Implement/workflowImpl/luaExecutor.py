@@ -6,7 +6,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class LuaExecutor(BaseNodeExecutor):
     type = "lua"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         """
         Lua renderer: receives content from upstream node.
         - input_data['fileContent']: raw file content (string)

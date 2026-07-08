@@ -148,10 +148,10 @@ function FlowEditorInner({
         }),
       );
 
-      // Cascade: find all downstream nodes connected from this node (all edges, not just matched)
+      // Cascade: find downstream nodes connected via matched edges and trigger them
       const currentEdges = getEdges();
       const downstreamEdges = currentEdges.filter(
-        (e) => e.source === succeededNodeId,
+        (e) => e.source === succeededNodeId && e.data?.matchStatus === 'matched',
       );
 
       // Deduplicate downstream targets (a node may have multiple edges from this node)
@@ -167,9 +167,10 @@ function FlowEditorInner({
         // Collect ALL upstream inputs for this downstream node
         const allIncomingEdges = currentEdges.filter((e) => e.target === edge.target);
 
-        // Check: ALL incoming edges must have a successful upstream output (regardless of matchStatus).
+        // Check: ALL matched incoming edges must have a successful upstream output.
         // If any upstream hasn't completed yet, skip — it will trigger again when that upstream finishes.
         const allUpstreamsReady = allIncomingEdges
+          .filter((e) => e.data?.matchStatus === 'matched')
           .every((inEdge) => {
             const srcNode = getNode(inEdge.source);
             if (!srcNode) return false;

@@ -4,7 +4,7 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 class NumberExecutor(BaseNodeExecutor):
     type = "number"
 
-    async def execute(self, config: dict, input_data: dict) -> dict:
+    def execute(self, config: dict, input_data: dict) -> dict:
         """
         Number node: outputs a numeric value.
         - If connected via valueIn port, use upstream value
