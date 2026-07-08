@@ -1,9 +1,13 @@
 import json
 import os
 import uuid
+import asyncio
+import logging
 from datetime import datetime
 
 WORKFLOW_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow')
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_dir():
@@ -78,72 +82,191 @@ class WorkflowManager:
 
 
 class WorkflowRuntime:
-    _tasks = {}
+    """DAG-based workflow execution runtime.
+
+    Execution strategy:
+    - Root nodes (no incoming edges) are launched concurrently via asyncio.gather.
+    - Each non-root node waits until ALL its upstream dependencies have finished.
+    - Shared nodes (nodes with multiple upstream parents) are executed exactly once,
+      after every one of their parent nodes has completed.
+    - Node outputs are stored in a shared context dict, protected by an asyncio.Lock.
+    """
+
+    _tasks: dict = {}
 
     @classmethod
     async def run(cls, workflow_json, task_id):
         from Implement.workflowImpl.nodeExecutor import ExecutorManager
-        from collections import deque
+
+        logger.info("[WorkflowRuntime.run] Starting: task_id=%r", task_id)
 
         nodes = workflow_json.get('nodes', [])
         edges = workflow_json.get('edges', [])
 
-        adj = {n['id']: [] for n in nodes}
-        in_degree = {n['id']: 0 for n in nodes}
+        logger.info("[WorkflowRuntime.run] task_id=%r, nodes=%d, edges=%d",
+                    task_id, len(nodes), len(edges))
+
+        if not nodes:
+            logger.warning("[WorkflowRuntime.run] task_id=%r: no nodes found, finishing immediately", task_id)
+            cls._tasks[task_id] = {'status': 'success', 'nodes': {}, 'result': {}}
+            return
+
+        # ── Build adjacency structures ──────────────────────────────────────
         node_map = {n['id']: n for n in nodes}
+
+        # adj[src] = list of (src, tgt, edge) — downstream edges from src
+        adj: dict[str, list] = {n['id']: [] for n in nodes}
+        # predecessors[tgt] = list of src node IDs
+        predecessors: dict[str, list[str]] = {n['id']: [] for n in nodes}
+        # in_degree for cycle detection
+        in_degree: dict[str, int] = {n['id']: 0 for n in nodes}
+        # All edges indexed by target for input assembly
+        edges_by_target: dict[str, list] = {n['id']: [] for n in nodes}
 
         for edge in edges:
             src = edge.get('source') or edge.get('sourceNodeID')
             tgt = edge.get('target') or edge.get('targetNodeID')
-            if src in adj and tgt in in_degree:
+            if src in node_map and tgt in node_map:
                 adj[src].append(tgt)
+                predecessors[tgt].append(src)
                 in_degree[tgt] += 1
+                edges_by_target[tgt].append(edge)
 
-        queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
-        order = []
-        while queue:
-            nid = queue.popleft()
-            order.append(nid)
+        # ── Cycle detection via topological sort ───────────────────────────
+        from collections import deque
+        topo_queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
+        topo_order = []
+        topo_in_degree = dict(in_degree)  # copy for cycle check
+        while topo_queue:
+            nid = topo_queue.popleft()
+            topo_order.append(nid)
             for neighbor in adj[nid]:
-                in_degree[neighbor] -= 1
-                if in_degree[neighbor] == 0:
-                    queue.append(neighbor)
+                topo_in_degree[neighbor] -= 1
+                if topo_in_degree[neighbor] == 0:
+                    topo_queue.append(neighbor)
 
-        if len(order) != len(nodes):
+        if len(topo_order) != len(nodes):
+            logger.error("[WorkflowRuntime.run] task_id=%r: cycle detected in workflow graph", task_id)
+            cls._tasks[task_id] = {
+                'status': 'error',
+                'nodes': {n['id']: 'idle' for n in nodes},
+                'result': None,
+                'error': 'Workflow contains a cycle',
+            }
             raise ValueError("Workflow contains a cycle")
 
+        root_nodes = [nid for nid, deg in in_degree.items() if deg == 0]
+        logger.info("[WorkflowRuntime.run] task_id=%r, root_nodes=%s, topo_order=%s",
+                    task_id, root_nodes, topo_order)
+
+        # ── Initialize task state ─────────────────────────────────────────
         cls._tasks[task_id] = {
             'status': 'processing',
-            'nodes': {nid: 'idle' for nid in order},
+            'nodes': {nid: 'idle' for nid in node_map},
             'result': None,
+            'error': None,
         }
 
-        context = {}
-        for nid in order:
+        # Shared execution context: node_id → output dict
+        context: dict = {}
+        context_lock = asyncio.Lock()
+
+        # Per-node asyncio.Event: set when the node has finished
+        node_done: dict[str, asyncio.Event] = {nid: asyncio.Event() for nid in node_map}
+
+        # ── Node executor coroutine ────────────────────────────────────────
+        async def execute_node(nid: str):
             node = node_map[nid]
+            node_type = node.get('type', '')
+
+            # Wait for ALL predecessors to complete first
+            preds = predecessors[nid]
+            if preds:
+                logger.info("[WorkflowRuntime] task_id=%r, node=%r: waiting for predecessors %s",
+                            task_id, nid, preds)
+                await asyncio.gather(*[node_done[p].wait() for p in preds])
+                logger.info("[WorkflowRuntime] task_id=%r, node=%r: all predecessors done", task_id, nid)
+
+            # Check for upstream errors
+            async with context_lock:
+                upstream_errors = [
+                    f"{p}: {context[p].get('error')}"
+                    for p in preds
+                    if isinstance(context.get(p), dict) and context[p].get('error')
+                ]
+            if upstream_errors:
+                error_msg = f"Upstream node(s) failed: {'; '.join(upstream_errors)}"
+                logger.warning("[WorkflowRuntime] task_id=%r, node=%r: skipping due to upstream errors: %s",
+                               task_id, nid, error_msg)
+                async with context_lock:
+                    context[nid] = {'error': error_msg}
+                cls._tasks[task_id]['nodes'][nid] = 'error'
+                node_done[nid].set()
+                return
+
+            # Assemble input_data from upstream outputs via port mapping
+            async with context_lock:
+                input_data: dict = {}
+                for edge in edges_by_target[nid]:
+                    src = edge.get('source') or edge.get('sourceNodeID')
+                    src_output = context.get(src, {})
+                    target_handle = edge.get('targetHandle')
+                    source_handle = edge.get('sourceHandle')
+                    if target_handle and source_handle and source_handle in src_output:
+                        input_data[target_handle] = src_output[source_handle]
+                    elif target_handle:
+                        input_data.update(src_output)
+                    else:
+                        input_data.update(src_output)
+
+            logger.info("[WorkflowRuntime] task_id=%r, node=%r (type=%r): executing, input_keys=%s",
+                        task_id, nid, node_type, list(input_data.keys()))
             cls._tasks[task_id]['nodes'][nid] = 'processing'
 
-            input_edges = [e for e in edges if (e.get('target') or e.get('targetNodeID')) == nid]
-            input_data = {}
-            for edge in input_edges:
-                src = edge.get('source') or edge.get('sourceNodeID')
-                src_output = context.get(src, {})
-                # Map port-keyed input: if targetHandle specified, map from sourceHandle
-                target_handle = edge.get('targetHandle')
-                source_handle = edge.get('sourceHandle')
-                if target_handle and source_handle and source_handle in src_output:
-                    input_data[target_handle] = src_output[source_handle]
-                elif target_handle:
-                    # Merge all upstream data under the target port key
-                    input_data.update(src_output)
+            try:
+                output = ExecutorManager.run_node(node_type, node.get('data', {}), input_data)
+                async with context_lock:
+                    context[nid] = output
+
+                if isinstance(output, dict) and output.get('error'):
+                    logger.warning("[WorkflowRuntime] task_id=%r, node=%r: executor error: %s",
+                                   task_id, nid, output['error'])
+                    cls._tasks[task_id]['nodes'][nid] = 'error'
                 else:
-                    input_data.update(src_output)
+                    output_keys = list(output.keys()) if isinstance(output, dict) else str(type(output))
+                    logger.info("[WorkflowRuntime] task_id=%r, node=%r: success, output_keys=%s",
+                                task_id, nid, output_keys)
+                    cls._tasks[task_id]['nodes'][nid] = 'success'
 
-            output = await ExecutorManager.run_node(node.get('type', ''), node.get('data', {}), input_data)
-            context[nid] = output
-            cls._tasks[task_id]['nodes'][nid] = 'success'
+            except Exception as exc:
+                logger.exception("[WorkflowRuntime] task_id=%r, node=%r: exception during execution: %s",
+                                 task_id, nid, exc)
+                async with context_lock:
+                    context[nid] = {'error': str(exc)}
+                cls._tasks[task_id]['nodes'][nid] = 'error'
+            finally:
+                # Always mark as done so downstream nodes are not blocked
+                node_done[nid].set()
+                logger.debug("[WorkflowRuntime] task_id=%r, node=%r: event set", task_id, nid)
 
-        cls._tasks[task_id]['status'] = 'success'
+        # ── Schedule all nodes concurrently ───────────────────────────────
+        # Each node coroutine internally waits for its predecessors, so launching
+        # all coroutines at once is safe. Root nodes start immediately; shared /
+        # downstream nodes block on their predecessor events.
+        logger.info("[WorkflowRuntime.run] task_id=%r: launching %d node coroutines", task_id, len(nodes))
+        await asyncio.gather(*[execute_node(nid) for nid in node_map])
+
+        # ── Finalize ──────────────────────────────────────────────────────
+        failed_nodes = [nid for nid, st in cls._tasks[task_id]['nodes'].items() if st == 'error']
+        if failed_nodes:
+            cls._tasks[task_id]['status'] = 'error'
+            cls._tasks[task_id]['error'] = f"Node(s) failed: {failed_nodes}"
+            logger.warning("[WorkflowRuntime.run] task_id=%r: finished with errors, failed_nodes=%s",
+                           task_id, failed_nodes)
+        else:
+            cls._tasks[task_id]['status'] = 'success'
+            logger.info("[WorkflowRuntime.run] task_id=%r: finished successfully", task_id)
+
         cls._tasks[task_id]['result'] = context
 
     @classmethod
@@ -152,7 +275,11 @@ class WorkflowRuntime:
 
     @classmethod
     def cancel_task(cls, task_id):
-        if task_id in cls._tasks:
-            cls._tasks[task_id]['status'] = 'canceled'
+        task = cls._tasks.get(task_id)
+        if task and task.get('status') == 'processing':
+            task['status'] = 'canceled'
+            logger.info("[WorkflowRuntime.cancel_task] task_id=%r canceled", task_id)
             return True
+        logger.warning("[WorkflowRuntime.cancel_task] task_id=%r not found or not running (status=%r)",
+                       task_id, task.get('status') if task else None)
         return False

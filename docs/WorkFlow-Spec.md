@@ -863,28 +863,89 @@ class LuaExecutor(BaseNodeExecutor):
 
 ### 12.1 后端 WorkflowRuntime
 
+**执行策略：**
+
+| 场景 | 行为 |
+|------|------|
+| **单节点 run**（`/api/workflow/node/run`） | 只执行当前节点本身，不触发下游。下游级联由**前端** NodeEventBus 负责调度。 |
+| **整图 run**（`/api/workflow/run`） | 在后台线程+独立 event loop 中异步执行整个 DAG，所有节点并发调度，共享节点等待所有前驱完成。 |
+
+**整图 run 并发调度流程：**
+
+```
+1. 构建邻接表（adj）、前驱表（predecessors）、按目标索引的边表（edges_by_target）
+2. 拓扑排序做环检测（Kahn 算法），有环则报错退出
+3. 为每个节点创建 asyncio.Event（node_done[nid]）
+4. 一次性 asyncio.gather 所有节点 coroutine（并发调度）
+   - 根节点（无前驱）：立即开始执行
+   - 下游节点：await asyncio.gather(*[node_done[p].wait() for p in preds]) 等待所有前驱完成
+   - 公共节点（多个前驱）：等待所有上游的 Event 都 set 后才开始，保证只执行一次
+5. 节点执行完毕 → 输出写入 context（asyncio.Lock 保护） → node_done[nid].set()
+6. 上游若有 error → 下游跳过执行，状态标为 error
+7. 全部完成 → 更新 task status 为 success / error
+```
+
+**公共节点（多前驱）示意：**
+
+```
+  RootA ─────┐
+              ├──▶ SharedNode ──▶ LeafNode
+  RootB ─────┘
+
+SharedNode 会等待 RootA 和 RootB 都完成（两个 Event 都 set）后才开始执行
+```
+
+**代码结构：**
+
 ```python
 class WorkflowRuntime:
+    _tasks: dict = {}
+
     @classmethod
     async def run(cls, workflow_json, task_id):
-        # 1. DAG 构建 + 拓扑排序
-        # 2. 按序执行每个节点
-        # 3. 端口映射：edge.sourceHandle → edge.targetHandle
-        # 4. 上下文传递：上游输出 → 下游 input_data
-        for nid in order:
-            node = node_map[nid]
-            input_edges = [e for e in edges if e.get('target') == nid]
-            input_data = {}
-            for edge in input_edges:
-                src_output = context.get(edge['source'], {})
-                if edge.get('targetHandle') and edge.get('sourceHandle'):
-                    if edge['sourceHandle'] in src_output:
-                        input_data[edge['targetHandle']] = src_output[edge['sourceHandle']]
-                else:
-                    input_data.update(src_output)
-            output = await ExecutorManager.run_node(node['type'], node['data'], input_data)
-            context[nid] = output
+        # 1. 构建 adj / predecessors / edges_by_target
+        # 2. 拓扑排序环检测
+        # 3. 初始化 task 状态
+        # 4. 创建每个节点的 asyncio.Event
+        context: dict = {}
+        context_lock = asyncio.Lock()
+        node_done: dict[str, asyncio.Event] = {nid: asyncio.Event() for nid in node_map}
+
+        async def execute_node(nid: str):
+            # 等待所有前驱完成
+            await asyncio.gather(*[node_done[p].wait() for p in predecessors[nid]])
+            # 检查上游是否有 error，有则跳过
+            # 从 context 收集 input_data（按端口映射）
+            # 执行节点
+            output = await ExecutorManager.run_node(node_type, node['data'], input_data)
+            async with context_lock:
+                context[nid] = output
+            node_done[nid].set()  # 通知下游可以继续
+
+        # 并发启动所有节点（根节点立即跑，其余节点等待各自前驱）
+        await asyncio.gather(*[execute_node(nid) for nid in node_map])
+
+    @classmethod
+    def get_task_status(cls, task_id): ...
+
+    @classmethod
+    def cancel_task(cls, task_id): ...
 ```
+
+### 12.2 日志规范
+
+后端各模块均使用 Python 标准 `logging` 模块（`logging.getLogger(__name__)`），日志格式：
+
+```
+[模块名.方法名] <关键字段>=<值>, ...
+```
+
+| 级别 | 场景 |
+|------|------|
+| `INFO` | API 请求入口、出口（成功）、任务启动/完成 |
+| `WARNING` | 参数缺失、资源未找到、执行器返回 error 字段、上游节点失败导致跳过 |
+| `DEBUG` | 状态查询（高频轮询接口）、节点 Event set 等细粒度事件 |
+| `ERROR` / `EXCEPTION` | 未预期异常（含完整 traceback）|
 
 ---
 
@@ -1022,11 +1083,13 @@ class WorkflowRuntime:
 7. ~~输出渲染（复用 Excel/JSON/Lua 渲染器）~~ ✅
 8. ~~端口信息（底部可折叠 Section）~~ ✅
 
-### Phase 6: 整体运行（待实现）
-1. 实现 GraphParser（DAG 解析 + 拓扑排序 + 环检测）
-2. 实现前端 Runtime（按拓扑序调度节点）
-3. 完善 `/api/workflow/run` 路由 + 端口映射
-4. Socket.IO 运行状态推送（如需要）
+### Phase 6: 整体运行 ✅（已完成）
+1. ~~实现后端 WorkflowRuntime 并发调度：asyncio.gather + asyncio.Event 等待前驱~~ ✅
+2. ~~公共节点等待所有上游前驱完成后再执行~~ ✅
+3. ~~上游 error 自动跳过下游节点~~ ✅
+4. ~~端口映射（targetHandle/sourceHandle）~~ ✅
+5. ~~完善 `/api/workflow/run` 路由 + 日志~~ ✅
+6. Socket.IO 实时推送（待实现，当前通过轮询 `/status` 接口）
 
 ### Phase 7: 增强（待实现）
 1. 节点拖拽排序（React Flow dnd 支持）
