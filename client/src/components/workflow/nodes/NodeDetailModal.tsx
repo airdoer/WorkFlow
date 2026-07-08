@@ -1,0 +1,563 @@
+import React, { useCallback, useState, useMemo, lazy, Suspense, useRef } from 'react';
+import { Modal, Button, Tag, message } from 'antd';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined } from '@ant-design/icons';
+import { useReactFlow, useStore } from 'reactflow';
+import type { NodeField, RunStatus } from './BaseNode';
+import { getNodePorts } from '../PortTypes';
+import { FlowApi } from '../services/FlowApi';
+import { NodeEventBus } from '../NodeEventBus';
+
+const PORT_COLORS: Record<string, string> = {
+  'file-content': '#1890ff',
+  'file-path': '#722ed1',
+  'any': '#8c8c8c',
+  'text': '#fa8c16',
+  'table-data': '#52c41a',
+  'json-data': '#13c2c2',
+};
+
+const STATUS_CONFIG: Record<RunStatus, { color: string; bg: string; label: string; icon: any }> = {
+  idle: { color: '#8c8c8c', bg: '#e8e8e8', label: '未运行', icon: PlayCircleOutlined },
+  running: { color: '#1890ff', bg: '#bae7ff', label: '运行中', icon: LoadingOutlined },
+  success: { color: '#52c41a', bg: '#d9f7be', label: '运行成功', icon: CheckCircleOutlined },
+  error: { color: '#ff4d4f', bg: '#ffa39e', label: '运行失败', icon: CloseCircleOutlined },
+};
+
+// Lazy renderers
+const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
+const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
+const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
+
+interface NodeDetailModalProps {
+  open: boolean;
+  onClose: () => void;
+  nodeId: string;
+  nodeType: string;
+  icon: string;
+  label: string;
+  fields: NodeField[];
+}
+
+/** Collapsible section with deeper header */
+function DetailSection({ title, defaultOpen = true, children, extra }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean; extra?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 12, border: '1px solid #d9d9d9', borderRadius: 6, overflow: 'hidden' }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          padding: '10px 14px', background: '#e6e6e6', fontWeight: 700, fontSize: 13, color: '#333',
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none',
+        }}
+      >
+        <span>{title}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {extra}
+          <span style={{ fontSize: 10, color: '#666' }}>{open ? '▼' : '▶'}</span>
+        </span>
+      </div>
+      {open && <div style={{ padding: '12px 14px', background: '#fff' }}>{children}</div>}
+    </div>
+  );
+}
+
+const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
+  open, onClose, nodeId, nodeType, icon, label, fields,
+}) => {
+  const { setNodes, getEdges, getNodes } = useReactFlow();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to live node data via useStore so any setNodes update re-renders this component
+  const nodeData = useStore(
+    useCallback(
+      (s) => {
+        const n = s.nodeInternals.get(nodeId);
+        return (n?.data || {}) as Record<string, any>;
+      },
+      [nodeId],
+    ),
+  );
+
+  const data = nodeData;
+  const runStatus: RunStatus = data._runStatus || 'idle';
+  const runOutput = data._runOutput as any;
+  const statusCfg = STATUS_CONFIG[runStatus];
+
+  const ports = getNodePorts(nodeType);
+  const inputPorts = ports.filter((p) => p.direction === 'input');
+  const outputPorts = ports.filter((p) => p.direction === 'output');
+
+  // Subscribe to all nodes so upstream data changes also trigger re-render
+  const allNodes = useStore((s) => Array.from(s.nodeInternals.values()));
+
+  // Upstream data
+  const upstreamInfo = useMemo(() => {
+    const edges = getEdges();
+    const incoming = edges.filter((e) => e.target === nodeId && e.data?.matchStatus === 'matched');
+    return incoming.map((e) => {
+      const tgtPort = inputPorts.find((p) => p.key === e.targetHandle);
+      const srcNode = allNodes.find((n) => n.id === e.source);
+      const srcOutput = (srcNode?.data as any)?._runOutput;
+      let previewValue: any = undefined;
+      if (srcOutput && !srcOutput.error) {
+        if (e.sourceHandle && srcOutput[e.sourceHandle] !== undefined) {
+          previewValue = srcOutput[e.sourceHandle];
+        } else {
+          previewValue = srcOutput;
+        }
+      }
+      return {
+        sourceId: e.source,
+        srcHandle: e.sourceHandle,
+        tgtHandle: e.targetHandle,
+        tgtPortLabel: tgtPort?.label || e.targetHandle || '',
+        tgtPortType: tgtPort?.type || '',
+        hasData: previewValue !== undefined,
+        preview: previewValue !== undefined
+          ? (typeof previewValue === 'string' ? previewValue : JSON.stringify(previewValue, null, 2))
+          : null,
+      };
+    });
+  }, [getEdges, allNodes, nodeId, inputPorts]);
+
+  // Check required fields
+  const canRun = useMemo(() => {
+    if (runStatus === 'running') return false;
+    return fields
+      .filter((f) => f.required)
+      .every((f) => {
+        const val = data[f.key];
+        if (f.type === 'multiselect') return Array.isArray(val) && val.length > 0;
+        return val !== undefined && val !== null && String(val).trim() !== '';
+      });
+  }, [fields, data, runStatus]);
+
+  const missingRequired = useMemo(
+    () => fields.filter((f) => f.required && !data[f.key]),
+    [fields, data],
+  );
+
+  const handleFieldChange = useCallback(
+    (key: string, value: any) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n,
+        ),
+      );
+    },
+    [nodeId, setNodes],
+  );
+
+  const collectUpstreamInput = useCallback(() => {
+    const edges = getEdges();
+    const incoming = edges.filter((e) => e.target === nodeId && e.targetHandle);
+    const nodes = getNodes();
+    const input: Record<string, any> = {};
+    for (const edge of incoming) {
+      const srcNode = nodes.find((n) => n.id === edge.source);
+      if (!srcNode) continue;
+      const srcOutput = (srcNode.data as any)?._runOutput;
+      if (!srcOutput || srcOutput.error) continue;
+      if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
+        input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
+      } else {
+        Object.assign(input, srcOutput);
+      }
+    }
+    return input;
+  }, [nodeId, getEdges, getNodes]);
+
+  const handleRun = useCallback(async () => {
+    if (!canRun) return;
+
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+      ),
+    );
+
+    try {
+      const upstreamInput = collectUpstreamInput();
+      const cleanConfig: Record<string, any> = {};
+      for (const f of fields) {
+        if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
+          cleanConfig[f.key] = data[f.key];
+        }
+      }
+      const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
+      const output = result.output ?? result;
+      const newStatus = output?.error ? 'error' : 'success';
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
+            : n,
+        ),
+      );
+      if (newStatus === 'success') {
+        NodeEventBus.emit(nodeId, output);
+      }
+    } catch (err: any) {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
+            : n,
+        ),
+      );
+    }
+  }, [nodeId, nodeType, data, fields, setNodes, canRun, collectUpstreamInput]);
+
+  const copyToClipboard = useCallback((text: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => message.success('已复制'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      message.success('已复制');
+    }
+  }, []);
+
+  const outputText = useMemo(() => {
+    if (!runOutput) return '';
+    if (typeof runOutput === 'string') return runOutput;
+    if (runOutput.error) return runOutput.error;
+    return JSON.stringify(runOutput, null, 2);
+  }, [runOutput]);
+
+  if (!open) return null;
+
+  return (
+    <Modal
+      title={null}
+      open={open}
+      onCancel={onClose}
+      width="80vw"
+      style={{ top: 20 }}
+      bodyStyle={{ padding: 0, height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      footer={[
+        <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(outputText)} disabled={!outputText}>
+          复制输出
+        </Button>,
+        <Button key="close" type="primary" onClick={onClose}>
+          关闭
+        </Button>,
+      ]}
+    >
+      {/* ===== Sticky zone: Node type header + Parameters ===== */}
+      <div style={{ flexShrink: 0, borderBottom: '2px solid #d9d9d9', background: '#fff' }}>
+        {/* Node type header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px', background: statusCfg.bg,
+          borderBottom: `2px solid ${runStatus === 'error' ? '#ffccc7' : runStatus === 'success' ? '#b7eb8f' : '#e8e8e8'}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>{icon}</span>
+            <span style={{ fontWeight: 700, fontSize: 18, color: '#333' }}>{label}</span>
+            <Tag color={runStatus === 'success' ? 'green' : runStatus === 'error' ? 'red' : runStatus === 'running' ? 'blue' : 'default'} style={{ fontSize: 12 }}>
+              {React.createElement(statusCfg.icon, { spin: runStatus === 'running' })}
+              <span style={{ marginLeft: 4 }}>{statusCfg.label}</span>
+            </Tag>
+          </div>
+          <Button
+            type="primary"
+            icon={React.createElement(canRun ? (runStatus === 'running' ? LoadingOutlined : PlayCircleOutlined) : PlayCircleOutlined, { spin: runStatus === 'running' })}
+            onClick={handleRun}
+            disabled={!canRun}
+            title={!canRun ? `请填写必填项: ${missingRequired.map((f) => f.label).join(', ')}` : '运行节点'}
+          >
+            运行
+          </Button>
+        </div>
+
+        {/* Parameters — full-width stacked fields */}
+        <div style={{ padding: '14px 16px', background: '#fafafa' }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#333', marginBottom: 10 }}>参数</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {fields.map((f) => {
+              const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
+
+              if (f.type === 'textarea') {
+                return (
+                  <div key={f.key}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>
+                      {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                    </label>
+                    <textarea
+                      value={val}
+                      onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                      placeholder={f.placeholder}
+                      rows={f.rows || 4}
+                      style={{
+                        width: '100%', fontSize: 13, padding: '8px 12px',
+                        border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+                        borderRadius: 4, resize: 'vertical', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (f.type === 'number') {
+                return (
+                  <div key={f.key}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>
+                      {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                    </label>
+                    <input
+                      type="number"
+                      value={val}
+                      onChange={(e) => handleFieldChange(f.key, parseFloat(e.target.value) || 0)}
+                      placeholder={f.placeholder}
+                      step={f.step}
+                      style={{
+                        width: '100%', fontSize: 13, padding: '8px 12px',
+                        border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+                        borderRadius: 4, boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (f.type === 'select' && f.options) {
+                return (
+                  <div key={f.key}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>
+                      {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                    </label>
+                    <select
+                      value={val}
+                      onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                      style={{
+                        width: '100%', fontSize: 13, padding: '8px 12px',
+                        border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+                        borderRadius: 4, boxSizing: 'border-box', background: '#fff',
+                      }}
+                    >
+                      <option value="">-- 选择 --</option>
+                      {f.options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
+              if (f.type === 'multiselect' && f.options) {
+                const selected: string[] = Array.isArray(val) ? val : [];
+                return (
+                  <div key={f.key}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>
+                      {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                      {selected.length > 0 && <Tag color="blue" style={{ marginLeft: 6 }}>{selected.length}</Tag>}
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {f.options.length === 0 && <span style={{ fontSize: 11, color: '#999' }}>运行后加载选项</span>}
+                      {f.options.map((opt) => {
+                        const isSelected = selected.includes(opt.value);
+                        return (
+                          <span
+                            key={opt.value}
+                            onClick={() => {
+                              const next = isSelected
+                                ? selected.filter((s) => s !== opt.value)
+                                : [...selected, opt.value];
+                              handleFieldChange(f.key, next);
+                            }}
+                            style={{
+                              padding: '4px 12px', fontSize: 12,
+                              border: `1px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
+                              borderRadius: 4, background: isSelected ? '#e6f7ff' : '#fff',
+                              color: isSelected ? '#1890ff' : '#666', cursor: 'pointer', userSelect: 'none',
+                            }}
+                          >
+                            {opt.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Default: text — full width
+              return (
+                <div key={f.key}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>
+                    {f.label}{f.required && <span style={{ color: '#ff4d4f', marginLeft: 4 }}>*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    value={val}
+                    onChange={(e) => handleFieldChange(f.key, e.target.value)}
+                    placeholder={f.placeholder}
+                    style={{
+                      width: '100%', fontSize: 13, padding: '8px 12px',
+                      border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+                      borderRadius: 4, boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ===== Scrollable zone: Port info, Input content, Output content ===== */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {/* Section: Port Info */}
+        {(inputPorts.length > 0 || outputPorts.length > 0) && (
+          <DetailSection title="端口信息" defaultOpen={false} extra={
+            <span style={{ fontSize: 11, color: '#666' }}>{inputPorts.length} 入 / {outputPorts.length} 出</span>
+          }>
+            <div style={{ display: 'flex', gap: 24 }}>
+              {inputPorts.length > 0 && (
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: '#555' }}>输入端口</div>
+                  {inputPorts.map((p) => (
+                    <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: PORT_COLORS[p.type] || '#d9d9d9', display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13 }}>{p.label}</span>
+                      <Tag style={{ fontSize: 10, margin: 0 }}>{p.type}</Tag>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {outputPorts.length > 0 && (
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: '#555' }}>输出端口</div>
+                  {outputPorts.map((p) => (
+                    <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: PORT_COLORS[p.type] || '#d9d9d9', display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13 }}>{p.label}</span>
+                      <Tag style={{ fontSize: 10, margin: 0 }}>{p.type}</Tag>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DetailSection>
+        )}
+
+        {/* Section: Input Content */}
+        {inputPorts.length > 0 && (
+          <DetailSection title="输入内容" defaultOpen={upstreamInfo.length > 0} extra={upstreamInfo.length > 0 ? <Tag color="blue">{upstreamInfo.length}</Tag> : undefined}>
+            {upstreamInfo.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#999' }}>未连接上游节点</div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#333' }}>
+                {upstreamInfo.map((u) => (
+                  <div key={u.tgtHandle} style={{ marginBottom: 10, padding: '8px 10px', background: '#f9f9f9', borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: PORT_COLORS[u.tgtPortType] || '#d9d9d9', display: 'inline-block' }} />
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{u.tgtPortLabel}</span>
+                      {u.hasData ? <Tag color="green" style={{ margin: 0 }}>已接收</Tag> : <Tag color="orange" style={{ margin: 0 }}>未接收</Tag>}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>来自 {u.sourceId} → {u.srcHandle || '全部输出'}</div>
+                    {u.hasData && u.preview && (
+                      <pre style={{
+                        margin: 0, padding: '8px 10px', background: '#fff', border: '1px solid #e8e8e8',
+                        borderRadius: 4, maxHeight: 200, overflowY: 'auto', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                      }}>
+                        {u.preview}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+        )}
+
+        {/* Section: Output Content — structured per output port */}
+        {(runStatus === 'success' || runStatus === 'error') && (
+          <DetailSection title="输出内容" defaultOpen extra={
+            runStatus === 'error' ? <Tag color="red">错误</Tag> : <Tag color="green">成功</Tag>
+          }>
+            {runStatus === 'error' ? (
+              <div style={{ marginBottom: 10, padding: '8px 10px', background: '#fff2f0', borderRadius: 4, border: '1px solid #ffccc7' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />
+                  <span style={{ fontWeight: 600, fontSize: 13, color: '#cf1322' }}>错误</span>
+                </div>
+                <pre style={{ margin: 0, padding: '6px 8px', background: '#fff', border: '1px solid #ffccc7', borderRadius: 4, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
+                  {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(runOutput, null, 2)}
+                </pre>
+              </div>
+            ) : outputPorts.length > 0 ? (
+              outputPorts.map((p) => {
+                const portValue = runOutput?.[p.key];
+                const hasValue = portValue !== undefined && portValue !== null;
+                // For nodes with a single output port, also check top-level keys if port key not found
+                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+                const hasDisplay = displayValue !== undefined && displayValue !== null;
+
+                // Determine renderer based on port type
+                const isExcel = p.type === 'table-data' && displayValue?.columns;
+                const isJson = p.type === 'json-data' && displayValue?.data;
+                const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
+                const isFileContent = typeof displayValue === 'string';
+                const isPre = !isExcel && !isJson && !isLua && typeof displayValue === 'object';
+
+                return (
+                  <div key={p.key} style={{ marginBottom: 10, padding: '8px 10px', background: '#f9f9f9', borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: PORT_COLORS[p.type] || '#d9d9d9', display: 'inline-block' }} />
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{p.label}</span>
+                      {hasDisplay ? <Tag color="green" style={{ margin: 0 }}>有输出</Tag> : <Tag color="orange" style={{ margin: 0 }}>无输出</Tag>}
+                      <Tag style={{ fontSize: 10, margin: 0 }}>{p.type}</Tag>
+                    </div>
+                    {hasDisplay && (
+                      <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
+                        {isExcel ? (
+                          <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
+                            <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
+                          </Suspense>
+                        ) : isJson ? (
+                          <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
+                            <JsonRenderer data={displayValue.data} jsonPath={displayValue.path} />
+                          </Suspense>
+                        ) : isLua ? (
+                          <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{displayValue.content?.slice(0, 200)}...</pre>}>
+                            <LuaRenderer content={displayValue.content} functionName={displayValue.functionName} functionContent={displayValue.functionContent} />
+                          </Suspense>
+                        ) : isFileContent ? (
+                          <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
+                            {displayValue}
+                          </pre>
+                        ) : isPre ? (
+                          <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
+                            {JSON.stringify(displayValue, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden', padding: 10 }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
+                  {typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(runOutput, null, 2)}
+                </pre>
+              </div>
+            )}
+          </DetailSection>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
+export default NodeDetailModal;

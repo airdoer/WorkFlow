@@ -1,9 +1,10 @@
-import React, { useCallback, lazy, Suspense, useMemo } from 'react';
+import React, { useCallback, useState, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts } from '../PortTypes';
 import { NodeEventBus } from '../NodeEventBus';
+import NodeDetailModal from './NodeDetailModal';
 
 // Lazy load renderers to reduce initial bundle
 const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
@@ -59,6 +60,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   fields,
 }) => {
   const { setNodes, getNodes, getEdges } = useReactFlow();
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
   const runOutput = data._runOutput as any;
@@ -183,6 +185,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             : '#d9d9d9';
 
   return (
+    <>
     <div
       style={{
         background: '#fff',
@@ -208,30 +211,38 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           <span style={{ fontSize: 16 }}>{icon}</span>
           <span>{label}</span>
         </div>
-        <button
-          onClick={handleRun}
-          disabled={!canRun}
-          title={!canRun ? `请填写必填项: ${missingRequired.map((f) => f.label).join(', ')}` : statusCfg.title}
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 4,
-            border: 'none',
-            background: !canRun ? '#f5f5f5' : statusCfg.bg,
-            color: !canRun ? '#d9d9d9' : statusCfg.color,
-            cursor: !canRun ? 'not-allowed' : runStatus === 'running' ? 'wait' : 'pointer',
-            fontSize: 14,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            flexShrink: 0,
-            transition: 'all 0.2s',
-            opacity: !canRun ? 0.5 : 1,
-          }}
-        >
-          {React.createElement(canRun ? statusCfg.icon : PlayCircleOutlined, { spin: canRun && runStatus === 'running' })}
-        </button>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {/* Expand button — opens NodeDetailModal */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+            title="查看详情"
+            style={{
+              width: 24, height: 24, borderRadius: 4, border: 'none',
+              background: '#f0f5ff', color: '#1890ff', cursor: 'pointer',
+              fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 0, flexShrink: 0, transition: 'all 0.2s',
+            }}
+          >
+            <ExpandOutlined />
+          </button>
+          {/* Run button */}
+          <button
+            onClick={handleRun}
+            disabled={!canRun}
+            title={!canRun ? `请填写必填项: ${missingRequired.map((f) => f.label).join(', ')}` : statusCfg.title}
+            style={{
+              width: 24, height: 24, borderRadius: 4, border: 'none',
+              background: !canRun ? '#f5f5f5' : statusCfg.bg,
+              color: !canRun ? '#d9d9d9' : statusCfg.color,
+              cursor: !canRun ? 'not-allowed' : runStatus === 'running' ? 'wait' : 'pointer',
+              fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 0, flexShrink: 0, transition: 'all 0.2s',
+              opacity: !canRun ? 0.5 : 1,
+            }}
+          >
+            {React.createElement(canRun ? statusCfg.icon : PlayCircleOutlined, { spin: canRun && runStatus === 'running' })}
+          </button>
+        </div>
       </div>
 
       {/* ===== Section 2: Port row ===== */}
@@ -480,64 +491,93 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           );
         })}
 
-        {/* Run output — typed renderer */}
+        {/* Run output — per output port */}
         {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
-          <div
-            style={{
-              marginTop: 6,
-              background: runStatus === 'error' ? '#fff2f0' : '#f6ffed',
-              border: `1px solid ${runStatus === 'error' ? '#ffccc7' : '#b7eb8f'}`,
-              borderRadius: 4,
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: runStatus === 'error' ? '#cf1322' : '#389e0d' }}>
-              {runStatus === 'error' ? '❌ 错误' : '✅ 结果'}
-            </div>
-            <div
-              style={{
-                padding: '4px 6px',
-                maxHeight: 200,
-                overflowY: 'auto',
-                fontSize: 9,
-                color: '#333',
-                borderTop: `1px solid ${runStatus === 'error' ? '#ffccc7' : '#b7eb8f'}`,
-              }}
-            >
-              {runStatus === 'error' ? (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(runOutput, null, 2)}
-                </pre>
-              ) : nodeType === 'excel' && runOutput.columns ? (
-                <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(runOutput, null, 2).slice(0, 100)}...</pre>}>
-                  <ExcelRenderer data={runOutput} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
-                </Suspense>
-              ) : nodeType === 'json' && runOutput.data ? (
-                <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(runOutput, null, 2).slice(0, 100)}...</pre>}>
-                  <JsonRenderer data={runOutput.data} jsonPath={runOutput.path} />
-                </Suspense>
-              ) : nodeType === 'lua' && runOutput.content ? (
-                <Suspense fallback={<pre style={{ margin: 0 }}>{runOutput.content?.slice(0, 100)}...</pre>}>
-                  <LuaRenderer content={runOutput.content} functionName={runOutput.functionName} functionContent={runOutput.functionContent} />
-                </Suspense>
-              ) : typeof runOutput === 'string' ? (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {runOutput}
-                </pre>
-              ) : runOutput.fileContent && typeof runOutput.fileContent === 'string' ? (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 160, overflowY: 'auto' }}>
-                  {runOutput.fileContent}
-                </pre>
-              ) : (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {JSON.stringify(runOutput, null, 2)}
-                </pre>
-              )}
-            </div>
+          <div style={{ marginTop: 6 }}>
+            {runStatus === 'error' ? (
+              <div style={{
+                background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, overflow: 'hidden',
+              }}>
+                <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#cf1322', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />
+                  错误
+                </div>
+                <div style={{ padding: '4px 6px', maxHeight: 80, overflowY: 'auto', borderTop: '1px solid #ffccc7', fontSize: 9 }}>
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
+                    {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(runOutput, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            ) : outputPorts.length > 0 ? (
+              outputPorts.map((p) => {
+                const portValue = runOutput?.[p.key];
+                const hasValue = portValue !== undefined && portValue !== null;
+                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+                const hasDisplay = displayValue !== undefined && displayValue !== null;
+
+                return (
+                  <div key={p.key} style={{ marginBottom: 4, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: PORT_COLORS[p.type] || '#52c41a', display: 'inline-block' }} />
+                      {p.label}
+                      {hasDisplay ? ' ✅' : ''}
+                    </div>
+                    {hasDisplay && (
+                      <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
+                        {p.type === 'table-data' && displayValue?.columns ? (
+                          <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
+                            <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
+                          </Suspense>
+                        ) : p.type === 'json-data' && displayValue?.data ? (
+                          <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
+                            <JsonRenderer data={displayValue.data} jsonPath={displayValue.path} />
+                          </Suspense>
+                        ) : p.type === 'text' && typeof displayValue === 'object' && displayValue?.content ? (
+                          <Suspense fallback={<pre style={{ margin: 0 }}>{displayValue.content?.slice(0, 80)}...</pre>}>
+                            <LuaRenderer content={displayValue.content} functionName={displayValue.functionName} functionContent={displayValue.functionContent} />
+                          </Suspense>
+                        ) : typeof displayValue === 'string' ? (
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {displayValue}
+                          </pre>
+                        ) : (
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {JSON.stringify(displayValue, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{
+                background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, overflow: 'hidden',
+              }}>
+                <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d' }}>✅ 结果</div>
+                <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(runOutput, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
+
+      {/* NodeDetailModal */}
+      <NodeDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        nodeId={id}
+        nodeType={nodeType}
+        icon={icon}
+        label={label}
+        fields={fields}
+      />
+    </>
   );
 };
 

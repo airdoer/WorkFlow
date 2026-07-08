@@ -445,12 +445,84 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         )}
       </Section>
 
-      {/* === Section 5: Output Content === */}
+      {/* === Section 5: Output Content — structured per output port === */}
       <Section title="输出内容" defaultOpen={runStatus === 'success' || runStatus === 'error'}>
         {runStatus === 'idle' || runStatus === 'running' ? (
           <div style={{ fontSize: 11, color: '#999' }}>
             {runStatus === 'running' ? '运行中...' : '运行后显示结果'}
           </div>
+        ) : runStatus === 'error' ? (
+          <div style={{ marginBottom: 8, padding: '4px 6px', background: '#fff2f0', borderRadius: 3, border: '1px solid #ffccc7' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />
+              <span style={{ fontWeight: 600, fontSize: 11, color: '#cf1322' }}>错误</span>
+            </div>
+            <pre style={{ margin: 0, padding: '4px 6px', background: '#fff', border: '1px solid #ffccc7', borderRadius: 3, fontSize: 9, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
+              {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(runOutput, null, 2)}
+            </pre>
+          </div>
+        ) : outputPorts.length > 0 ? (
+          outputPorts.map((p) => {
+            const portValue = runOutput?.[p.key];
+            const hasValue = portValue !== undefined && portValue !== null;
+            const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+            const hasDisplay = displayValue !== undefined && displayValue !== null;
+            const previewText = hasDisplay
+              ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
+              : null;
+
+            return (
+              <div key={p.key} style={{ marginBottom: 8, padding: '4px 6px', background: '#f5f5f5', borderRadius: 3, border: '1px solid #e8e8e8' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <span
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: PORT_COLORS[p.type] || '#d9d9d9',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span style={{ fontWeight: 600 }}>{p.label}</span>
+                  {hasDisplay ? (
+                    <Tag style={{ fontSize: 9, margin: 0 }} color="green">有输出</Tag>
+                  ) : (
+                    <Tag style={{ fontSize: 9, margin: 0 }} color="orange">无输出</Tag>
+                  )}
+                  <Tag style={{ fontSize: 9, margin: 0 }}>{p.type}</Tag>
+                  {hasDisplay && previewText && (
+                    <Button
+                      size="small"
+                      icon={<ExpandOutlined />}
+                      style={{ fontSize: 10, padding: '0 6px', height: 20 }}
+                      onClick={() => { setModalContent(previewText || ''); setModalTitle(`输出内容 - ${p.label}`); setOutputModalOpen(true); }}
+                    >
+                      弹窗查看
+                    </Button>
+                  )}
+                </div>
+                {hasDisplay && previewText && (
+                  <pre
+                    style={{
+                      margin: 0,
+                      padding: '4px 6px',
+                      background: '#fff',
+                      border: '1px solid #e8e8e8',
+                      borderRadius: 3,
+                      maxHeight: 120,
+                      overflowY: 'auto',
+                      fontSize: 9,
+                      color: '#333',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {previewText}
+                  </pre>
+                )}
+              </div>
+            );
+          })
         ) : (
           <>
             <div style={{ marginBottom: 8 }}>
@@ -472,10 +544,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                 overflowY: 'auto',
                 fontSize: 10,
                 color: '#333',
-                background: runStatus === 'error' ? '#fff2f0' : '#f9f9f9',
+                background: '#f9f9f9',
                 padding: '6px 8px',
                 borderRadius: 3,
-                border: `1px solid ${runStatus === 'error' ? '#ffccc7' : '#e8e8e8'}`,
+                border: '1px solid #e8e8e8',
               }}
             >
               {outputText}
