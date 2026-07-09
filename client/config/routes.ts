@@ -6,13 +6,13 @@ export default [
     routes: [
       {
         path: '/workflow/editor',
-        name: 'workflow.editor',
+        name: 'editor',
         icon: 'edit',
         component: './FlowDemo',
       },
       {
         path: '/workflow/history',
-        name: 'workflow.history',
+        name: 'history',
         icon: 'history',
         component: './FlowHistory',
       },
