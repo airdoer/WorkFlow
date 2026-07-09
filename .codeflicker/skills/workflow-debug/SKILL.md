@@ -19,7 +19,7 @@ version: 1.0.0
 | 项目路径 | `/data/chenzhixu/WorkFlow` |
 | 客户端容器 | `work_flow_client_dev` |
 | 服务端容器 | `work_flow_server_container` |
-| **前端访问地址** | `http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a681f75` |
+| **前端访问地址** | `http://172.28.200.60:8000/workflow/fullscreen?id=2caab557-41a2-4a41-a274-f2325c86160d` |
 | **后端访问地址** | `http://172.28.200.60:16666` |
 
 ---
@@ -50,7 +50,7 @@ http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a6
 
 ```bash
 # 本地 curl 检测前端是否可访问
-curl -s -o /dev/null -w "%{http_code}" "http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a681f75"
+curl -s -o /dev/null -w "%{http_code}" "http://172.28.200.60:8000/workflow/fullscreen?id=2caab557-41a2-4a41-a274-f2325c86160d"
 ```
 
 返回 `200` 表示正常，`502`/`503` 说明前端容器异常。
@@ -212,7 +212,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 2. 查看客户端日志：`docker logs --tail=100 work_flow_client_dev`
 3. 检查端口映射：`docker port work_flow_client_dev`
 4. 重启客户端：`docker restart work_flow_client_dev`
-5. 重新访问：`http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a681f75`
+5. 重新访问：`http://172.28.200.60:8000/workflow/fullscreen?id=2caab557-41a2-4a41-a274-f2325c86160d`
 
 ### 场景 C：代码更新后服务不生效
 
@@ -238,7 +238,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 ssh -i "C:\Users\Administrator\.ssh\id_rsa" chenzhixu@172.28.200.60
 
 # 前端地址
-http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a681f75
+http://172.28.200.60:8000/workflow/fullscreen?id=2caab557-41a2-4a41-a274-f2325c86160d
 
 # 后端地址
 http://172.28.200.60:16666

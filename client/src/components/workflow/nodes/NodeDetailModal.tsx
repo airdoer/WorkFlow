@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useMemo, lazy, Suspense, useRef } from 'react';
 import { Modal, Button, Tag, message } from 'antd';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
@@ -71,6 +71,7 @@ function DetailSection({ title, defaultOpen = true, children, extra }: {
 const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   open, onClose, nodeId, nodeType, icon, label, fields,
 }) => {
+  const [closeHovered, setCloseHovered] = React.useState(false);
   const { setNodes, getEdges, getNodes } = useReactFlow();
   const { workflowId, onNodeUpdate } = useWorkflowContext();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -259,6 +260,27 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       onCancel={onClose}
       width="80vw"
       style={{ top: 20 }}
+      closeIcon={
+        <span
+          onMouseEnter={() => setCloseHovered(true)}
+          onMouseLeave={() => setCloseHovered(false)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 64,
+            height: 32,
+            borderRadius: 6,
+            background: closeHovered ? '#595959' : '#8c8c8c',
+            color: '#fff',
+            fontSize: 14,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            transition: 'background 0.2s',
+          }}
+        >
+          <CloseOutlined />
+        </span>
+      }
       styles={{ body: { padding: 0, height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
       footer={[
         <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(outputText)} disabled={!outputText}>
@@ -291,6 +313,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
             onClick={handleRun}
             disabled={!canRun}
             title={!canRun ? `请填写必填项: ${missingRequired.map((f) => f.label).join(', ')}` : '运行节点'}
+            style={{ marginRight: 15 }}
           >
             运行
           </Button>
