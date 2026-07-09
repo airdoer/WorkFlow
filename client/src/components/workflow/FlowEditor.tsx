@@ -241,12 +241,14 @@ function FlowEditorInner({
     setIsDirty(true);
   }, []);
 
-  // Track multi-selection for special styling (Ctrl+click)
+  // Track selection changes for special styling
   const onSelectionChange: OnSelectionChangeFunc = useCallback(
     ({ nodes: selectedNodes }) => {
-      if (selectedNodes.length > 1) {
+      if (selectedNodes.length >= 1) {
+        setSelectedNodeId(selectedNodes[0].id);
         setMultiSelectedIds(new Set(selectedNodes.map((n) => n.id)));
       } else {
+        setSelectedNodeId(null);
         setMultiSelectedIds(new Set());
       }
     },
@@ -476,7 +478,6 @@ function FlowEditorInner({
             edgeTypes={edgeTypes}
             fitView
             deleteKeyCode={['Delete', 'Backspace']}
-            selectionKeyCode="Control"
             multiSelectionKeyCode="Control"
             selectNodesOnDrag={true}
           >

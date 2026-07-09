@@ -186,6 +186,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
   return (
     <>
       <div
+        className={isMultiSelected ? 'node-multi-selected' : undefined}
         data-multi-selected={isMultiSelected ? 'true' : undefined}
         style={{
           background: '#fff',
