@@ -505,44 +505,43 @@ const canRun = fields
 
 ---
 
-## 七、级联执行机制
+## 七、执行模式
 
-### 7.1 NodeEventBus
+### 7.1 两种执行模式
 
-节点间通过事件总线通信，实现上游成功后自动触发下游：
+系统支持两种执行模式，互相独立：
+
+| 模式 | 触发方式 | 调度位置 | 适用场景 |
+|------|----------|----------|----------|
+| **单节点独立运行** | 节点 Header 的 ▶ 按钮 / NodeDetailModal 的运行按钮 | 前端 NodeEventBus 级联 | 调试单个节点、局部测试 |
+| **整图运行** | Toolbar 的「运行」按钮 | 后端 WorkflowRuntime DAG 调度 | 完整流程执行 |
+
+### 7.2 单节点运行 + 前端级联（NodeEventBus）
+
+**触发路径：**
+
+```
+1. 用户点击节点 Header ▶ → BaseNode.handleRun()
+2. 前端收集上游 input（从 node.data._runOutput 读取）
+3. POST /api/workflow/node/run { type, config, input }
+4. 后端只执行当前节点，返回 output
+5. 运行成功 → NodeEventBus.emit(nodeId, output)
+6. FlowEditor 订阅 → handleNodeSuccess(nodeId, output)
+   a. 标记出边 activated: true（边变绿+流动）
+   b. 检查下游节点所有上游是否均已成功
+   c. 全部就绪 → 收集 input → POST /node/run 触发下游
+   d. 下游成功 → 继续 emit → 继续级联
+```
+
+**上游输入收集（前端）：**
 
 ```typescript
-// NodeEventBus.ts
-export const NodeEventBus = {
-  subscribe(fn: (nodeId: string, output: any) => void): () => void;
-  emit(nodeId: string, output: any): void;
-};
-```
-
-### 7.2 级联流程
-
-```
-1. 用户点击节点运行按钮 → BaseNode.handleRun()
-2. 调用 FlowApi.runNode(nodeType, cleanConfig, upstreamInput)
-3. 运行成功 → NodeEventBus.emit(id, output)
-4. FlowEditor 订阅 → handleNodeSuccess(succeededNodeId, output)
-   a. 标记出边 activated: true
-   b. 查找下游节点 → 收集输入 → 自动运行
-   c. 下游成功 → 继续 emit → 继续级联
-```
-
-### 7.3 上游输入收集
-
-BaseNode 和 PropertyPanel 在运行时通过 `getNodes()` + `getEdges()` 读取当前节点状态：
-
-```typescript
+// BaseNode / PropertyPanel 在运行时读取最新节点状态
 const collectUpstreamInput = () => {
-  const edges = getEdges();
-  const incoming = edges.filter((e) => e.target === id && e.targetHandle);
-  const nodes = getNodes();
+  const incoming = getEdges().filter((e) => e.target === id);
   const input: Record<string, any> = {};
   for (const edge of incoming) {
-    const srcNode = nodes.find((n) => n.id === edge.source);
+    const srcNode = getNode(edge.source);
     const srcOutput = srcNode?.data?._runOutput;
     if (!srcOutput || srcOutput.error) continue;
     if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
@@ -555,18 +554,89 @@ const collectUpstreamInput = () => {
 };
 ```
 
-### 7.4 Config 清理
-
-发送到后端的 config 只包含字段值，过滤掉内部状态键（`_runStatus`、`_runOutput` 等）：
+**Config 清理（过滤内部键）：**
 
 ```typescript
 const cleanConfig: Record<string, any> = {};
 for (const [k, v] of Object.entries(nodeData)) {
-  if (!k.startsWith('_') && v !== undefined) {
-    cleanConfig[k] = v;
-  }
+  if (!k.startsWith('_') && v !== undefined) cleanConfig[k] = v;
 }
 ```
+
+### 7.3 整图运行（后端 DAG 调度 + WebSocket 实时推送）
+
+**设计原则：**
+
+- 上游数据完全在后端 context 中流转，**不经前端中转**，避免大文件二次传输
+- 后端并发调度所有节点（`asyncio.gather`），根节点立即执行，共享节点等待所有前驱完成
+- 前端通过 **Socket.IO WebSocket 长连接**实时接收节点状态推送，无轮询延迟
+
+**触发路径：**
+
+```
+1. Toolbar「运行」按钮 → handleRun(json, workflowId)
+2. 前端重置所有节点状态为 idle、所有边 activated=false
+3. FlowApi.runWorkflowWS(workflowId, onNodeUpdate, onDone)
+   a. socket.emit('workflow:run', { workflowId })
+4. 后端收到 'workflow:run' 事件：
+   a. 生成 task_id，客户端 sid 自动加入 room(task_id)
+   b. emit('workflow:started', { taskId }) 回客户端
+   c. socketio.start_background_task → asyncio 执行 WorkflowRuntime.run
+5. 节点状态变化 → emit('workflow:node_update', { taskId, nodeId, status, output }) 推送到 room
+   - 前端收到 → onNodeUpdate(nodeId, status, output)
+   - 更新节点 _runStatus / _runOutput
+   - 节点 success → 标记出边 activated: true（边变绿+流动）
+6. 所有节点完成 → emit('workflow:done', { taskId, status, error })
+   - 前端收到 → onDone(status, error) → setRunCancelFn(null)
+```
+
+**Socket.IO 事件协议：**
+
+| 方向 | 事件名 | payload |
+|------|--------|---------|
+| Client → Server | `workflow:run` | `{ workflowId }` |
+| Server → Client | `workflow:started` | `{ taskId }` |
+| Server → Client | `workflow:node_update` | `{ taskId, nodeId, status, output }` |
+| Server → Client | `workflow:done` | `{ taskId, status, error }` |
+| Server → Client | `workflow:error` | `{ error }` |
+| Client → Server | `workflow:cancel` | `{ taskId }` |
+
+**status 枚举映射：**
+
+| 后端 status | 前端 _runStatus |
+|------------|----------------|
+| `idle` | `idle` |
+| `processing` | `running` |
+| `success` | `success` |
+| `error` | `error` |
+
+**FlowApi.runWorkflowWS 接口：**
+
+```typescript
+// 返回 cancelFn，调用即向服务端发 workflow:cancel 并清除监听器
+const cancelFn = FlowApi.runWorkflowWS(
+  workflowId,
+  (nodeId, status, output) => { /* 更新节点状态 */ },
+  (status, error) => { /* 运行结束回调 */ },
+);
+// 停止时：cancelFn()
+```
+
+**停止运行：**
+
+Toolbar「停止」按钮调用 `runCancelFn()`，前端立即清除监听器并向服务端发送 `workflow:cancel` 事件。服务端将任务状态标记为 `canceled` 并推送 `workflow:done`。
+
+### 7.4 NodeEventBus（单节点级联通信）
+
+```typescript
+// NodeEventBus.ts
+export const NodeEventBus = {
+  subscribe(fn: (nodeId: string, output: any) => void): () => void;
+  emit(nodeId: string, output: any): void;
+};
+```
+
+仅用于**单节点运行**的级联场景（节点 ▶ 按钮触发），整图运行不使用此机制。
 
 ---
 
@@ -733,11 +803,33 @@ export default {
 | GET | `/api/workflow/<id>` | 获取工作流 | - | `{ id, name, json, ... }` |
 | GET | `/api/workflow/list` | 工作流列表 | - | `{ list: [...] }` |
 | DELETE | `/api/workflow/<id>` | 删除工作流 | - | `{ success }` |
-| POST | `/api/workflow/node/run` | 运行单个节点 | `{ type, config, input }` | `{ output }` |
-| POST | `/api/workflow/run` | 运行整个工作流 | `{ workflowId }` | `{ taskId }` |
-| GET | `/api/workflow/run/<taskId>/status` | 查询运行状态 | - | `{ status, nodes }` |
-| POST | `/api/workflow/run/<taskId>/cancel` | 取消运行 | - | `{ success }` |
+| POST | `/api/workflow/node/run` | 运行单个节点（同步，节点 ▶ 按钮） | `{ type, config, input }` | `{ output }` |
+| GET | `/api/workflow/run/<taskId>/status` | 查询任务状态（REST 调试用） | - | `{ status, nodes, result }` |
 | GET | `/api/workflow/executors` | 列出注册的执行器 | - | `{ executors: [{ type, class }] }` |
+
+### 10.4 Socket.IO 事件协议（整图运行）
+
+| 方向 | 事件名 | payload | 说明 |
+|------|--------|---------|------|
+| C→S | `workflow:run` | `{ workflowId }` | 触发整图运行，客户端自动加入 task room |
+| S→C | `workflow:started` | `{ taskId }` | 任务已创建，taskId 用于标识本次运行 |
+| S→C | `workflow:node_update` | `{ taskId, nodeId, status, output }` | 节点状态变化（processing/success/error） |
+| S→C | `workflow:done` | `{ taskId, status, error }` | 所有节点执行完毕 |
+| S→C | `workflow:error` | `{ error }` | 运行前校验失败（如 workflowId 不存在） |
+| C→S | `workflow:cancel` | `{ taskId }` | 取消运行（停止推送，标记任务为 canceled） |
+| C→S | `workflow:join` | `{ taskId }` | 手动加入 task room（断线重连时使用） |
+| C→S | `workflow:leave` | `{ taskId }` | 离开 task room |
+
+**连接配置：**
+
+```typescript
+// 开发环境：通过 UMI proxy 代理 /socket.io/ 到 localhost:16666
+// 生产/Docker：直连 window.FLASK_BACKEND_URL
+const socket = io(socketUrl, {
+  transports: ['websocket', 'polling'],
+  path: '/socket.io/',
+});
+```
 
 ---
 
@@ -1088,8 +1180,12 @@ class WorkflowRuntime:
 2. ~~公共节点等待所有上游前驱完成后再执行~~ ✅
 3. ~~上游 error 自动跳过下游节点~~ ✅
 4. ~~端口映射（targetHandle/sourceHandle）~~ ✅
-5. ~~完善 `/api/workflow/run` 路由 + 日志~~ ✅
-6. Socket.IO 实时推送（待实现，当前通过轮询 `/status` 接口）
+5. ~~flask-socketio 初始化（gevent 模式），app.py 改用 socketio.run~~ ✅
+6. ~~WorkflowRuntime 节点状态变化时通过 socketio.emit 推送到 room(task_id)~~ ✅
+7. ~~WorkFlow.py Socket.IO 事件处理（workflow:run / workflow:cancel）~~ ✅
+8. ~~前端 FlowApi.runWorkflowWS：Socket.IO 连接管理 + 事件监听 + cancelFn~~ ✅
+9. ~~FlowEditor.handleRun：WebSocket 整图 run + 实时节点状态更新 + 边激活~~ ✅
+10. ~~Toolbar 运行/停止按钮接入 WebSocket run / cancelFn~~ ✅
 
 ### Phase 7: 增强（待实现）
 1. 节点拖拽排序（React Flow dnd 支持）

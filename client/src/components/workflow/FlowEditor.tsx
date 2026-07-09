@@ -62,6 +62,8 @@ function FlowEditorInner({
     })),
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // cancelFn returned by FlowApi.runWorkflowWS — non-null while a workflow run is in progress
+  const [runCancelFn, setRunCancelFn] = useState<(() => void) | null>(null);
 
   const { getNode, getEdges } = useReactFlow();
 
@@ -254,10 +256,65 @@ function FlowEditorInner({
   }, [handleNodeSuccess]);
 
   const handleRun = useCallback(
-    (json: WorkflowJSON) => {
-      console.log('Run workflow:', json);
+    async (json: WorkflowJSON, currentWorkflowId?: string) => {
+      const wfId = currentWorkflowId || workflowId;
+      if (!wfId) {
+        return;
+      }
+
+      // Reset all node statuses to 'idle' and deactivate all edges
+      setNodes((nds) =>
+        nds.map((n) => ({ ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null } })),
+      );
+      setEdges((eds) =>
+        eds.map((e) => ({ ...e, data: { ...e.data, activated: false } })),
+      );
+
+      // Status map: backend → frontend
+      const statusMap: Record<string, string> = {
+        idle: 'idle',
+        processing: 'running',
+        success: 'success',
+        error: 'error',
+      };
+
+      // Start WebSocket-based workflow run
+      const cancelFn = FlowApi.runWorkflowWS(
+        wfId,
+        // onNodeUpdate: called for each node status push from backend
+        (nodeId, nodeStatus, output) => {
+          const frontendStatus = statusMap[nodeStatus] ?? nodeStatus;
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === nodeId
+                ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output } }
+                : n,
+            ),
+          );
+          // Activate outgoing edges when a node succeeds
+          if (nodeStatus === 'success') {
+            setEdges((eds) =>
+              eds.map((e) =>
+                e.source === nodeId && e.data?.matchStatus === 'matched'
+                  ? { ...e, data: { ...e.data, activated: true } }
+                  : e,
+              ),
+            );
+          }
+        },
+        // onDone: workflow finished
+        (_status, error) => {
+          setRunCancelFn(null);
+          if (error) {
+            console.error('[FlowEditor] Workflow run finished with error:', error);
+          }
+        },
+      );
+
+      // Store cancel function so Toolbar stop button can cancel
+      setRunCancelFn(() => cancelFn);
     },
-    [],
+    [workflowId, setNodes, setEdges],
   );
 
   return (
@@ -277,6 +334,7 @@ function FlowEditorInner({
         onFullscreenToggle={onFullscreenToggle}
         onSave={onSave}
         onRun={handleRun}
+        runCancelFn={runCancelFn}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} />

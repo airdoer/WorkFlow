@@ -4,6 +4,7 @@ import logging
 # 3rd ext
 from flask import Flask, request
 from flask_migrate import Migrate
+from flask_socketio import SocketIO
 
 # int
 import config
@@ -16,6 +17,17 @@ from managers import timeMgr
 # region init
 app = Flask(__name__)
 g.app = app
+
+# Initialize SocketIO with gevent async_mode for compatibility with gevent WSGIServer
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="gevent",
+    logger=False,
+    engineio_logger=False,
+)
+g.socketio = socketio
+
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s in %(module)s: %(message)s',

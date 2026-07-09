@@ -29,7 +29,8 @@ interface ToolbarProps {
   isFullscreen?: boolean;
   onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
-  onRun?: (json: WorkflowJSON) => void;
+  onRun?: (json: WorkflowJSON, workflowId?: string) => void;
+  runCancelFn?: (() => void) | null;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -47,9 +48,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onFullscreenToggle,
   onSave,
   onRun,
+  runCancelFn,
 }) => {
   const [saving, setSaving] = useState(false);
-  const [running, setRunning] = useState(false);
+  const isRunning = !!runCancelFn;
   const [name, setName] = useState(initialName || '未命名工作流');
   const [author, setAuthor] = useState(initialAuthor || '');
   const [description, setDescription] = useState(initialDesc || '');
@@ -74,16 +76,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
       message.warning('请先保存工作流');
       return;
     }
-    setRunning(true);
-    try {
-      const json = reactFlowInstance.toObject();
-      onRun?.(json);
-      const result = await FlowApi.runWorkflow(workflowId);
-      message.info(`工作流已提交，taskId: ${result.taskId}`);
-    } catch (err: any) {
-      message.error(`运行失败: ${err.message}`);
-    } finally {
-      setRunning(false);
+    const json = reactFlowInstance.toObject();
+    onRun?.(json, workflowId);
+  };
+
+  const handleStop = async () => {
+    if (runCancelFn) {
+      runCancelFn();
+      message.info('已请求停止运行');
     }
   };
 
@@ -169,10 +169,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <Button icon={<SaveOutlined />} loading={saving} onClick={handleSave} size="small">
           保存
         </Button>
-        <Button type="primary" icon={<PlayCircleOutlined />} loading={running} onClick={handleRun} size="small">
+        <Button type="primary" icon={<PlayCircleOutlined />} loading={isRunning} onClick={handleRun} size="small" disabled={isRunning}>
           运行
         </Button>
-        <Button icon={<StopOutlined />} size="small" disabled>
+        <Button icon={<StopOutlined />} size="small" disabled={!isRunning} onClick={handleStop} danger={isRunning}>
           停止
         </Button>
         <Button icon={<ImportOutlined />} onClick={handleImport} size="small">
