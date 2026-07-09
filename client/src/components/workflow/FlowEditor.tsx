@@ -218,6 +218,10 @@ function FlowEditorInner({
     setSelectedNodeId(node.id);
   }, []);
 
+  const onNodeDragStart: NodeMouseHandler = useCallback((_, node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
     setMultiSelectedIds(new Set());
@@ -461,6 +465,7 @@ function FlowEditorInner({
             onEdgesChange={wrappedOnEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onNodeDragStart={onNodeDragStart}
             onPaneClick={onPaneClick}
             onNodesDelete={onNodesDelete}
             onEdgesDelete={onEdgesDelete}
@@ -473,7 +478,7 @@ function FlowEditorInner({
             deleteKeyCode={['Delete', 'Backspace']}
             selectionKeyCode="Control"
             multiSelectionKeyCode="Control"
-            selectNodesOnDrag={false}
+            selectNodesOnDrag={true}
           >
             <Background />
             <Controls />

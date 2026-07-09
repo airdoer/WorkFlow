@@ -259,7 +259,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       onCancel={onClose}
       width="80vw"
       style={{ top: 20 }}
-      bodyStyle={{ padding: 0, height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      styles={{ body: { padding: 0, height: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
       footer={[
         <Button key="copy" icon={<CopyOutlined />} onClick={() => copyToClipboard(outputText)} disabled={!outputText}>
           复制输出

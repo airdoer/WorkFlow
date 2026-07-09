@@ -41,7 +41,7 @@ const PORT_COLORS: Record<string, string> = {
 
 function JsonNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, multiSelectedIds } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState(false);
 
@@ -176,6 +176,9 @@ function JsonNode({ data, id, selected }: NodeProps) {
             ? '#1890ff'
             : '#d9d9d9';
 
+  // Whether this node is part of a multi-selection
+  const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
+
   const fields: NodeField[] = [
     { key: 'jsonPath', label: 'JSON Path', placeholder: '$.data.items（可选）', linkedPortKey: 'jsonPath' },
   ];
@@ -183,6 +186,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
   return (
     <>
       <div
+        data-multi-selected={isMultiSelected ? 'true' : undefined}
         style={{
           background: '#fff',
           border: `2px solid ${borderColor}`,
