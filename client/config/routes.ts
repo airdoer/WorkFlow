@@ -1,18 +1,18 @@
 export default [
   {
     path: '/workflow',
-    name: '工作流',
+    name: 'workflow',
     icon: 'apartment',
     routes: [
       {
         path: '/workflow/editor',
-        name: '编辑器',
+        name: 'workflow.editor',
         icon: 'edit',
         component: './FlowDemo',
       },
       {
         path: '/workflow/history',
-        name: '历史记录',
+        name: 'workflow.history',
         icon: 'history',
         component: './FlowHistory',
       },
