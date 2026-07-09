@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -24,7 +24,7 @@ import { nodeTypes } from './NodeRegistry';
 import FlowingEdge from './nodes/FlowingEdge';
 import { isPortTypeCompatible, getNodePorts } from './PortTypes';
 import { FlowApi } from './services/FlowApi';
-import { NodeEventBus } from './NodeEventBus';
+import { WorkflowContext } from './WorkflowContext';
 import type { WorkflowJSON } from './types';
 
 const edgeTypes = { flowing: FlowingEdge };
@@ -54,22 +54,89 @@ function FlowEditorInner({
   onFullscreenToggle,
   onSave,
 }: FlowEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialData?.nodes || []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(
-    (initialData?.edges || []).map((e: any) => ({
-      ...e,
-      type: 'flowing',
-    })),
-  );
+  const initialNodes = initialData?.nodes || [];
+
+  // Re-compute matchStatus for all edges on load, in case saved data is stale
+  // (e.g., port type compatibility rules changed since the workflow was last saved)
+  const initialEdges = useMemo(() => {
+    const nodeMap: Record<string, any> = {};
+    for (const n of initialNodes) nodeMap[n.id] = n;
+
+    return (initialData?.edges || []).map((e: any) => {
+      const srcNode = nodeMap[e.source];
+      const tgtNode = nodeMap[e.target];
+      if (srcNode && tgtNode && e.sourceHandle && e.targetHandle) {
+        const srcPort = getNodePorts(srcNode.type || '').find(
+          (p: any) => p.key === e.sourceHandle && p.direction === 'output',
+        );
+        const tgtPort = getNodePorts(tgtNode.type || '').find(
+          (p: any) => p.key === e.targetHandle && p.direction === 'input',
+        );
+        if (srcPort && tgtPort) {
+          const compatible = isPortTypeCompatible(srcPort.type, tgtPort.type);
+          return {
+            ...e,
+            type: 'flowing',
+            data: {
+              ...e.data,
+              sourcePortType: srcPort.type,
+              targetPortType: tgtPort.type,
+              matchStatus: compatible ? 'matched' : 'mismatched',
+            },
+          };
+        }
+      }
+      return { ...e, type: 'flowing' };
+    });
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps — only run once on mount
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // cancelFn returned by FlowApi.runWorkflowWS — non-null while a workflow run is in progress
   const [runCancelFn, setRunCancelFn] = useState<(() => void) | null>(null);
 
-  const { getNode, getEdges } = useReactFlow();
+  const { getNode } = useReactFlow();
 
   const selectedNode = useMemo(
     () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
     [selectedNodeId, nodes],
+  );
+
+  // ── Status map: backend → frontend ──────────────────────────────────────
+  const statusMap: Record<string, string> = {
+    idle: 'idle',
+    processing: 'running',
+    success: 'success',
+    error: 'error',
+  };
+
+  /**
+   * Shared node update handler — used by BOTH the full-graph run (Toolbar) and
+   * single-node ▶ run (BaseNode). Applies status/output to the target node and
+   * activates outgoing edges on success.
+   */
+  const handleNodeUpdate = useCallback(
+    (nodeId: string, nodeStatus: string, output: any) => {
+      const frontendStatus = statusMap[nodeStatus] ?? nodeStatus;
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output } }
+            : n,
+        ),
+      );
+      if (nodeStatus === 'success') {
+        setEdges((eds) =>
+          eds.map((e) =>
+            e.source === nodeId && e.data?.matchStatus === 'matched'
+              ? { ...e, data: { ...e.data, activated: true } }
+              : e,
+          ),
+        );
+      }
+    },
+    [setNodes, setEdges],
   );
 
   const onConnect: OnConnect = useCallback(
@@ -132,128 +199,9 @@ function FlowEditorInner({
   );
 
   /**
-   * When a node succeeds, mark its outgoing matched edges as activated
-   * and cascade-trigger connected downstream nodes.
-   *
-   * A downstream node is only triggered when ALL its matched incoming edges
-   * have a successful upstream output — preventing partial-input runs.
+   * When a node succeeds, mark its outgoing matched edges as activated.
+   * (Legacy frontend cascade is removed — cascade is now handled by the backend subgraph run.)
    */
-  const handleNodeSuccess = useCallback(
-    (succeededNodeId: string, _output: any) => {
-      // Mark outgoing matched edges as activated
-      setEdges((eds) =>
-        eds.map((e) => {
-          if (e.source === succeededNodeId && e.data?.matchStatus === 'matched') {
-            return { ...e, data: { ...e.data, activated: true } };
-          }
-          return e;
-        }),
-      );
-
-      // Cascade: find downstream nodes connected via matched edges and trigger them
-      const currentEdges = getEdges();
-      const downstreamEdges = currentEdges.filter(
-        (e) => e.source === succeededNodeId && e.data?.matchStatus === 'matched',
-      );
-
-      // Deduplicate downstream targets (a node may have multiple edges from this node)
-      const triggeredTargets = new Set<string>();
-
-      for (const edge of downstreamEdges) {
-        if (triggeredTargets.has(edge.target)) continue;
-        triggeredTargets.add(edge.target);
-
-        const targetNode = getNode(edge.target);
-        if (!targetNode) continue;
-
-        // Collect ALL upstream inputs for this downstream node
-        const allIncomingEdges = currentEdges.filter((e) => e.target === edge.target);
-
-        // Check: ALL matched incoming edges must have a successful upstream output.
-        // If any upstream hasn't completed yet, skip — it will trigger again when that upstream finishes.
-        const allUpstreamsReady = allIncomingEdges
-          .filter((e) => e.data?.matchStatus === 'matched')
-          .every((inEdge) => {
-            const srcNode = getNode(inEdge.source);
-            if (!srcNode) return false;
-            const srcOutput = (srcNode.data as any)?._runOutput;
-            return srcOutput && !srcOutput.error;
-          });
-
-        if (!allUpstreamsReady) {
-          // Not all upstreams done yet — this node will be triggered by the other upstream when it finishes
-          continue;
-        }
-
-        const input: Record<string, any> = {};
-        for (const inEdge of allIncomingEdges) {
-          const srcNode = getNode(inEdge.source);
-          if (!srcNode) continue;
-          const srcOutput = (srcNode.data as any)?._runOutput;
-          if (!srcOutput || srcOutput.error) continue;
-          if (inEdge.sourceHandle && srcOutput[inEdge.sourceHandle] !== undefined) {
-            input[inEdge.targetHandle || inEdge.sourceHandle] = srcOutput[inEdge.sourceHandle];
-          } else if (inEdge.sourceHandle && srcOutput.value !== undefined) {
-            // Basic type nodes output { value: ... } — map to target handle
-            input[inEdge.targetHandle || inEdge.sourceHandle] = srcOutput.value;
-          } else {
-            Object.assign(input, srcOutput);
-          }
-        }
-
-        // Set downstream node to running
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === edge.target
-              ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } }
-              : n,
-          ),
-        );
-
-        // Build clean config (strip internal keys)
-        const cleanConfig: Record<string, any> = {};
-        for (const [k, v] of Object.entries(targetNode.data as Record<string, any>)) {
-          if (!k.startsWith('_') && v !== undefined && v !== null && String(v).trim() !== '') {
-            cleanConfig[k] = v;
-          }
-        }
-
-        // Run the downstream node
-        FlowApi.runNode(targetNode.type || '', cleanConfig, input)
-          .then((result) => {
-            const out = result.output ?? result;
-            const newStatus = out?.error ? 'error' : 'success';
-            setNodes((nds) =>
-              nds.map((n) =>
-                n.id === edge.target
-                  ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: out } }
-                  : n,
-              ),
-            );
-            // Continue cascade if downstream also succeeds
-            if (newStatus === 'success') {
-              NodeEventBus.emit(edge.target, out);
-            }
-          })
-          .catch((err) => {
-            setNodes((nds) =>
-              nds.map((n) =>
-                n.id === edge.target
-                  ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-                  : n,
-              ),
-            );
-          });
-      }
-    },
-    [setEdges, setNodes, getNode, getEdges],
-  );
-
-  // Subscribe to node success events
-  useEffect(() => {
-    const unsub = NodeEventBus.subscribe(handleNodeSuccess);
-    return unsub;
-  }, [handleNodeSuccess]);
 
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
@@ -270,38 +218,10 @@ function FlowEditorInner({
         eds.map((e) => ({ ...e, data: { ...e.data, activated: false } })),
       );
 
-      // Status map: backend → frontend
-      const statusMap: Record<string, string> = {
-        idle: 'idle',
-        processing: 'running',
-        success: 'success',
-        error: 'error',
-      };
-
       // Start WebSocket-based workflow run
       const cancelFn = FlowApi.runWorkflowWS(
         wfId,
-        // onNodeUpdate: called for each node status push from backend
-        (nodeId, nodeStatus, output) => {
-          const frontendStatus = statusMap[nodeStatus] ?? nodeStatus;
-          setNodes((nds) =>
-            nds.map((n) =>
-              n.id === nodeId
-                ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output } }
-                : n,
-            ),
-          );
-          // Activate outgoing edges when a node succeeds
-          if (nodeStatus === 'success') {
-            setEdges((eds) =>
-              eds.map((e) =>
-                e.source === nodeId && e.data?.matchStatus === 'matched'
-                  ? { ...e, data: { ...e.data, activated: true } }
-                  : e,
-              ),
-            );
-          }
-        },
+        handleNodeUpdate,
         // onDone: workflow finished
         (_status, error) => {
           setRunCancelFn(null);
@@ -314,10 +234,11 @@ function FlowEditorInner({
       // Store cancel function so Toolbar stop button can cancel
       setRunCancelFn(() => cancelFn);
     },
-    [workflowId, setNodes, setEdges],
+    [workflowId, setNodes, setEdges, handleNodeUpdate],
   );
 
   return (
+    <WorkflowContext.Provider value={{ workflowId, onNodeUpdate: handleNodeUpdate }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar
         nodes={nodes}
@@ -361,6 +282,7 @@ function FlowEditorInner({
         <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} edges={edges} nodes={nodes} />
       </div>
     </div>
+    </WorkflowContext.Provider>
   );
 }
 

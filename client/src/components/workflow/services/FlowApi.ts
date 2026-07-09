@@ -164,4 +164,80 @@ export const FlowApi = {
       cleanup();
     };
   },
+
+  /**
+   * Run a subgraph starting from a specific node via Socket.IO WebSocket.
+   *
+   * The server will execute startNodeId + all its downstream nodes in topo order.
+   * Upstream nodes are NOT re-executed; their last outputs are passed via nodeDataOverrides
+   * so the server can do port-mapping correctly.
+   *
+   * Flow:
+   *   client → emit('workflow:run_from_node', { workflowId, startNodeId, nodeDataOverrides })
+   *   server → emit('workflow:started',     { taskId })
+   *   server → emit('workflow:node_update', { taskId, nodeId, status, output })  (multiple times)
+   *   server → emit('workflow:done',        { taskId, status, error })
+   *
+   * @param workflowId        Saved workflow ID
+   * @param startNodeId       ID of the node to start execution from
+   * @param nodeDataOverrides { nodeId: fieldData | runOutput } — field overrides for the start
+   *                          node and cached outputs for upstream nodes (for port mapping)
+   * @param onNodeUpdate      Called on each node status change
+   * @param onDone            Called when the subgraph finishes
+   * @returns                 Cleanup / cancel function
+   */
+  runNodeWS(
+    workflowId: string,
+    startNodeId: string,
+    nodeDataOverrides: Record<string, any>,
+    onNodeUpdate: (nodeId: string, status: string, output: any) => void,
+    onDone: (status: string, error: string | null) => void,
+  ): () => void {
+    const socket = getSocket();
+    let taskId: string | null = null;
+
+    const onStarted = (data: { taskId: string }) => {
+      taskId = data.taskId;
+      console.log('[FlowApi] NodeRun started, taskId:', taskId, 'startNode:', startNodeId);
+    };
+
+    const onNodeUpd = (data: { taskId: string; nodeId: string; status: string; output: any }) => {
+      onNodeUpdate(data.nodeId, data.status, data.output);
+    };
+
+    const onDoneEvt = (data: { taskId: string; status: string; error: string | null }) => {
+      console.log('[FlowApi] NodeRun done:', data);
+      onDone(data.status, data.error);
+      cleanup();
+    };
+
+    const onError = (data: { error: string }) => {
+      console.error('[FlowApi] NodeRun error:', data.error);
+      onDone('error', data.error);
+      cleanup();
+    };
+
+    function cleanup() {
+      socket.off('workflow:started', onStarted);
+      socket.off('workflow:node_update', onNodeUpd);
+      socket.off('workflow:done', onDoneEvt);
+      socket.off('workflow:error', onError);
+    }
+
+    socket.on('workflow:started', onStarted);
+    socket.on('workflow:node_update', onNodeUpd);
+    socket.on('workflow:done', onDoneEvt);
+    socket.on('workflow:error', onError);
+
+    socket.emit('workflow:run_from_node', {
+      workflowId,
+      startNodeId,
+      nodeDataOverrides,
+    });
+
+    return () => {
+      if (taskId) socket.emit('workflow:cancel', { taskId });
+      cleanup();
+    };
+  },
 };

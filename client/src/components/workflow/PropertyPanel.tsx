@@ -4,6 +4,7 @@ import { getNodeRegistry } from './NodeRegistry';
 import { Button, Tag, Modal, message } from 'antd';
 import { ExpandOutlined, CopyOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
+import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
 
@@ -56,6 +57,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState('');
   const [modalTitle, setModalTitle] = useState('');
+  const { workflowId, onNodeUpdate } = useWorkflowContext();
 
   const nodeType = selectedNode?.type ?? '';
   const nodeData = (selectedNode?.data || {}) as Record<string, unknown>;
@@ -119,63 +121,52 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
     [selectedNode, setNodes],
   );
 
-  const handleRunNode = useCallback(async () => {
+  const handleRunNode = useCallback(() => {
     if (!selectedNode) return;
-    const upstreamInput: Record<string, any> = {};
+    if (!workflowId) {
+      message.warning('请先保存工作流，再运行节点');
+      return;
+    }
 
-    setNodes((nds) => {
-      for (const edge of incomingEdges) {
-        const srcNode = nds.find((n) => n.id === edge.source);
-        if (!srcNode) continue;
-        const srcOutput = (srcNode.data as any)?._runOutput;
-        if (!srcOutput || srcOutput.error) continue;
-        if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-          upstreamInput[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
-        } else {
-          Object.assign(upstreamInput, srcOutput);
-        }
-      }
-      return nds.map((n) =>
+    // Mark this node as running immediately for visual feedback
+    setNodes((nds) =>
+      nds.map((n) =>
         n.id === selectedNode.id
           ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } }
           : n,
-      );
-    });
+      ),
+    );
 
-    try {
-      // Build clean config — strip internal state keys (_runStatus, _runOutput, etc.)
-      const cleanConfig: Record<string, any> = {};
-      for (const [k, v] of Object.entries(nodeData)) {
-        if (!k.startsWith('_') && v !== undefined && v !== null && String(v).trim() !== '') {
-          cleanConfig[k] = v;
+    // Build clean config — strip internal state keys
+    const cleanConfig: Record<string, any> = {};
+    for (const [k, v] of Object.entries(nodeData)) {
+      if (!k.startsWith('_') && v !== undefined && v !== null && String(v).trim() !== '') {
+        cleanConfig[k] = v;
+      }
+    }
+
+    // Collect all other nodes' last known _runOutput as upstream context
+    const nodeDataOverrides: Record<string, any> = {};
+    nodeDataOverrides[selectedNode.id] = cleanConfig;
+    for (const n of nodes) {
+      if (n.id !== selectedNode.id) {
+        const runOutput = (n.data as any)?._runOutput;
+        if (runOutput && !runOutput.error) {
+          nodeDataOverrides[n.id] = runOutput;
         }
       }
-      const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
-      const output = result.output ?? result;
-      const newStatus = output?.error ? 'error' : 'success';
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
-            : n,
-        ),
-      );
-      if (output?.error) {
-        message.error(`运行失败: ${output.error}`);
-      } else {
-        message.success('节点运行完成');
-      }
-    } catch (err: any) {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-            : n,
-        ),
-      );
-      message.error(`运行失败: ${err.message}`);
     }
-  }, [selectedNode, nodeType, nodeData, setNodes, incomingEdges]);
+
+    FlowApi.runNodeWS(
+      workflowId,
+      selectedNode.id,
+      nodeDataOverrides,
+      onNodeUpdate,
+      (_status, error) => {
+        if (error) message.error(`运行失败: ${error}`);
+      },
+    );
+  }, [selectedNode, nodeData, nodes, setNodes, workflowId, onNodeUpdate]);
 
   // Format output for display
   const formatOutput = (output: any): string => {

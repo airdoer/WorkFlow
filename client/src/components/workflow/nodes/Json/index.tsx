@@ -18,8 +18,8 @@ import {
   ExpandOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from '../../services/FlowApi';
-import { NodeEventBus } from '../../NodeEventBus';
 import { getNodePorts } from '../../PortTypes';
+import { useWorkflowContext } from '../../WorkflowContext';
 import NodeDetailModal from '../NodeDetailModal';
 import { NodeField } from '../BaseNode';
 
@@ -40,7 +40,8 @@ const PORT_COLORS: Record<string, string> = {
 };
 
 function JsonNode({ data, id, selected }: NodeProps) {
-  const { setNodes, getEdges, getNode } = useReactFlow();
+  const { setNodes, getNodes } = useReactFlow();
+  const { workflowId, onNodeUpdate } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState(false);
 
@@ -80,21 +81,6 @@ function JsonNode({ data, id, selected }: NodeProps) {
     }
   }, [hasJsonPathEdge]);
 
-  // 获取上游 jsonPath 的实际值（用于展示）
-  const getUpstreamJsonPath = useCallback((): string | undefined => {
-    const edges = getEdges();
-    const inEdge = edges.find((e) => e.target === id && e.targetHandle === 'jsonPath');
-    if (!inEdge) return undefined;
-    const srcNode = getNode(inEdge.source);
-    if (!srcNode) return undefined;
-    const srcOutput = (srcNode.data as any)?._runOutput;
-    if (!srcOutput) return undefined;
-    if (inEdge.sourceHandle && srcOutput[inEdge.sourceHandle] !== undefined) {
-      return String(srcOutput[inEdge.sourceHandle]);
-    }
-    return srcOutput.value !== undefined ? String(srcOutput.value) : undefined;
-  }, [getEdges, getNode, id]);
-
   const handleJsonPathChange = useCallback(
     (val: string) => {
       if (hasJsonPathEdge) return;
@@ -105,72 +91,78 @@ function JsonNode({ data, id, selected }: NodeProps) {
     [id, setNodes, hasJsonPathEdge],
   );
 
-  const collectUpstreamInput = useCallback(() => {
-    const edges = getEdges();
-    const incoming = edges.filter((e) => e.target === id && e.targetHandle);
-    const input: Record<string, any> = {};
-    for (const edge of incoming) {
-      const srcNode = getNode(edge.source);
-      if (!srcNode) continue;
-      const srcOutput = (srcNode.data as any)?._runOutput;
-      if (!srcOutput || srcOutput.error) continue;
-      if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-        input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
-      } else if (srcOutput.value !== undefined) {
-        input[edge.targetHandle!] = srcOutput.value;
-      } else {
-        Object.assign(input, srcOutput);
-      }
-    }
-    return input;
-  }, [id, getEdges, getNode]);
-
-  const canRun = runStatus !== 'running' && hasFileContentEdge;
+  // JSON 节点可运行：有 fileContent 连线，或有 workflowId（由后端整图推送）
+  const canRun = runStatus !== 'running' && (hasFileContentEdge || !!workflowId);
 
   const handleRun = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!canRun) return;
 
+      if (!workflowId) {
+        console.warn('[JsonNode] No workflowId, cannot run via WebSocket');
+        return;
+      }
+
+      // Mark this node as running immediately
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
         ),
       );
 
-      try {
-        const upstreamInput = collectUpstreamInput();
-        const effectivePath = hasJsonPathEdge
-          ? (upstreamInput.jsonPath ?? getUpstreamJsonPath())
-          : manualJsonPath;
+      // Build node data overrides: current node config + other nodes' cached outputs
+      const allNodes = getNodes();
+      const nodeDataOverrides: Record<string, any> = {};
 
-        const cleanConfig: Record<string, any> = {};
-        if (effectivePath) cleanConfig.jsonPath = effectivePath;
-
-        const result = await FlowApi.runNode('json', cleanConfig, upstreamInput);
-        const output = result.output ?? result;
-        const newStatus = output?.error ? 'error' : 'success';
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
-              : n,
-          ),
-        );
-        if (newStatus === 'success') {
-          NodeEventBus.emit(id, output);
-        }
-      } catch (err: any) {
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-              : n,
-          ),
-        );
+      // Override current node's config with latest field values
+      const cleanConfig: Record<string, any> = {};
+      if (!hasJsonPathEdge && manualJsonPath) {
+        cleanConfig.jsonPath = manualJsonPath;
       }
+      nodeDataOverrides[id] = cleanConfig;
+
+      // Pass cached outputs of other nodes for upstream context
+      for (const n of allNodes) {
+        if (n.id !== id) {
+          const runOutput = (n.data as any)?._runOutput;
+          if (runOutput && !runOutput.error) {
+            nodeDataOverrides[n.id] = runOutput;
+          }
+        }
+      }
+
+      FlowApi.runNodeWS(
+        workflowId,
+        id,
+        nodeDataOverrides,
+        onNodeUpdate,
+        (_status, error) => {
+          if (error) console.error('[JsonNode] NodeRun error:', error);
+        },
+      );
     },
-    [id, setNodes, canRun, collectUpstreamInput, hasJsonPathEdge, getUpstreamJsonPath, manualJsonPath],
+    [id, setNodes, canRun, workflowId, onNodeUpdate, getNodes, hasJsonPathEdge, manualJsonPath],
+  );
+
+  // Display the upstream jsonPath value (from other node's _runOutput)
+  const upstreamJsonPath = useStore(
+    useCallback(
+      (s) => {
+        if (!hasJsonPathEdge) return undefined;
+        const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'jsonPath');
+        if (!edge) return undefined;
+        const srcNode = s.nodeInternals.get(edge.source);
+        if (!srcNode) return undefined;
+        const srcOutput = (srcNode.data as any)?._runOutput;
+        if (!srcOutput) return undefined;
+        if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
+          return String(srcOutput[edge.sourceHandle]);
+        }
+        return srcOutput.value !== undefined ? String(srcOutput.value) : undefined;
+      },
+      [id, hasJsonPathEdge],
+    ),
   );
 
   const borderColor =
@@ -231,7 +223,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
             <button
               onClick={handleRun}
               disabled={!canRun}
-              title={!canRun ? '请先连接文件内容输入' : statusCfg.title}
+              title={!canRun ? '请先连接文件内容输入或配置工作流' : statusCfg.title}
               style={{
                 width: 24, height: 24, borderRadius: 4, border: 'none',
                 background: !canRun ? '#f5f5f5' : statusCfg.bg,
@@ -352,7 +344,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
             </label>
             <input
               type="text"
-              value={hasJsonPathEdge ? (getUpstreamJsonPath() ?? '...等待上游运行') : (manualJsonPath ?? '')}
+              value={hasJsonPathEdge ? (upstreamJsonPath ?? '...等待上游运行') : (manualJsonPath ?? '')}
               disabled={hasJsonPathEdge}
               onChange={(e) => handleJsonPathChange(e.target.value)}
               onClick={(e) => e.stopPropagation()}

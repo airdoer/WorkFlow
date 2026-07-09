@@ -109,10 +109,22 @@ class WorkflowRuntime:
             logger.debug("[WorkflowRuntime._emit] socketio not available, skip emit %r", event)
 
     @classmethod
-    async def run(cls, workflow_json, task_id):
+    async def run(cls, workflow_json, task_id, start_node_id: str = None, node_data_overrides: dict = None):
+        """Run workflow (full graph or subgraph from start_node_id).
+
+        Args:
+            workflow_json:       Saved workflow JSON (nodes + edges).
+            task_id:             Unique task identifier for this run.
+            start_node_id:       If set, only execute this node and all its downstream nodes.
+                                 Predecessors of start_node_id are NOT executed; their outputs
+                                 are assumed to be already available in node_data_overrides.
+            node_data_overrides: Per-node data dict overrides { nodeId: { fieldKey: value, ... } }.
+                                 Used to inject the latest field values from the frontend without
+                                 requiring a save first.
+        """
         from Implement.workflowImpl.nodeExecutor import ExecutorManager
 
-        logger.info("[WorkflowRuntime.run] Starting: task_id=%r", task_id)
+        logger.info("[WorkflowRuntime.run] Starting: task_id=%r, start_node_id=%r", task_id, start_node_id)
 
         nodes = workflow_json.get('nodes', [])
         edges = workflow_json.get('edges', [])
@@ -142,7 +154,7 @@ class WorkflowRuntime:
                 in_degree[tgt] += 1
                 edges_by_target[tgt].append(edge)
 
-        # ── Cycle detection ─────────────────────────────────────────────────
+        # ── Cycle detection via full-graph topological sort ─────────────────
         from collections import deque
         topo_queue = deque([nid for nid, deg in in_degree.items() if deg == 0])
         topo_order = []
@@ -165,8 +177,27 @@ class WorkflowRuntime:
             cls._emit('workflow:done', {'taskId': task_id, 'status': 'error', 'error': error_msg}, room=task_id)
             raise ValueError(error_msg)
 
-        root_nodes = [nid for nid, deg in in_degree.items() if deg == 0]
-        logger.info("[WorkflowRuntime.run] task_id=%r, root_nodes=%s", task_id, root_nodes)
+        # ── Determine which nodes to execute ─────────────────────────────────
+        # Full graph: all nodes in topo order.
+        # Subgraph (start_node_id set): start_node + all reachable downstream nodes (BFS).
+        if start_node_id and start_node_id in node_map:
+            # BFS to find all nodes reachable from start_node_id
+            subgraph_nodes = set()
+            bfs_queue = deque([start_node_id])
+            while bfs_queue:
+                nid = bfs_queue.popleft()
+                if nid in subgraph_nodes:
+                    continue
+                subgraph_nodes.add(nid)
+                for downstream in adj[nid]:
+                    bfs_queue.append(downstream)
+            # Keep topological order but only for subgraph nodes
+            exec_nodes = [nid for nid in topo_order if nid in subgraph_nodes]
+            logger.info("[WorkflowRuntime.run] task_id=%r: subgraph from %r, exec_nodes=%s",
+                        task_id, start_node_id, exec_nodes)
+        else:
+            exec_nodes = list(topo_order)
+            logger.info("[WorkflowRuntime.run] task_id=%r: full graph, exec_nodes=%s", task_id, exec_nodes)
 
         # ── Initialize task state ────────────────────────────────────────────
         cls._tasks[task_id] = {
@@ -176,9 +207,29 @@ class WorkflowRuntime:
             'error': None,
         }
 
+        # Pre-fill context with upstream outputs passed from the frontend (node_data_overrides).
+        # For subgraph runs: predecessors of start_node are not executed; we put placeholder
+        # entries in context so that edge port mapping in execute_node can find their outputs.
         context: dict = {}
+        if node_data_overrides:
+            for nid, override_data in node_data_overrides.items():
+                if nid not in [n for n in exec_nodes]:
+                    # This is an upstream node not in exec set — store its output in context
+                    # so downstream port mapping can reference it.
+                    context[nid] = override_data
+                    logger.debug("[WorkflowRuntime.run] task_id=%r: pre-filled context for upstream node %r", task_id, nid)
+
         context_lock = asyncio.Lock()
+
+        # asyncio.Event per node — only create for nodes we actually execute
         node_done: dict = {nid: asyncio.Event() for nid in node_map}
+
+        # Pre-mark predecessors of exec_nodes that are NOT in exec_nodes as already done,
+        # so execute_node doesn't wait forever for them.
+        exec_set = set(exec_nodes)
+        for nid in node_map:
+            if nid not in exec_set:
+                node_done[nid].set()
 
         # ── Node executor coroutine ──────────────────────────────────────────
         async def execute_node(nid: str):
@@ -186,18 +237,19 @@ class WorkflowRuntime:
             node_type = node.get('type', '')
             preds = predecessors[nid]
 
+            # Wait for predecessors (already-done predecessors return immediately)
             if preds:
                 logger.info("[WorkflowRuntime] task_id=%r, node=%r: waiting for predecessors %s",
                             task_id, nid, preds)
                 await asyncio.gather(*[node_done[p].wait() for p in preds])
                 logger.info("[WorkflowRuntime] task_id=%r, node=%r: all predecessors done", task_id, nid)
 
-            # Check upstream errors
+            # Check upstream errors (only for predecessors that were in exec set)
             async with context_lock:
                 upstream_errors = [
                     f"{p}: {context[p].get('error')}"
                     for p in preds
-                    if isinstance(context.get(p), dict) and context[p].get('error')
+                    if p in exec_set and isinstance(context.get(p), dict) and context[p].get('error')
                 ]
             if upstream_errors:
                 error_msg = f"Upstream node(s) failed: {'; '.join(upstream_errors)}"
@@ -227,6 +279,11 @@ class WorkflowRuntime:
                     else:
                         input_data.update(src_output)
 
+            # Merge node data with any frontend overrides
+            node_data = dict(node.get('data', {}))
+            if node_data_overrides and nid in node_data_overrides:
+                node_data.update(node_data_overrides[nid])
+
             logger.info("[WorkflowRuntime] task_id=%r, node=%r (type=%r): executing, input_keys=%s",
                         task_id, nid, node_type, list(input_data.keys()))
 
@@ -237,7 +294,7 @@ class WorkflowRuntime:
             }, room=task_id)
 
             try:
-                output = ExecutorManager.run_node(node_type, node.get('data', {}), input_data)
+                output = ExecutorManager.run_node(node_type, node_data, input_data)
                 async with context_lock:
                     context[nid] = output
 
@@ -267,12 +324,13 @@ class WorkflowRuntime:
             finally:
                 node_done[nid].set()
 
-        # ── Launch all coroutines concurrently ───────────────────────────────
-        logger.info("[WorkflowRuntime.run] task_id=%r: launching %d node coroutines", task_id, len(nodes))
-        await asyncio.gather(*[execute_node(nid) for nid in node_map])
+        # ── Launch coroutines for exec_nodes only ────────────────────────────
+        logger.info("[WorkflowRuntime.run] task_id=%r: launching %d node coroutines (of %d total)",
+                    task_id, len(exec_nodes), len(node_map))
+        await asyncio.gather(*[execute_node(nid) for nid in exec_nodes])
 
-        # ── Finalize ─────────────────────────────────────────────────────────
-        failed_nodes = [nid for nid, st in cls._tasks[task_id]['nodes'].items() if st == 'error']
+        # ── Finalize (only consider executed nodes for error check) ──────────
+        failed_nodes = [nid for nid in exec_nodes if cls._tasks[task_id]['nodes'].get(nid) == 'error']
         if failed_nodes:
             cls._tasks[task_id]['status'] = 'error'
             cls._tasks[task_id]['error'] = f"Node(s) failed: {failed_nodes}"

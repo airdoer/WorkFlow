@@ -3,7 +3,7 @@ import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts } from '../PortTypes';
-import { NodeEventBus } from '../NodeEventBus';
+import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
 
 // Lazy load renderers to reduce initial bundle
@@ -67,7 +67,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   nodeType,
   fields,
 }) => {
-  const { setNodes, getNodes, getEdges } = useReactFlow();
+  const { setNodes, getNodes } = useReactFlow();
+  const { workflowId, onNodeUpdate } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
@@ -93,27 +94,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const ports = getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
-
-  // Collect upstream input data from connected nodes — computed on demand, not memoized
-  // (getNodes/getEdges are stable refs so useMemo won't recompute when node data changes)
-  const collectUpstreamInput = useCallback(() => {
-    const edges = getEdges();
-    const incoming = edges.filter((e) => e.target === id && e.targetHandle);
-    const nodes = getNodes();
-    const input: Record<string, any> = {};
-    for (const edge of incoming) {
-      const srcNode = nodes.find((n) => n.id === edge.source);
-      if (!srcNode) continue;
-      const srcOutput = (srcNode.data as any)?._runOutput;
-      if (!srcOutput || srcOutput.error) continue;
-      if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-        input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
-      } else {
-        Object.assign(input, srcOutput);
-      }
-    }
-    return input;
-  }, [id, getEdges, getNodes]);
 
   // Check if all required fields are filled
   // A required field is satisfied if: it has a value, OR its linkedPortKey is connected via an edge
@@ -149,54 +129,56 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!canRun) return;
+      if (!workflowId) {
+        console.warn('[BaseNode] No workflowId in context, cannot run via WebSocket');
+        return;
+      }
 
+      // Mark this node (and reset downstream) to running immediately for visual feedback
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
         ),
       );
 
-      try {
-        const upstreamInput = collectUpstreamInput();
-        // Build clean config — only include actual field values, not internal state
-        const cleanConfig: Record<string, any> = {};
-        for (const f of fields) {
-          if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
-            cleanConfig[f.key] = data[f.key];
+      // Build clean field config for the current node (latest values, may not be saved yet)
+      const cleanConfig: Record<string, any> = {};
+      for (const f of fields) {
+        if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
+          cleanConfig[f.key] = data[f.key];
+        }
+      }
+
+      // Collect all other nodes' last known _runOutput as upstream context.
+      // The backend will use these as pre-filled context for port-mapping of nodes
+      // that are upstream of start_node_id (they won't be re-executed).
+      const allNodes = getNodes();
+      const nodeDataOverrides: Record<string, any> = {};
+      // Override the start node's data with the current (possibly unsaved) field values
+      nodeDataOverrides[id] = cleanConfig;
+      // Pass cached outputs of other nodes for upstream context
+      for (const n of allNodes) {
+        if (n.id !== id) {
+          const runOutput = (n.data as any)?._runOutput;
+          if (runOutput && !runOutput.error) {
+            nodeDataOverrides[n.id] = runOutput;
           }
         }
-        const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
-        const output = result.output ?? result;
-        const newStatus = output?.error ? 'error' : 'success';
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
-              : n,
-          ),
-        );
-        // Notify event bus for cascade execution
-        if (newStatus === 'success') {
-          NodeEventBus.emit(id, output);
-        }
-      } catch (err: any) {
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    _runStatus: 'error',
-                    _runOutput: { error: err.message },
-                  },
-                }
-              : n,
-          ),
-        );
       }
+
+      FlowApi.runNodeWS(
+        workflowId,
+        id,
+        nodeDataOverrides,
+        onNodeUpdate,
+        (_status, error) => {
+          if (error) {
+            console.error('[BaseNode] NodeRun finished with error:', error);
+          }
+        },
+      );
     },
-    [id, nodeType, data, setNodes, canRun, collectUpstreamInput],
+    [id, nodeType, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes],
   );
 
   const borderColor =

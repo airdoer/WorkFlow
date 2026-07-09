@@ -129,6 +129,79 @@ def on_workflow_run(data):
     socketio.start_background_task(run_workflow)
 
 
+@socketio.on('workflow:run_from_node')
+def on_workflow_run_from_node(data):
+    """Run a subgraph starting from a specific node via Socket.IO.
+
+    Client sends:
+      {
+        workflowId,        # required
+        startNodeId,       # required: the node to start from
+        nodeDataOverrides, # optional: { nodeId: { fieldKey: value, ... } }
+                           #   - for the start node: its latest field values (may not be saved yet)
+                           #   - for upstream nodes: their last known _runOutput to use as context
+      }
+    Server emits:
+      - workflow:started      { taskId }
+      - workflow:node_update  { taskId, nodeId, status, output }
+      - workflow:done         { taskId, status, error }
+    """
+    workflow_id = data.get('workflowId')
+    start_node_id = data.get('startNodeId')
+    node_data_overrides = data.get('nodeDataOverrides') or {}
+
+    logger.info("[SocketIO workflow:run_from_node] sid=%s, workflowId=%r, startNodeId=%r",
+                request.sid, workflow_id, start_node_id)
+
+    if not workflow_id or not start_node_id:
+        socketio.emit('workflow:error', {'error': 'workflowId and startNodeId are required'}, room=request.sid)
+        return
+
+    workflow = WorkflowManager.get(workflow_id)
+    if not workflow:
+        socketio.emit('workflow:error', {'error': f'Workflow not found: {workflow_id}'}, room=request.sid)
+        return
+
+    workflow_json = workflow.get('json')
+    nodes = workflow_json.get('nodes', []) if isinstance(workflow_json, dict) else []
+    edges = workflow_json.get('edges', []) if isinstance(workflow_json, dict) else []
+
+    task_id = str(uuid.uuid4())
+    logger.info("[SocketIO workflow:run_from_node] task_id=%r, nodes=%d, edges=%d, startNode=%r",
+                task_id, len(nodes), len(edges), start_node_id)
+
+    # Client automatically joins the task room
+    join_room(task_id)
+    logger.info("[SocketIO workflow:run_from_node] sid=%s auto-joined room task_id=%r", request.sid, task_id)
+
+    # Notify client of task_id immediately
+    socketio.emit('workflow:started', {'taskId': task_id}, room=request.sid)
+
+    def run_subgraph():
+        logger.info("[SocketIO workflow:run_from_node] Background task started: task_id=%r, startNode=%r",
+                    task_id, start_node_id)
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                WorkflowRuntime.run(
+                    workflow_json,
+                    task_id,
+                    start_node_id=start_node_id,
+                    node_data_overrides=node_data_overrides,
+                )
+            )
+            loop.close()
+            logger.info("[SocketIO workflow:run_from_node] Background task completed: task_id=%r", task_id)
+        except Exception as e:
+            logger.exception("[SocketIO workflow:run_from_node] Background task error: task_id=%r, %s", task_id, e)
+            socketio.emit('workflow:done', {
+                'taskId': task_id, 'status': 'error', 'error': str(e)
+            }, room=task_id)
+
+    socketio.start_background_task(run_subgraph)
+
+
 @socketio.on('workflow:cancel')
 def on_workflow_cancel(data):
     """Cancel a running workflow via Socket.IO."""
