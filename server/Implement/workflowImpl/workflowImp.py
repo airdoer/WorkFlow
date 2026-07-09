@@ -195,6 +195,20 @@ class WorkflowRuntime:
             exec_nodes = [nid for nid in topo_order if nid in subgraph_nodes]
             logger.info("[WorkflowRuntime.run] task_id=%r: subgraph from %r, exec_nodes=%s",
                         task_id, start_node_id, exec_nodes)
+        elif start_node_id and start_node_id not in node_map:
+            # start_node_id was specified but not found in saved workflow — likely unsaved node
+            error_msg = f"Start node '{start_node_id}' not found in workflow (workflow may need to be saved first)"
+            logger.error("[WorkflowRuntime.run] task_id=%r: %s", task_id, error_msg)
+            cls._tasks[task_id] = {
+                'status': 'error', 'nodes': {}, 'result': None, 'error': error_msg,
+            }
+            # Emit error for the start node so the frontend can reset its status
+            cls._emit('workflow:node_update', {
+                'taskId': task_id, 'nodeId': start_node_id, 'status': 'error',
+                'output': {'error': error_msg}
+            }, room=task_id)
+            cls._emit('workflow:done', {'taskId': task_id, 'status': 'error', 'error': error_msg}, room=task_id)
+            return
         else:
             exec_nodes = list(topo_order)
             logger.info("[WorkflowRuntime.run] task_id=%r: full graph, exec_nodes=%s", task_id, exec_nodes)

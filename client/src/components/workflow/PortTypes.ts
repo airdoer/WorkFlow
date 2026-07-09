@@ -21,14 +21,14 @@ export interface PortDefinition {
 
 /** Registry of all known port types and their compatibility */
 export const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
-  'file-content': ['file-content', 'any'],
-  'file-path': ['file-path', 'any'],
+  'file-content': ['file-content', 'string', 'text', 'any'],  // file-content is essentially a string
+  'file-path': ['file-path', 'string', 'any'],  // file-path is also a string
   'any': ['file-content', 'file-path', 'any', 'text', 'table-data', 'json-data', 'boolean', 'string', 'number', 'json-path'],
-  'text': ['text', 'any', 'string'],
+  'text': ['text', 'any', 'string', 'file-content'],  // text accepts file-content too
   'table-data': ['table-data', 'any'],
   'json-data': ['json-data', 'any'],
   'boolean': ['boolean', 'any'],
-  'string': ['string', 'any', 'text'],
+  'string': ['string', 'any', 'text', 'file-content', 'file-path'],  // string is compatible with file-content/file-path
   'number': ['number', 'any'],
   'json-path': ['json-path', 'string', 'any'],
 };
@@ -92,6 +92,13 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   number: [
     { key: 'valueIn', label: '输入值', type: 'number', direction: 'input', maxConnections: 1 },
     { key: 'value', label: '数值', type: 'number', direction: 'output' },
+  ],
+  // Diff node — compares two strings
+  diff: [
+    { key: 'stringA', label: '字符串 A', type: 'string', direction: 'input' },
+    { key: 'stringB', label: '字符串 B', type: 'string', direction: 'input' },
+    { key: 'diffResult', label: 'Diff 结果', type: 'json-data', direction: 'output' },
+    { key: 'isSame', label: '是否相同', type: 'boolean', direction: 'output' },
   ],
 };
 

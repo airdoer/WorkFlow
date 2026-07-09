@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -15,8 +15,10 @@ import ReactFlow, {
   useReactFlow,
   NodeMouseHandler,
   Connection,
+  OnSelectionChangeFunc,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { message } from 'antd';
 import Toolbox from './Toolbox';
 import PropertyPanel from './PropertyPanel';
 import Toolbar from './Toolbar';
@@ -56,8 +58,7 @@ function FlowEditorInner({
 }: FlowEditorProps) {
   const initialNodes = initialData?.nodes || [];
 
-  // Re-compute matchStatus for all edges on load, in case saved data is stale
-  // (e.g., port type compatibility rules changed since the workflow was last saved)
+  // Re-compute matchStatus for all edges on load
   const initialEdges = useMemo(() => {
     const nodeMap: Record<string, any> = {};
     for (const n of initialNodes) nodeMap[n.id] = n;
@@ -88,15 +89,21 @@ function FlowEditorInner({
       }
       return { ...e, type: 'flowing' };
     });
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps — only run once on mount
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  // cancelFn returned by FlowApi.runWorkflowWS — non-null while a workflow run is in progress
   const [runCancelFn, setRunCancelFn] = useState<(() => void) | null>(null);
 
-  const { getNode } = useReactFlow();
+  // Track unsaved state
+  const [isDirty, setIsDirty] = useState(false);
+  const lastSavedJsonRef = useRef<string>('');
+
+  // Track multi-selection for special styling
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+
+  const { getNode, getNodes, getEdges, toObject, screenToFlowPosition } = useReactFlow();
 
   const selectedNode = useMemo(
     () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) ?? null : null),
@@ -112,9 +119,7 @@ function FlowEditorInner({
   };
 
   /**
-   * Shared node update handler — used by BOTH the full-graph run (Toolbar) and
-   * single-node ▶ run (BaseNode). Applies status/output to the target node and
-   * activates outgoing edges on success.
+   * Shared node update handler
    */
   const handleNodeUpdate = useCallback(
     (nodeId: string, nodeStatus: string, output: any) => {
@@ -139,6 +144,32 @@ function FlowEditorInner({
     [setNodes, setEdges],
   );
 
+  /**
+   * Ensure the workflow is saved before running.
+   */
+  const ensureSaved = useCallback(async (): Promise<string | undefined> => {
+    if (!workflowId) {
+      message.warning('请先保存工作流后再运行节点');
+      return undefined;
+    }
+    if (isDirty) {
+      try {
+        const json = toObject();
+        const result = await FlowApi.save(workflowName || '未命名工作流', json, workflowId, {
+          author: workflowAuthor || '',
+          description: workflowDescription || '',
+        });
+        lastSavedJsonRef.current = JSON.stringify(json);
+        setIsDirty(false);
+        onSave?.(result.id, workflowName || '未命名工作流');
+      } catch (err: any) {
+        message.error(`自动保存失败: ${err.message}`);
+        return undefined;
+      }
+    }
+    return workflowId;
+  }, [workflowId, workflowName, workflowAuthor, workflowDescription, isDirty, toObject, onSave]);
+
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
       const sourceNode = getNode(params.source!);
@@ -161,15 +192,16 @@ function FlowEditorInner({
             activated: false,
           };
 
+          if (!compatible) {
+            message.warning(`端口类型不兼容: ${sourcePort.type} → ${targetPort.type}，请检查连线`);
+          }
+
           const newEdge = addEdge(
-            {
-              ...params,
-              type: 'flowing',
-              data: edgeData,
-            },
+            { ...params, type: 'flowing', data: edgeData },
             edges,
           );
           setEdges(newEdge);
+          setIsDirty(true);
           return;
         }
       }
@@ -177,6 +209,7 @@ function FlowEditorInner({
       setEdges((eds) =>
         addEdge({ ...params, type: 'flowing', data: { matchStatus: 'unknown', activated: false } }, eds),
       );
+      setIsDirty(true);
     },
     [edges, setEdges, getNode],
   );
@@ -187,6 +220,7 @@ function FlowEditorInner({
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    setMultiSelectedIds(new Set());
   }, []);
 
   const onNodesDelete = useCallback(
@@ -194,23 +228,85 @@ function FlowEditorInner({
       if (deleted.some((n) => n.id === selectedNodeId)) {
         setSelectedNodeId(null);
       }
+      setIsDirty(true);
     },
     [selectedNodeId],
   );
 
+  const onEdgesDelete = useCallback(() => {
+    setIsDirty(true);
+  }, []);
+
+  // Track multi-selection for special styling (Ctrl+click)
+  const onSelectionChange: OnSelectionChangeFunc = useCallback(
+    ({ nodes: selectedNodes }) => {
+      if (selectedNodes.length > 1) {
+        setMultiSelectedIds(new Set(selectedNodes.map((n) => n.id)));
+      } else {
+        setMultiSelectedIds(new Set());
+      }
+    },
+    [],
+  );
+
+  // Track node/edge changes as dirty
+  const wrappedOnNodesChange: OnNodesChange = useCallback(
+    (changes) => {
+      onNodesChange(changes);
+      const meaningful = changes.some(
+        (c) => c.type === 'add' || c.type === 'remove' || c.type === 'position',
+      );
+      if (meaningful) setIsDirty(true);
+    },
+    [onNodesChange],
+  );
+
+  const wrappedOnEdgesChange: OnEdgesChange = useCallback(
+    (changes) => {
+      onEdgesChange(changes);
+      const meaningful = changes.some(
+        (c) => c.type === 'add' || c.type === 'remove',
+      );
+      if (meaningful) setIsDirty(true);
+    },
+    [onEdgesChange],
+  );
+
   /**
-   * When a node succeeds, mark its outgoing matched edges as activated.
-   * (Legacy frontend cascade is removed — cascade is now handled by the backend subgraph run.)
+   * Duplicate a node — create a copy with fresh id, offset position, no run status
    */
+  const handleDuplicateNode = useCallback(
+    (nodeId: string) => {
+      const node = getNode(nodeId);
+      if (!node) return;
+
+      const newNodeId = `${node.type}_${Date.now()}`;
+      const { _runStatus, _runOutput, ...cleanData } = node.data as any;
+
+      const newNode: Node = {
+        id: newNodeId,
+        type: node.type,
+        position: { x: node.position.x + 50, y: node.position.y + 50 },
+        data: { ...cleanData },
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setIsDirty(true);
+    },
+    [getNode, setNodes],
+  );
+
+  // ── Clipboard: Ctrl+C / Ctrl+V ──────────────────────────────────────
+  const clipboardRef = useRef<{ type: string; data: Record<string, any> } | null>(null);
 
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
       const wfId = currentWorkflowId || workflowId;
       if (!wfId) {
+        message.warning('请先保存工作流');
         return;
       }
 
-      // Reset all node statuses to 'idle' and deactivate all edges
       setNodes((nds) =>
         nds.map((n) => ({ ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null } })),
       );
@@ -218,27 +314,122 @@ function FlowEditorInner({
         eds.map((e) => ({ ...e, data: { ...e.data, activated: false } })),
       );
 
-      // Start WebSocket-based workflow run
       const cancelFn = FlowApi.runWorkflowWS(
         wfId,
         handleNodeUpdate,
-        // onDone: workflow finished
         (_status, error) => {
           setRunCancelFn(null);
           if (error) {
             console.error('[FlowEditor] Workflow run finished with error:', error);
+            message.error(`运行出错: ${error}`);
           }
         },
       );
 
-      // Store cancel function so Toolbar stop button can cancel
       setRunCancelFn(() => cancelFn);
     },
     [workflowId, setNodes, setEdges, handleNodeUpdate],
   );
 
+  // Handle drag-over from Toolbox
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle drop from Toolbox — create a new node at the exact drop position
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const nodeType = e.dataTransfer.getData('application/reactflow');
+      if (!nodeType) return;
+
+      // Use screenToFlowPosition to convert screen coords to flow coords
+      const position = screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      const id = `${nodeType}_${Date.now()}`;
+      const newNode: Node = {
+        id,
+        type: nodeType,
+        position,
+        data: {},
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setIsDirty(true);
+    },
+    [setNodes, screenToFlowPosition],
+  );
+
+  // Keyboard shortcuts — must be on the ReactFlow pane, not on a random div
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      // Ctrl+C: copy selected node(s) to clipboard
+      if (ctrl && e.key === 'c') {
+        // Don't intercept if user is typing in an input/textarea
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        const selectedNodes = nodes.filter((n) => n.selected);
+        if (selectedNodes.length > 0) {
+          // Copy all selected nodes to clipboard
+          clipboardRef.current = {
+            type: selectedNodes[0].type || '',
+            data: (() => {
+              // For single node, copy its data
+              const { _runStatus, _runOutput, ...cleanData } = selectedNodes[0].data as any;
+              return cleanData;
+            })(),
+          };
+          e.preventDefault();
+          message.success(`已复制 ${selectedNodes.length} 个节点`);
+        }
+      }
+
+      // Ctrl+V: paste from clipboard
+      if (ctrl && e.key === 'v') {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        if (clipboardRef.current) {
+          const { type, data } = clipboardRef.current;
+          const id = `${type}_${Date.now()}`;
+          // Offset from current selected node or center of view
+          const srcNode = selectedNodeId ? getNode(selectedNodeId) : null;
+          const position = srcNode
+            ? { x: srcNode.position.x + 50, y: srcNode.position.y + 50 }
+            : { x: Math.random() * 300 + 100, y: Math.random() * 200 + 100 };
+
+          const newNode: Node = {
+            id,
+            type,
+            position,
+            data: { ...data },
+          };
+
+          setNodes((nds) => [...nds, newNode]);
+          setIsDirty(true);
+          e.preventDefault();
+          message.success('已粘贴节点');
+        }
+      }
+
+      // Ctrl+D: duplicate selected node
+      if (ctrl && e.key === 'd' && selectedNodeId) {
+        e.preventDefault();
+        handleDuplicateNode(selectedNodeId);
+      }
+    },
+    [nodes, selectedNodeId, handleDuplicateNode, setNodes, getNode],
+  );
+
   return (
-    <WorkflowContext.Provider value={{ workflowId, onNodeUpdate: handleNodeUpdate }}>
+    <WorkflowContext.Provider value={{ workflowId, workflowName: workflowName || '', onNodeUpdate: handleNodeUpdate, ensureSaved, multiSelectedIds }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar
         nodes={nodes}
@@ -253,33 +444,49 @@ function FlowEditorInner({
         workflowUpdatedAt={workflowUpdatedAt}
         isFullscreen={isFullscreen}
         onFullscreenToggle={onFullscreenToggle}
-        onSave={onSave}
+        onSave={(id, name) => {
+          setIsDirty(false);
+          onSave?.(id, name);
+        }}
         onRun={handleRun}
         runCancelFn={runCancelFn}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <Toolbox nodes={nodes} setNodes={setNodes} />
-        <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }}>
+        <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => setIsDirty(true)} />
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onNodesChange={wrappedOnNodesChange}
+            onEdgesChange={wrappedOnEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
             onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+            onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
             deleteKeyCode={['Delete', 'Backspace']}
+            selectionKeyCode="Control"
+            multiSelectionKeyCode="Control"
+            selectNodesOnDrag={false}
           >
             <Background />
             <Controls />
             <MiniMap />
           </ReactFlow>
         </div>
-        <PropertyPanel selectedNode={selectedNode} setNodes={setNodes} edges={edges} nodes={nodes} />
+        <PropertyPanel
+          selectedNode={selectedNode}
+          setNodes={setNodes}
+          edges={edges}
+          nodes={nodes}
+          onDuplicate={handleDuplicateNode}
+        />
       </div>
     </div>
     </WorkflowContext.Provider>

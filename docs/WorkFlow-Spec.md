@@ -2,7 +2,7 @@
 
 ## 一、项目概述
 
-基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理等操作的流程化编排。
+基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点以及 **String / Bool / Number** 三类基础值节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理等操作的流程化编排。
 
 ### 技术选型
 
@@ -11,10 +11,11 @@
 | 前端画布 | `reactflow` ^11.11.0 | 基于 React 的节点/边图编辑器，节点可任意放置，自由连线 |
 | 前端表单 | `antd` + `@ant-design/icons` | 项目已有，节点属性面板 + 节点运行状态图标 |
 | 前端渲染 | `antd Table` + `highlight.js` | Excel 表格渲染 / Lua 语法高亮 / JSON 自定义树 |
-| 前端运行时 | 自实现 Runtime + Event Bus | 前端 DAG 调度 + 节点成功后级联触发下游 |
+| 前端运行时 | WorkflowContext + onNodeUpdate | 统一节点执行回调，WebSocket 推送更新节点状态 + 激活边 |
 | 后端框架 | Flask (Python) + gevent | 项目已有服务端，gevent WSGIServer 运行 |
-| 通信协议 | HTTP REST | REST 负责 CRUD + 节点执行 |
+| 通信协议 | HTTP REST + Socket.IO WebSocket | REST 负责 CRUD；WebSocket 负责节点执行 + 实时状态推送 |
 | P4 集成 | `p4Utils` (项目已有) | 使用 `p4 print -q` 下载文件，不依赖 client root |
+| 实时通信 | `socket.io-client` ^4.x | WebSocket 长连接，节点执行状态实时推送 |
 
 ---
 
@@ -26,36 +27,39 @@
 client/
 └── src/
     ├── pages/
-    │   └── Workflow/
-    │       └── index.tsx                    // 页面入口，挂载 FlowEditor
+    │   ├── Workflow/
+    │   │   └── index.tsx                    // 页面入口，挂载 FlowEditor
+    │   ├── FlowDemo.tsx                      // 工作流编辑器页面（ADP 布局）
+    │   └── FlowHistory.tsx                   // 工作流历史列表页
     │
     └── components/
         └── workflow/
-            ├── FlowEditor.tsx               // ReactFlow 初始化 + 选中节点管理 + 级联执行
+            ├── FlowEditor.tsx               // ReactFlow 初始化 + 选中节点管理 + handleNodeUpdate
             ├── Toolbar.tsx                  // 保存 / 导入 / 导出 / 运行
-            ├── PropertyPanel.tsx             // 右侧属性面板（五段式）+ 运行按钮 + 弹窗查看
+            ├── PropertyPanel.tsx             // 右侧属性面板（五段式）+ 运行按钮（runNodeWS）+ 弹窗查看
             ├── Toolbox.tsx                  // 左侧节点工具箱（分类 + 点击创建节点）
             ├── NodeRegistry.tsx             // 注册所有节点类型 → NodeComponent / Icon / Category
             ├── PortTypes.ts                 // 端口类型系统 + 兼容性矩阵
-            ├── NodeEventBus.ts              // 节点事件总线（级联执行通信）
+            ├── WorkflowContext.tsx           // React Context：提供 workflowId + onNodeUpdate 回调
+            ├── NodeEventBus.ts              // [已废弃] 节点事件总线，保留兼容
             ├── types.ts                     // 全局类型定义
             │
             ├── services/
-            │   └── FlowApi.ts               // 封装所有后端 API 调用
+            │   └── FlowApi.ts               // 封装所有后端 API 调用（REST + Socket.IO）
             │
             ├── runtime/
-            │   ├── Runtime.ts               // 整体运行调度器
-            │   ├── GraphParser.ts           // DAG 解析 + 拓扑排序
-            │   ├── ExecutorManager.ts        // 根据 node.type 获取对应执行器
-            │   └── Context.ts               // 节点运行上下文（变量、输出缓存）
+            │   ├── ExecutorManager.ts        // 根据 node.type 获取对应执行器（前端侧，已弃用独立调度）
+            │   └── ...                       // 其他运行时辅助文件
             │
             └── nodes/
-                ├── BaseNode.tsx              // 通用节点基座组件（三段式布局 + 端口 Handle + 必填校验）
+                ├── BaseNode.tsx              // 通用节点基座组件（三段式布局 + 端口 Handle + 必填校验 + runNodeWS）
+                ├── ValueNode.tsx             // 基础值节点基座（String/Bool/Number 共用 + runNodeWS）
                 ├── FlowingEdge.tsx           // 自定义边组件（三种视觉状态）
+                ├── NodeDetailModal.tsx       // 节点详情弹窗（参数编辑 + 运行 + 输出渲染 + runNodeWS）
                 │
                 ├── P4File/
-                │   ├── index.tsx             // P4File 节点（数据源）
-                │   ├── executor.ts           // （仅类型导出）
+                │   ├── index.tsx             // P4File 节点（数据源，基于 BaseNode）
+                │   ├── executor.ts           // 前端执行器代理
                 │   └── icon.tsx              // Toolbox 图标
                 │
                 ├── Excel/
@@ -67,11 +71,24 @@ client/
                 │   └── LuaRenderer.tsx        // highlight.js 语法高亮渲染器
                 │
                 ├── Json/
-                │   ├── index.tsx
-                │   └── JsonRenderer.tsx        // 自定义 JSON 树渲染器
+                │   ├── index.tsx             // JSON 节点（自定义组件，双输入端口 + runNodeWS）
+                │   ├── JsonRenderer.tsx        // 自定义 JSON 树渲染器
+                │   └── executor.ts
                 │
-                └── Prompt/
-                    ├── index.tsx
+                ├── Prompt/
+                │   ├── index.tsx
+                │   └── executor.ts
+                │
+                ├── String/
+                │   ├── index.tsx             // 基于 ValueNode
+                │   └── executor.ts
+                │
+                ├── Bool/
+                │   ├── index.tsx             // 基于 ValueNode
+                │   └── executor.ts
+                │
+                └── Number/
+                    ├── index.tsx             // 基于 ValueNode
                     └── executor.ts
 ```
 
@@ -80,18 +97,21 @@ client/
 ```
 server/
 ├── routers/
-│   └── WorkFlow.py                         // HTTP REST 路由
+│   └── WorkFlow.py                         // HTTP REST 路由 + Socket.IO 事件处理
 │
 ├── Implement/
 │   └── workflowImpl/
 │       ├── __init__.py
-│       ├── workflowImp.py                   // 工作流 CRUD 实现 + DAG 运行时
+│       ├── workflowImp.py                   // 工作流 CRUD 实现 + DAG 运行时（支持子图执行）
 │       ├── nodeExecutor.py                  // 节点执行器基类 + 分发
 │       ├── p4FileExecutor.py                // P4File 节点执行（p4Utils 下载 + 文件类型检测）
 │       ├── excelExecutor.py                 // Excel 节点执行（接收上游 fileContent / localPath）
 │       ├── luaExecutor.py                   // Lua 节点执行（接收上游 fileContent）
 │       ├── jsonExecutor.py                  // JSON 节点执行（接收上游 fileContent + jsonPath 过滤）
-│       └── promptExecutor.py                // Prompt 节点执行（调用 LLM API）
+│       ├── promptExecutor.py                // Prompt 节点执行（调用 LLM API）
+│       ├── stringExecutor.py               // String 节点执行（输出字符串值）
+│       ├── boolExecutor.py                  // Bool 节点执行（输出布尔值）
+│       └── numberExecutor.py               // Number 节点执行（输出数值）
 │
 ├── utility/
 │   └── p4Utils.py                          // P4 工具库（download_file / update_file / list_dir 等）
@@ -203,18 +223,21 @@ interface JsonConfig {
 | 方向 | key | label | type |
 |------|-----|-------|------|
 | input | fileContent | 文件内容 | file-content |
+| input | jsonPath | JSON Path | json-path |
 | output | jsonData | JSON 数据 | json-data |
 
 **执行流程:**
 
 ```
 1. 从 input_data 获取 fileContent
-2. json.loads 解析
-3. 如指定 jsonPath → 按 dot notation 过滤
-4. 如未指定 jsonPath → 返回完整解析数据
+2. jsonPath 来源：config.jsonPath（手动输入）或 input_data.jsonPath（连线从 String 接收）
+   连线优先，两者同时存在时使用连线值
+3. json.loads 解析
+4. 如指定 jsonPath → 按 dot notation 过滤
+5. 如未指定 jsonPath → 返回完整解析数据
 ```
 
-**输出:** `{ data: any, path?: string }`
+**输出:** `{ jsonData: any }`
 
 ### 3.5 Lua 节点（渲染器）
 
@@ -273,6 +296,84 @@ interface PromptConfig {
 
 **输出:** `{ content: string, model: string, usage: { promptTokens: number, completionTokens: number } }`
 
+### 3.7 String 节点（基础值）
+
+**设计原则：** String 是基础值节点，支持手动输入或通过连线接收上游输入。使用通用 `ValueNode` 组件。
+
+**Schema:**
+
+```typescript
+interface StringConfig {
+  value: string;   // 字符串值（手动输入或连线接收）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | valueIn | 输入值 | string |
+| output | value | 字符串 | string |
+
+**执行流程:**
+
+```
+1. 如有连线输入 → 使用 input_data.valueIn
+2. 否则 → 使用 config.value
+3. 返回 { value: String(rawValue) }
+```
+
+**输出:** `{ value: string }`
+
+### 3.8 Bool 节点（基础值）
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | valueIn | 输入值 | boolean |
+| output | value | 布尔值 | boolean |
+
+**输出:** `{ value: boolean }`
+
+### 3.9 Number 节点（基础值）
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | valueIn | 输入值 | number |
+| output | value | 数值 | number |
+
+**输出:** `{ value: number }`
+
+### 3.10 ValueNode 通用基础值组件
+
+String / Bool / Number 三类节点共用 `ValueNode` 组件，支持两种输入模式（互斥）：
+
+1. **手动输入**：在节点上直接输入值
+2. **连线输入**：通过 `valueIn` 输入端口从上游节点获取
+
+```typescript
+interface ValueNodeProps {
+  id: string;
+  data: Record<string, unknown>;
+  selected: boolean;
+  icon: string;           // emoji 图标
+  label: string;          // 显示名
+  nodeType: string;       // 'string' | 'bool' | 'number'
+  valueKey: string;       // 存放值的 data key，通常为 'value'
+  portColor: string;      // 输出端口颜色
+  inputType: 'text' | 'number' | 'boolean';  // 输入控件类型
+  outputPortKey?: string; // 输出端口 key
+  outputPortLabel?: string;
+  inputPortKey?: string;  // 输入端口 key
+  inputPortLabel?: string;
+}
+```
+
+**连线覆盖行为：** 当有连线输入时，手动输入框被禁用并显示「🔗 由连线提供」提示；如手动已有值且连线接入，短暂显示覆盖警告。
+
 ---
 
 ## 四、端口类型系统
@@ -294,10 +395,15 @@ interface PortDefinition {
 ```typescript
 const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
   'file-content': ['file-content', 'any'],     // file-content 可连接到自身或 any
+  'file-path':    ['file-path', 'any'],
   'table-data':   ['table-data', 'any'],
   'json-data':    ['json-data', 'any'],
-  'text':         ['text', 'any'],
-  'any':          ['file-content', 'table-data', 'json-data', 'text', 'any'],
+  'text':         ['text', 'any', 'string'],    // text 兼容 string
+  'any':          ['file-content', 'file-path', 'table-data', 'json-data', 'text', 'any', 'boolean', 'string', 'number', 'json-path'],
+  'boolean':      ['boolean', 'any'],
+  'string':       ['string', 'any', 'text'],    // string 兼容 text
+  'number':       ['number', 'any'],
+  'json-path':    ['json-path', 'string', 'any'], // json-path 兼容 string（String→JSON Path 连线）
 };
 ```
 
@@ -307,9 +413,12 @@ const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
 |------|-------------|-------------|
 | P4File | — | fileContent (file-content) |
 | Excel | fileContent (file-content) | tableData (table-data) |
-| JSON | fileContent (file-content) | jsonData (json-data) |
+| JSON | fileContent (file-content), jsonPath (json-path) | jsonData (json-data) |
 | Lua | fileContent (file-content) | textOutput (text) |
 | Prompt | context (any) | result (text) |
+| String | valueIn (string) | value (string) |
+| Bool | valueIn (boolean) | value (boolean) |
+| Number | valueIn (number) | value (number) |
 
 ### 4.4 端口颜色
 
@@ -321,6 +430,10 @@ const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
 | text | 橙色 | #fa8c16 |
 | table-data | 绿色 | #52c41a |
 | json-data | 青色 | #13c2c2 |
+| boolean | 粉色 | #eb2f96 |
+| string | 橙色 | #fa8c16 |
+| number | 青色 | #13c2c2 |
+| json-path | 紫色 | #722ed1 |
 
 ---
 
@@ -350,11 +463,12 @@ interface EdgeData {
 ```
 连接时 → onConnect 计算 matchStatus → matched/mismatched
          ↓
-上游节点执行成功 → NodeEventBus.emit → FlowEditor 标记 activated: true
+上游节点执行成功 → onNodeUpdate(status='success')
+         → setEdges: activated: true（边变绿+流动）
          ↓
 边缘视觉变化 → matched_idle (灰) → activated (绿+流动+✓)
          ↓
-级联触发 → 自动运行下游节点
+后端子图执行 → 自动级联执行下游节点
 ```
 
 ---
@@ -461,9 +575,12 @@ interface NodeField {
 |------|------|----------|--------|
 | P4File | 📁 | 数据源 | p4Path(text, **required**) |
 | Excel | 📊 | 渲染器 | sheet(text), rowFilter(multiselect), columnFilter(multiselect) |
-| JSON | 📋 | 渲染器 | jsonPath(text) |
+| JSON | 📋 | 渲染器 | jsonPath(text, linkedPortKey='jsonPath') |
 | Lua | 🌙 | 渲染器 | entryFunction(text) |
 | Prompt | 🤖 | AI | prompt(textarea, **required**), model(text), temperature(number,0.1) |
+| String | 📝 | 基础值 | value(text, **required**) — 使用 ValueNode |
+| Bool | 🔘 | 基础值 | value(boolean, **required**) — 使用 ValueNode |
+| Number | 🔢 | 基础值 | value(number, **required**) — 使用 ValueNode |
 
 ### 6.5 节点类型注册
 
@@ -475,6 +592,9 @@ export const nodeTypes: NodeTypes = {
   lua: LuaNode,
   json: JsonNode,
   prompt: PromptNode,
+  string: StringNode,
+  bool: BoolNode,
+  number: NumberNode,
 };
 
 export const nodeRegistryList: NodeRegistryEntry[] = [
@@ -483,6 +603,9 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'json', label: 'JSON', icon: <JsonIcon />, category: '渲染器' },
   { type: 'lua', label: 'Lua', icon: <LuaIcon />, category: '渲染器' },
   { type: 'prompt', label: 'Prompt', icon: <PromptIcon />, category: 'AI' },
+  { type: 'string', label: 'String', icon: <StringIcon />, category: '基础值' },
+  { type: 'bool', label: 'Bool', icon: <BoolIcon />, category: '基础值' },
+  { type: 'number', label: 'Number', icon: <NumberIcon />, category: '基础值' },
 ];
 ```
 
@@ -507,63 +630,71 @@ const canRun = fields
 
 ## 七、执行模式
 
-### 7.1 两种执行模式
+### 7.1 统一执行模型（WebSocket）
 
-系统支持两种执行模式，互相独立：
+**设计原则：** 所有节点执行入口统一使用 `FlowApi.runNodeWS()` 通过 Socket.IO WebSocket 与后端通信，后端执行子图并实时推送状态更新。不再使用 HTTP REST 的 `FlowApi.runNode()` 进行节点级联。
 
-| 模式 | 触发方式 | 调度位置 | 适用场景 |
-|------|----------|----------|----------|
-| **单节点独立运行** | 节点 Header 的 ▶ 按钮 / NodeDetailModal 的运行按钮 | 前端 NodeEventBus 级联 | 调试单个节点、局部测试 |
-| **整图运行** | Toolbar 的「运行」按钮 | 后端 WorkflowRuntime DAG 调度 | 完整流程执行 |
+| 执行入口 | 组件 | 调用方式 | 说明 |
+|----------|------|----------|------|
+| 节点 Header ▶ 按钮 | `BaseNode.handleRun` | `FlowApi.runNodeWS()` | P4/Excel/Lua/Prompt 等节点 |
+| 节点 Header ▶ 按钮 | `ValueNode.handleRun` | `FlowApi.runNodeWS()` | String/Bool/Number 节点 |
+| JSON 节点 ▶ 按钮 | `JsonNode.handleRun` | `FlowApi.runNodeWS()` | JSON 节点（自定义组件） |
+| 详情弹窗运行 | `NodeDetailModal.handleRun` | `FlowApi.runNodeWS()` | 所有节点通用 |
+| 侧边栏运行 | `PropertyPanel.handleRunNode` | `FlowApi.runNodeWS()` | 所有节点通用 |
+| 工具栏整图运行 | `Toolbar → FlowEditor.handleRun` | `FlowApi.runWorkflowWS()` | 整图 DAG 运行 |
 
-### 7.2 单节点运行 + 前端级联（NodeEventBus）
+**关键区别：** `runNodeWS` 和 `runWorkflowWS` 共用同一套后端 `WorkflowRuntime.run()`，唯一区别是：
+- `runWorkflowWS`：`start_node_id` 为空，执行整图所有节点
+- `runNodeWS`：指定 `start_node_id`，执行该节点及其所有下游节点（子图）
+
+### 7.2 单节点子图执行（runNodeWS）
 
 **触发路径：**
 
 ```
-1. 用户点击节点 Header ▶ → BaseNode.handleRun()
-2. 前端收集上游 input（从 node.data._runOutput 读取）
-3. POST /api/workflow/node/run { type, config, input }
-4. 后端只执行当前节点，返回 output
-5. 运行成功 → NodeEventBus.emit(nodeId, output)
-6. FlowEditor 订阅 → handleNodeSuccess(nodeId, output)
-   a. 标记出边 activated: true（边变绿+流动）
-   b. 检查下游节点所有上游是否均已成功
-   c. 全部就绪 → 收集 input → POST /node/run 触发下游
-   d. 下游成功 → 继续 emit → 继续级联
+1. 用户点击节点 Header ▶ → BaseNode/ValueNode/JsonNode.handleRun()
+2. 前端立即将本节点标记为 running（视觉反馈）
+3. 构造 nodeDataOverrides：
+   a. 当前节点：{ fieldKey: value } — 最新字段值（可能未保存）
+   b. 其他节点：{ nodeId: _runOutput } — 上游节点的缓存输出
+4. FlowApi.runNodeWS(workflowId, startNodeId, nodeDataOverrides, onNodeUpdate, onDone)
+   a. socket.emit('workflow:run_from_node', { workflowId, startNodeId, nodeDataOverrides })
+5. 后端收到 'workflow:run_from_node' 事件：
+   a. 加载完整工作流 JSON（nodes + edges）
+   b. BFS 从 startNodeId 出发找到所有下游节点（子图）
+   c. 拓扑排序确定执行顺序
+   d. 上游节点（不在子图中）不执行，使用 nodeDataOverrides 中的缓存输出
+   e. 按拓扑序并发执行子图中的节点
+6. 每个节点完成 → emit('workflow:node_update', { taskId, nodeId, status, output })
+   - 前端收到 → onNodeUpdate(nodeId, status, output)
+   - 更新节点 _runStatus / _runOutput
+   - 节点 success → 标记出边 activated: true（边变绿+流动）
+7. 全部子图节点完成 → emit('workflow:done', { taskId, status, error })
 ```
 
-**上游输入收集（前端）：**
+**nodeDataOverrides 结构：**
 
 ```typescript
-// BaseNode / PropertyPanel 在运行时读取最新节点状态
-const collectUpstreamInput = () => {
-  const incoming = getEdges().filter((e) => e.target === id);
-  const input: Record<string, any> = {};
-  for (const edge of incoming) {
-    const srcNode = getNode(edge.source);
-    const srcOutput = srcNode?.data?._runOutput;
-    if (!srcOutput || srcOutput.error) continue;
-    if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-      input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
-    } else {
-      Object.assign(input, srcOutput);
+// 节点执行时传递给后端的数据覆盖
+const nodeDataOverrides: Record<string, any> = {};
+
+// 1. 当前节点的最新字段值
+nodeDataOverrides[startNodeId] = { p4Path: '//C7/...', value: 'hello' };
+
+// 2. 其他节点的缓存输出（上游节点不重新执行，后端用这些做端口映射）
+for (const n of allNodes) {
+  if (n.id !== startNodeId) {
+    const runOutput = n.data._runOutput;
+    if (runOutput && !runOutput.error) {
+      nodeDataOverrides[n.id] = runOutput;
     }
   }
-  return input;
-};
-```
-
-**Config 清理（过滤内部键）：**
-
-```typescript
-const cleanConfig: Record<string, any> = {};
-for (const [k, v] of Object.entries(nodeData)) {
-  if (!k.startsWith('_') && v !== undefined) cleanConfig[k] = v;
 }
 ```
 
-### 7.3 整图运行（后端 DAG 调度 + WebSocket 实时推送）
+### 7.3 整图运行（runWorkflowWS）
+
+与 7.2 共用后端 `WorkflowRuntime.run()`，区别是 `start_node_id` 为空，执行所有节点。
 
 **设计原则：**
 
@@ -590,11 +721,56 @@ for (const [k, v] of Object.entries(nodeData)) {
    - 前端收到 → onDone(status, error) → setRunCancelFn(null)
 ```
 
+### 7.4 handleNodeUpdate — 统一节点状态回调
+
+**所有执行入口**的节点状态更新都通过 `FlowEditor.handleNodeUpdate` 回调处理：
+
+```typescript
+const handleNodeUpdate = useCallback(
+  (nodeId: string, nodeStatus: string, output: any) => {
+    const frontendStatus = statusMap[nodeStatus] ?? nodeStatus;
+    // 1. 更新节点运行状态和输出
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output } }
+          : n,
+      ),
+    );
+    // 2. 节点成功 → 激活所有出边（matched 边变绿+流动）
+    if (nodeStatus === 'success') {
+      setEdges((eds) =>
+        eds.map((e) =>
+          e.source === nodeId && e.data?.matchStatus === 'matched'
+            ? { ...e, data: { ...e.data, activated: true } }
+            : e,
+        ),
+      );
+    }
+  },
+  [setNodes, setEdges],
+);
+```
+
+此回调通过 `WorkflowContext` 传递给所有节点组件：
+
+```typescript
+// WorkflowContext.tsx
+export const WorkflowContext = React.createContext<{
+  workflowId?: string;
+  onNodeUpdate: (nodeId: string, status: string, output: any) => void;
+}>({ workflowId: undefined, onNodeUpdate: () => {} });
+
+// FlowEditor.tsx
+<WorkflowContext.Provider value={{ workflowId, onNodeUpdate: handleNodeUpdate }}>
+```
+
 **Socket.IO 事件协议：**
 
 | 方向 | 事件名 | payload |
 |------|--------|---------|
 | Client → Server | `workflow:run` | `{ workflowId }` |
+| Client → Server | `workflow:run_from_node` | `{ workflowId, startNodeId, nodeDataOverrides }` |
 | Server → Client | `workflow:started` | `{ taskId }` |
 | Server → Client | `workflow:node_update` | `{ taskId, nodeId, status, output }` |
 | Server → Client | `workflow:done` | `{ taskId, status, error }` |
@@ -613,30 +789,46 @@ for (const [k, v] of Object.entries(nodeData)) {
 **FlowApi.runWorkflowWS 接口：**
 
 ```typescript
-// 返回 cancelFn，调用即向服务端发 workflow:cancel 并清除监听器
+// 整图运行 — 返回 cancelFn
 const cancelFn = FlowApi.runWorkflowWS(
   workflowId,
-  (nodeId, status, output) => { /* 更新节点状态 */ },
+  (nodeId, status, output) => { /* onNodeUpdate — 更新节点状态 */ },
   (status, error) => { /* 运行结束回调 */ },
 );
 // 停止时：cancelFn()
+```
+
+**FlowApi.runNodeWS 接口：**
+
+```typescript
+// 子图执行 — 从指定节点开始，执行该节点及所有下游
+const cancelFn = FlowApi.runNodeWS(
+  workflowId,           // 已保存的工作流 ID
+  startNodeId,          // 起始节点 ID
+  nodeDataOverrides,    // { nodeId: fieldConfig | runOutput }
+  onNodeUpdate,         // (nodeId, status, output) => void
+  onDone,               // (status, error) => void
+);
+// 取消时：cancelFn()
 ```
 
 **停止运行：**
 
 Toolbar「停止」按钮调用 `runCancelFn()`，前端立即清除监听器并向服务端发送 `workflow:cancel` 事件。服务端将任务状态标记为 `canceled` 并推送 `workflow:done`。
 
-### 7.4 NodeEventBus（单节点级联通信）
+### 7.5 NodeEventBus（已弃用）
+
+> **注意：** NodeEventBus 已不再使用。早期设计中单节点级联通过前端 NodeEventBus 通信，
+> 现已统一为后端子图执行模式（`runNodeWS`），级联由后端 WorkflowRuntime 自动处理。
+> 文件保留仅为兼容，无活跃消费者。
 
 ```typescript
-// NodeEventBus.ts
+// NodeEventBus.ts — 已弃用，保留兼容
 export const NodeEventBus = {
   subscribe(fn: (nodeId: string, output: any) => void): () => void;
   emit(nodeId: string, output: any): void;
 };
 ```
-
-仅用于**单节点运行**的级联场景（节点 ▶ 按钮触发），整图运行不使用此机制。
 
 ---
 
@@ -807,11 +999,12 @@ export default {
 | GET | `/api/workflow/run/<taskId>/status` | 查询任务状态（REST 调试用） | - | `{ status, nodes, result }` |
 | GET | `/api/workflow/executors` | 列出注册的执行器 | - | `{ executors: [{ type, class }] }` |
 
-### 10.4 Socket.IO 事件协议（整图运行）
+### 10.4 Socket.IO 事件协议（整图运行 + 子图执行）
 
 | 方向 | 事件名 | payload | 说明 |
 |------|--------|---------|------|
 | C→S | `workflow:run` | `{ workflowId }` | 触发整图运行，客户端自动加入 task room |
+| C→S | `workflow:run_from_node` | `{ workflowId, startNodeId, nodeDataOverrides }` | 触发子图执行：从 startNodeId 开始执行该节点及所有下游节点 |
 | S→C | `workflow:started` | `{ taskId }` | 任务已创建，taskId 用于标识本次运行 |
 | S→C | `workflow:node_update` | `{ taskId, nodeId, status, output }` | 节点状态变化（processing/success/error） |
 | S→C | `workflow:done` | `{ taskId, status, error }` | 所有节点执行完毕 |
@@ -819,6 +1012,28 @@ export default {
 | C→S | `workflow:cancel` | `{ taskId }` | 取消运行（停止推送，标记任务为 canceled） |
 | C→S | `workflow:join` | `{ taskId }` | 手动加入 task room（断线重连时使用） |
 | C→S | `workflow:leave` | `{ taskId }` | 离开 task room |
+
+**`workflow:run_from_node` 详解：**
+
+```typescript
+// 前端调用
+FlowApi.runNodeWS(
+  workflowId,          // 已保存的工作流 ID
+  startNodeId,         // 起始节点 ID
+  nodeDataOverrides,   // { nodeId: fieldConfig | runOutput }
+  onNodeUpdate,        // 节点状态回调
+  onDone,              // 完成回调
+);
+
+// 后端处理流程
+1. 加载 workflow JSON（nodes + edges）
+2. BFS 从 startNodeId 找到所有下游节点 → 子图节点集
+3. 拓扑排序子图节点 → exec_nodes
+4. 不在子图中的上游节点：不执行，用 nodeDataOverrides 填充 context
+5. 按拓扑序并发执行子图节点（与整图运行共用 WorkflowRuntime.run）
+6. 每个节点完成 → emit node_update
+7. 全部完成 → emit done
+```
 
 **连接配置：**
 
@@ -957,12 +1172,28 @@ class LuaExecutor(BaseNodeExecutor):
 
 **执行策略：**
 
-| 场景 | 行为 |
-|------|------|
-| **单节点 run**（`/api/workflow/node/run`） | 只执行当前节点本身，不触发下游。下游级联由**前端** NodeEventBus 负责调度。 |
-| **整图 run**（`/api/workflow/run`） | 在后台线程+独立 event loop 中异步执行整个 DAG，所有节点并发调度，共享节点等待所有前驱完成。 |
+| 场景 | 触发事件 | 行为 |
+|------|----------|------|
+| **整图 run** | `workflow:run` | 在后台线程+独立 event loop 中异步执行整个 DAG，所有节点并发调度 |
+| **子图 run** | `workflow:run_from_node` | BFS 找出 startNodeId 的所有下游节点，只执行子图。上游节点不执行，用 nodeDataOverrides 填充 context |
+| **单节点 run** | `POST /api/workflow/node/run` | 只执行当前节点本身，不触发下游，无工作流上下文。**仅用于无 workflowId 的调试场景** |
 
-**整图 run 并发调度流程：**
+**子图执行流程（run_from_node）：**
+
+```
+1. 加载完整 workflow JSON（nodes + edges）
+2. BFS 从 startNodeId 出发，沿 adj 找到所有可达下游节点 → subgraph_nodes
+3. 按全图拓扑排序，筛选出子图节点 → exec_nodes
+4. 预填充 context：将 nodeDataOverrides 中非子图节点的数据写入 context
+   （上游节点不重新执行，其输出从前端缓存传入）
+5. 将不在子图中的节点的 node_done Event 设为已 set（不等待它们）
+6. 按拓扑序并发执行子图中的节点（与整图运行共用 execute_node 逻辑）
+   - 端口映射时，上游数据从 context 中读取（包括预填充的上游输出）
+7. 每个节点完成 → emit node_update
+8. 全部完成 → emit done
+```
+
+**整图/子图 run 共用的并发调度流程：**
 
 ```
 1. 构建邻接表（adj）、前驱表（predecessors）、按目标索引的边表（edges_by_target）
@@ -994,12 +1225,31 @@ class WorkflowRuntime:
     _tasks: dict = {}
 
     @classmethod
-    async def run(cls, workflow_json, task_id):
+    async def run(cls, workflow_json, task_id,
+                 start_node_id: str = None,
+                 node_data_overrides: dict = None):
         # 1. 构建 adj / predecessors / edges_by_target
         # 2. 拓扑排序环检测
-        # 3. 初始化 task 状态
-        # 4. 创建每个节点的 asyncio.Event
+        # 3. 确定执行节点集（整图 or 子图 BFS）
+        if start_node_id:
+            # BFS from start_node_id → subgraph_nodes
+            exec_nodes = [nid for nid in topo_order if nid in subgraph_nodes]
+        else:
+            exec_nodes = list(topo_order)
+
+        # 4. 预填充 context（node_data_overrides 中的上游输出）
         context: dict = {}
+        if node_data_overrides:
+            for nid, override_data in node_data_overrides.items():
+                if nid not in exec_nodes:
+                    context[nid] = override_data  # 上游节点不执行，用前端缓存
+
+        # 5. 不在执行集中的节点的 Event 预设为 set
+        for nid in node_map:
+            if nid not in exec_set:
+                node_done[nid].set()
+
+        # 6. 初始化 task 状态
         context_lock = asyncio.Lock()
         node_done: dict[str, asyncio.Event] = {nid: asyncio.Event() for nid in node_map}
 
@@ -1008,14 +1258,15 @@ class WorkflowRuntime:
             await asyncio.gather(*[node_done[p].wait() for p in predecessors[nid]])
             # 检查上游是否有 error，有则跳过
             # 从 context 收集 input_data（按端口映射）
+            # 合并 node_data_overrides 中的字段覆盖
             # 执行节点
-            output = await ExecutorManager.run_node(node_type, node['data'], input_data)
+            output = ExecutorManager.run_node(node_type, node_data, input_data)
             async with context_lock:
                 context[nid] = output
             node_done[nid].set()  # 通知下游可以继续
 
-        # 并发启动所有节点（根节点立即跑，其余节点等待各自前驱）
-        await asyncio.gather(*[execute_node(nid) for nid in node_map])
+        # 并发启动子图/整图中的所有节点
+        await asyncio.gather(*[execute_node(nid) for nid in exec_nodes])
 
     @classmethod
     def get_task_status(cls, task_id): ...
@@ -1049,34 +1300,37 @@ class WorkflowRuntime:
 │                                                   │
 │  ReactFlowProvider                                │
 │       ├── ReactFlow (Canvas)                     │
-│       │     ├── nodeTypes: 5 种节点               │
+│       │     ├── nodeTypes: 8 种节点               │
+│       │     │   (P4File/Excel/Lua/JSON/Prompt     │
+│       │     │    String/Bool/Number)               │
 │       │     ├── edgeTypes: FlowingEdge            │
 │       │     ├── Background / Controls / MiniMap    │
 │       │     └── onConnect: 端口类型匹配 → 边 data  │
-│       ├── Toolbox (分类: 数据源/渲染器/AI)          │
-│       ├── BaseNode (三段式布局 + 端口Handle)        │
-│       │     ├── Section1: Header + 运行按钮        │
-│       │     ├── Section2: Port Row (Handle=端口点) │
-│       │     └── Section3: Fields + Renderer       │
-│       ├── PropertyPanel (五段式: 端口/参数/输入/运行/输出)│
-│       │     └── 弹窗查看 (输入+输出, 复制按钮在弹窗内) │
-│       ├── Toolbar (保存/导入/导出/运行)              │
-│       ├── NodeEventBus (级联执行通信)               │
-│       └── FlowEditor (订阅事件 → 标记边activated → 触发下游)│
+│       ├── Toolbox (分类: 数据源/渲染器/AI/基础值)   │
+│       ├── BaseNode (三段式布局 + runNodeWS)        │
+│       ├── ValueNode (基础值节点 + runNodeWS)        │
+│       ├── JsonNode (双输入端口 + runNodeWS)        │
+│       ├── PropertyPanel (五段式 + runNodeWS)        │
+│       ├── NodeDetailModal (弹窗运行 + runNodeWS)    │
+│       ├── Toolbar (整图运行: runWorkflowWS)         │
+│       └── FlowEditor (handleNodeUpdate → 更新状态/激活边)│
 │                                                   │
-│  数据流:                                          │
-│    P4File(fileContent) ──matched edge──→ JSON     │
-│         │                                         │
-│         └──matched edge──→ Excel / Lua            │
+│  WorkflowContext:                                 │
+│    workflowId + onNodeUpdate → 所有组件共享          │
 │                                                   │
-│  运行状态:                                        │
-│    上游成功 → NodeEventBus.emit                    │
-│           → FlowEditor.handleNodeSuccess           │
-│           → edges[activated=true] + 级联触发下游     │
+│  运行模型:                                        │
+│    单节点 ▶ → runNodeWS(startNodeId)               │
+│            → 后端执行子图 → node_update 推送        │
+│            → onNodeUpdate → 更新节点状态 + 激活边    │
+│                                                   │
+│    整图 ▶ → runWorkflowWS()                        │
+│           → 后端执行全部节点 → node_update 推送      │
+│           → onNodeUpdate → 更新节点状态 + 激活边     │
 │                                                   │
 └──────────┬────────────────────────────────────────┘
            │
-     HTTP REST (UMI proxy / env-config.js auto-detect)
+     Socket.IO WebSocket (主) + HTTP REST (CRUD)
+     UMI proxy / env-config.js auto-detect
            │
            ▼
 ┌──────────────────────────────────────────────────┐
@@ -1084,16 +1338,26 @@ class WorkflowRuntime:
 │                                                  │
 │  routers/WorkFlow.py                             │
 │       ├── CRUD: save / get / list / delete       │
-│       ├── POST /api/workflow/node/run             │
-│       └── POST /api/workflow/run + status         │
+│       ├── Socket: workflow:run (整图)             │
+│       ├── Socket: workflow:run_from_node (子图)   │
+│       └── REST: POST /api/workflow/node/run (单节点,无上下文) │
 │                                                  │
 │  Implement/workflowImpl/                         │
-│       ├── ExecutorManager (5 个执行器注册)         │
+│       ├── ExecutorManager (8 个执行器注册)         │
 │       ├── P4FileExecutor (数据源: p4 sync + 输出)  │
 │       ├── ExcelExecutor (渲染器: 接收上游内容)       │
-│       ├── JsonExecutor  (渲染器: 接收上游内容)       │
+│       ├── JsonExecutor  (渲染器: 接收上游内容+jsonPath) │
 │       ├── LuaExecutor   (渲染器: 接收上游内容)       │
-│       └── PromptExecutor (AI: LLM 调用)            │
+│       ├── PromptExecutor (AI: LLM 调用)            │
+│       ├── StringExecutor  (基础值: 输出字符串)       │
+│       ├── BoolExecutor    (基础值: 输出布尔值)       │
+│       └── NumberExecutor  (基础值: 输出数值)       │
+│                                                  │
+│  WorkflowRuntime.run(workflow_json, task_id,      │
+│                      start_node_id=None,          │
+│                      node_data_overrides=None)     │
+│       ├── 整图: 执行全部节点                        │
+│       └── 子图: BFS下游 + 预填充上游context        │
 │                                                  │
 └──────────────────────────────────────────────────┘
 ```
@@ -1107,6 +1371,7 @@ class WorkflowRuntime:
 | 包名 | 版本 | 说明 |
 |------|------|------|
 | `reactflow` | ^11.11.0 | React Flow 画布编辑器 |
+| `socket.io-client` | ^4.x | Socket.IO 客户端，WebSocket 长连接 |
 | `@ant-design/icons` | 项目已有 | 节点运行状态图标 |
 | `antd` | ^6.5.0 | 属性面板 Button / Modal / Tag / Table 等组件 |
 | `highlight.js` | ^11.x | Lua 语法高亮渲染 |
@@ -1187,7 +1452,27 @@ class WorkflowRuntime:
 9. ~~FlowEditor.handleRun：WebSocket 整图 run + 实时节点状态更新 + 边激活~~ ✅
 10. ~~Toolbar 运行/停止按钮接入 WebSocket run / cancelFn~~ ✅
 
-### Phase 7: 增强（待实现）
+### Phase 7: 基础值节点 ✅（已完成）
+1. ~~实现 ValueNode 通用组件（手动输入 + 连线输入双模式）~~ ✅
+2. ~~实现 String / Bool / Number 节点（基于 ValueNode）~~ ✅
+3. ~~后端实现 StringExecutor / BoolExecutor / NumberExecutor~~ ✅
+4. ~~添加 string / boolean / number / json-path 端口类型~~ ✅
+5. ~~端口兼容性矩阵更新（string↔text, json-path↔string 等）~~ ✅
+6. ~~JSON 节点添加 jsonPath 输入端口（连线从 String 接收 JSON Path）~~ ✅
+
+### Phase 8: 统一执行模型 ✅（已完成）
+1. ~~所有节点执行入口统一为 FlowApi.runNodeWS()（WebSocket 子图执行）~~ ✅
+2. ~~BaseNode.handleRun 改用 runNodeWS~~ ✅
+3. ~~ValueNode.handleRun 从 FlowApi.runNode() 改为 runNodeWS~~ ✅
+4. ~~NodeDetailModal.handleRun 从 FlowApi.runNode() 改为 runNodeWS~~ ✅
+5. ~~PropertyPanel.handleRunNode 已使用 runNodeWS~~ ✅
+6. ~~WorkflowContext 提供 workflowId + onNodeUpdate 回调~~ ✅
+7. ~~后端实现 workflow:run_from_node 事件处理（BFS 子图 + 预填充上游 context）~~ ✅
+8. ~~节点成功 → onNodeUpdate → 出边 activated:true（边变绿+流动）~~ ✅
+9. ~~后端 CORS 允许 DELETE 方法（修复工作流删除失败）~~ ✅
+10. ~~路由 name 使用英文 key 匹配 locale 翻译（修复 React Intl missing message）~~ ✅
+
+### Phase 9: 增强（待实现）
 1. 节点拖拽排序（React Flow dnd 支持）
 2. 运行历史记录
 3. 错误处理与重试

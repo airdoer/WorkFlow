@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, lazy, Suspense } from 'react';
 import type { Node, Edge } from 'reactflow';
 import { getNodeRegistry } from './NodeRegistry';
 import { Button, Tag, Modal, message } from 'antd';
@@ -7,6 +7,8 @@ import { FlowApi } from './services/FlowApi';
 import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
+
+const DiffRenderer = lazy(() => import('./nodes/Diff/DiffRenderer'));
 
 const PORT_COLORS: Record<string, string> = {
   'file-content': '#1890ff',
@@ -49,15 +51,16 @@ interface PropertyPanelProps {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   edges: Edge[];
   nodes: Node[];
+  onDuplicate?: (nodeId: string) => void;
 }
 
-const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes }) => {
+const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes, onDuplicate }) => {
   // ALL hooks must be called before any conditional return
   const [outputModalOpen, setOutputModalOpen] = useState(false);
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState('');
   const [modalTitle, setModalTitle] = useState('');
-  const { workflowId, onNodeUpdate } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved } = useWorkflowContext();
 
   const nodeType = selectedNode?.type ?? '';
   const nodeData = (selectedNode?.data || {}) as Record<string, unknown>;
@@ -121,12 +124,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
     [selectedNode, setNodes],
   );
 
-  const handleRunNode = useCallback(() => {
+  const handleRunNode = useCallback(async () => {
     if (!selectedNode) return;
-    if (!workflowId) {
-      message.warning('请先保存工作流，再运行节点');
-      return;
-    }
+
+    // Ensure workflow is saved before running
+    const savedId = await ensureSaved();
+    if (!savedId) return;
 
     // Mark this node as running immediately for visual feedback
     setNodes((nds) =>
@@ -158,7 +161,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
     }
 
     FlowApi.runNodeWS(
-      workflowId,
+      savedId,
       selectedNode.id,
       nodeDataOverrides,
       onNodeUpdate,
@@ -166,7 +169,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         if (error) message.error(`运行失败: ${error}`);
       },
     );
-  }, [selectedNode, nodeData, nodes, setNodes, workflowId, onNodeUpdate]);
+  }, [selectedNode, nodeData, nodes, setNodes, ensureSaved, onNodeUpdate]);
 
   // Format output for display
   const formatOutput = (output: any): string => {
@@ -443,10 +446,21 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         )}
       </Section>
 
-      {/* Run button */}
-      <Button type="primary" loading={running} onClick={handleRunNode} block style={{ marginBottom: 12 }}>
-        运行节点
-      </Button>
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <Button type="primary" loading={running} onClick={handleRunNode} style={{ flex: 1 }}>
+          运行节点
+        </Button>
+        {onDuplicate && selectedNode && (
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => onDuplicate(selectedNode.id)}
+            title="复制节点 (Ctrl+D)"
+          >
+            复制
+          </Button>
+        )}
+      </div>
 
       {/* === Section 4: Run Info === */}
       <Section title="运行信息" defaultOpen={runStatus !== 'idle'}>
@@ -494,7 +508,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const hasValue = portValue !== undefined && portValue !== null;
             const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
             const hasDisplay = displayValue !== undefined && displayValue !== null;
-            const previewText = hasDisplay
+            // For Diff node: show side-by-side diff instead of raw JSON string
+            const isDiffPort = nodeType === 'diff' && p.key === 'diffResult' && runOutput?.stringA !== undefined && runOutput?.stringB !== undefined;
+            const previewText = hasDisplay && !isDiffPort
               ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
               : null;
 
@@ -528,7 +544,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     </Button>
                   )}
                 </div>
-                {hasDisplay && previewText && (
+                {/* Content area: DiffRenderer for diff, pre for others */}
+                {hasDisplay && isDiffPort ? (
+                  <Suspense fallback={<div style={{ padding: 10, textAlign: 'center', color: '#999', fontSize: 11 }}>加载 Diff 编辑器...</div>}>
+                    <DiffRenderer
+                      original={String(runOutput.stringA ?? '')}
+                      modified={String(runOutput.stringB ?? '')}
+                      language="plaintext"
+                      height={200}
+                    />
+                  </Suspense>
+                ) : hasDisplay && previewText ? (
                   <pre
                     style={{
                       margin: 0,
@@ -546,7 +572,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   >
                     {previewText}
                   </pre>
-                )}
+                ) : null}
               </div>
             );
           })

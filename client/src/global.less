@@ -121,3 +121,17 @@ ol {
     }
   }
 }
+
+/* ========== ReactFlow multi-select node styling ========== */
+/* Only apply when multiple nodes are selected — controlled by data attribute on nodes */
+.react-flow__node[data-multi-selected="true"] {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Selection box styling */
+.react-flow__selection {
+  background: rgba(24, 144, 255, 0.08);
+  border: 1px dashed #1890ff;
+}

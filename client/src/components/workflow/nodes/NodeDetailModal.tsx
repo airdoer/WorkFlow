@@ -14,6 +14,10 @@ const PORT_COLORS: Record<string, string> = {
   'text': '#fa8c16',
   'table-data': '#52c41a',
   'json-data': '#13c2c2',
+  'boolean': '#eb2f96',
+  'string': '#fa8c16',
+  'number': '#13c2c2',
+  'json-path': '#722ed1',
 };
 
 const STATUS_CONFIG: Record<RunStatus, { color: string; bg: string; label: string; icon: any }> = {
@@ -27,6 +31,7 @@ const STATUS_CONFIG: Record<RunStatus, { color: string; bg: string; label: strin
 const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
+const DiffRenderer = lazy(() => import('./Diff/DiffRenderer'));
 
 interface NodeDetailModalProps {
   open: boolean;
@@ -536,11 +541,13 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
                 // Determine renderer based on port type
+                // Diff node: check if runOutput has stringA + stringB (MUST be checked before isJson)
+                const isDiff = nodeType === 'diff' && runOutput?.stringA !== undefined && runOutput?.stringB !== undefined;
                 const isExcel = p.type === 'table-data' && displayValue?.columns;
-                const isJson = p.type === 'json-data';
+                const isJson = !isDiff && p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
                 const isFileContent = typeof displayValue === 'string';
-                const isPre = !isExcel && !isJson && !isLua && typeof displayValue === 'object';
+                const isPre = !isExcel && !isJson && !isLua && !isDiff && typeof displayValue === 'object';
 
                 return (
                   <div key={p.key} style={{ marginBottom: 10, padding: '8px 10px', background: '#f9f9f9', borderRadius: 4, border: '1px solid #e8e8e8' }}>
@@ -555,6 +562,15 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                         {isExcel ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
                             <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
+                          </Suspense>
+                        ) : isDiff ? (
+                          <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#999' }}>加载 Diff 编辑器...</div>}>
+                            <DiffRenderer
+                              original={String(runOutput.stringA ?? '')}
+                              modified={String(runOutput.stringB ?? '')}
+                              language="plaintext"
+                              height={400}
+                            />
                           </Suspense>
                         ) : isJson ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>

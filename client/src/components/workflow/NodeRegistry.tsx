@@ -8,6 +8,7 @@ import PromptNode from './nodes/Prompt';
 import BoolNode from './nodes/Bool';
 import StringNode from './nodes/String';
 import NumberNode from './nodes/Number';
+import DiffNode from './nodes/Diff';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -17,6 +18,7 @@ import PromptIcon from './nodes/Prompt/icon';
 import BoolIcon from './nodes/Bool/icon';
 import StringIcon from './nodes/String/icon';
 import NumberIcon from './nodes/Number/icon';
+import DiffIcon from './nodes/Diff/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -27,6 +29,7 @@ export const nodeTypes: NodeTypes = {
   bool: BoolNode,
   string: StringNode,
   number: NumberNode,
+  diff: DiffNode,
 };
 
 export interface NodeRegistryEntry {
@@ -50,6 +53,8 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'bool', label: 'Bool', icon: <BoolIcon />, category: '基础类型', description: '布尔值节点，可直接在节点上切换 true/false，或通过连线获取输入' },
   { type: 'string', label: 'String', icon: <StringIcon />, category: '基础类型', description: '字符串节点，可直接在节点上输入文本，或通过连线获取输入' },
   { type: 'number', label: 'Number', icon: <NumberIcon />, category: '基础类型', description: '数值节点，可直接在节点上输入数字，或通过连线获取输入' },
+  // Tool
+  { type: 'diff', label: 'Diff', icon: <DiffIcon />, category: '工具', description: '对比两个字符串的差异，输出 diff 结果和是否相同布尔值' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

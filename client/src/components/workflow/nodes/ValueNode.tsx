@@ -75,13 +75,16 @@ const ValueNode: React.FC<ValueNodeProps> = ({
   inputPortLabel = '输入值',
 }) => {
   const { setNodes, getEdges, getNode, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState(false);
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
   const runOutput = data._runOutput as any;
   const statusCfg = STATUS_CONFIG[runStatus];
+
+  // Whether this node is part of a multi-selection
+  const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
 
   // 检测是否有连线连接到输入端口
   const hasIncomingEdge = useStore(
@@ -136,10 +139,9 @@ const ValueNode: React.FC<ValueNodeProps> = ({
       e.stopPropagation();
       if (!canRun) return;
 
-      if (!workflowId) {
-        console.warn('[ValueNode] No workflowId, cannot run via WebSocket');
-        return;
-      }
+      // Ensure workflow is saved before running
+      const savedId = await ensureSaved();
+      if (!savedId) return;
 
       // Mark this node as running immediately for visual feedback
       setNodes((nds) =>
@@ -166,7 +168,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
       }
 
       FlowApi.runNodeWS(
-        workflowId,
+        savedId,
         id,
         nodeDataOverrides,
         onNodeUpdate,
@@ -175,7 +177,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
         },
       );
     },
-    [id, nodeType, effectiveValue, valueKey, setNodes, canRun, workflowId, onNodeUpdate, getNodes],
+    [id, nodeType, effectiveValue, valueKey, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
   );
 
   const borderColor =
@@ -265,6 +267,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
   return (
     <>
       <div
+        data-multi-selected={isMultiSelected ? 'true' : undefined}
         style={{
           background: '#fff',
           border: `2px solid ${borderColor}`,

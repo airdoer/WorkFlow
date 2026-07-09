@@ -23,6 +23,7 @@ from Implement.workflowImpl.p4FileExecutor import P4FileExecutor
 from Implement.workflowImpl.stringExecutor import StringExecutor
 from Implement.workflowImpl.boolExecutor import BoolExecutor
 from Implement.workflowImpl.numberExecutor import NumberExecutor
+from Implement.workflowImpl.diffExecutor import DiffExecutor
 
 # region init
 
@@ -37,6 +38,7 @@ ExecutorManager.register(P4FileExecutor())
 ExecutorManager.register(StringExecutor())
 ExecutorManager.register(BoolExecutor())
 ExecutorManager.register(NumberExecutor())
+ExecutorManager.register(DiffExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 
@@ -130,7 +132,7 @@ def on_workflow_run(data):
 
 
 @socketio.on('workflow:run_from_node')
-def on_workflow_run_from_node(data):
+def on_workflow_run_from_node(data) -> None:
     """Run a subgraph starting from a specific node via Socket.IO.
 
     Client sends:

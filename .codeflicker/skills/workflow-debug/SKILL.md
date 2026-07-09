@@ -95,9 +95,21 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 
 ---
 
-## 4. Docker 容器管理
+## 4. telnet 连接
 
-### 4.1 查看容器状态
+### 4.1 端口
+telnet的端口是本地的6666
+在连接ssh后，可以通过telnet localhost 6666来进行连接
+
+### 4.2
+
+本质上是一个python console，可以通过import g等来进行调试
+相关的实现代码可以查看server\tools\TelnetHandler.py
+
+
+## 5. Docker 容器管理
+
+### 5.1 查看容器状态
 
 ```bash
 ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhixu@172.28.200.60 "docker ps | grep work_flow"
@@ -106,14 +118,14 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhixu@172.28.200.60 "docker ps -a | grep work_flow"
 ```
 
-### 4.2 查看端口映射
+### 5.2 查看端口映射
 
 ```bash
 ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhixu@172.28.200.60 \
   "docker port work_flow_server_container && docker port work_flow_client_dev"
 ```
 
-### 4.3 查看容器日志
+### 5.3 查看容器日志
 
 ```bash
 # 服务端日志（最新 100 行）
@@ -133,7 +145,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
   "docker logs -f work_flow_client_dev"
 ```
 
-### 4.4 重启容器
+### 5.4 重启容器
 
 ```bash
 # 重启服务端
@@ -163,7 +175,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 
 ---
 
-## 5. 项目代码操作
+## 6. 项目代码操作
 
 ```bash
 # 查看项目目录
@@ -185,7 +197,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 
 ---
 
-## 6. 常见调试场景
+## 7. 常见调试场景
 
 ### 场景 A：后端接口 502 / 无响应
 
@@ -219,7 +231,7 @@ ssh -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no chenzhix
 
 ---
 
-## 7. 快速参考
+## 8. 快速参考
 
 ```bash
 # SSH 连接
@@ -232,6 +244,9 @@ http://172.28.200.60:8000/workflow/fullscreen?id=8e9bfca2-5826-4e27-8fb9-591f1a6
 http://172.28.200.60:16666
 
 # 查服务端日志
+业务优先用
+less /data/chenzhixu/WorkFlow/server/log/work_flow_server.log
+容器启动失败用
 docker logs -f work_flow_server_container
 
 # 查客户端日志

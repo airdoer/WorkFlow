@@ -68,12 +68,15 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   fields,
 }) => {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
   const runOutput = data._runOutput as any;
   const statusCfg = STATUS_CONFIG[runStatus];
+
+  // Whether this node is part of a multi-selection
+  const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
 
   // Reactively track which input ports are connected via edges
   const connectedInputPorts = useStore(
@@ -129,10 +132,10 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!canRun) return;
-      if (!workflowId) {
-        console.warn('[BaseNode] No workflowId in context, cannot run via WebSocket');
-        return;
-      }
+
+      // Ensure workflow is saved before running
+      const savedId = await ensureSaved();
+      if (!savedId) return;
 
       // Mark this node (and reset downstream) to running immediately for visual feedback
       setNodes((nds) =>
@@ -149,14 +152,10 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         }
       }
 
-      // Collect all other nodes' last known _runOutput as upstream context.
-      // The backend will use these as pre-filled context for port-mapping of nodes
-      // that are upstream of start_node_id (they won't be re-executed).
+      // Collect all other nodes' last known _runOutput as upstream context
       const allNodes = getNodes();
       const nodeDataOverrides: Record<string, any> = {};
-      // Override the start node's data with the current (possibly unsaved) field values
       nodeDataOverrides[id] = cleanConfig;
-      // Pass cached outputs of other nodes for upstream context
       for (const n of allNodes) {
         if (n.id !== id) {
           const runOutput = (n.data as any)?._runOutput;
@@ -167,7 +166,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       }
 
       FlowApi.runNodeWS(
-        workflowId,
+        savedId,
         id,
         nodeDataOverrides,
         onNodeUpdate,
@@ -178,7 +177,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         },
       );
     },
-    [id, nodeType, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes],
+    [id, nodeType, data, fields, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
   );
 
   const borderColor =
@@ -195,6 +194,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   return (
     <>
     <div
+      data-multi-selected={isMultiSelected ? 'true' : undefined}
       style={{
         background: '#fff',
         border: `2px solid ${borderColor}`,
