@@ -20,7 +20,7 @@ import {
   ExpandOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
-import { NodeEventBus } from '../NodeEventBus';
+import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
 import { NodeField } from './BaseNode';
 
@@ -74,7 +74,8 @@ const ValueNode: React.FC<ValueNodeProps> = ({
   inputPortKey = 'valueIn',
   inputPortLabel = '输入值',
 }) => {
-  const { setNodes, getEdges, getNode } = useReactFlow();
+  const { setNodes, getEdges, getNode, getNodes } = useReactFlow();
+  const { workflowId, onNodeUpdate } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState(false);
 
@@ -135,38 +136,46 @@ const ValueNode: React.FC<ValueNodeProps> = ({
       e.stopPropagation();
       if (!canRun) return;
 
+      if (!workflowId) {
+        console.warn('[ValueNode] No workflowId, cannot run via WebSocket');
+        return;
+      }
+
+      // Mark this node as running immediately for visual feedback
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
         ),
       );
 
-      try {
-        const config = { [valueKey]: effectiveValue };
-        const result = await FlowApi.runNode(nodeType, config, {});
-        const output = result.output ?? result;
-        const newStatus = output?.error ? 'error' : 'success';
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
-              : n,
-          ),
-        );
-        if (newStatus === 'success') {
-          NodeEventBus.emit(id, output);
+      // Build node data overrides: current node config + other nodes' cached outputs
+      const allNodes = getNodes();
+      const nodeDataOverrides: Record<string, any> = {};
+
+      // Override current node's config with latest field values
+      nodeDataOverrides[id] = { [valueKey]: effectiveValue };
+
+      // Pass cached outputs of other nodes for upstream context
+      for (const n of allNodes) {
+        if (n.id !== id) {
+          const runOutput = (n.data as any)?._runOutput;
+          if (runOutput && !runOutput.error) {
+            nodeDataOverrides[n.id] = runOutput;
+          }
         }
-      } catch (err: any) {
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-              : n,
-          ),
-        );
       }
+
+      FlowApi.runNodeWS(
+        workflowId,
+        id,
+        nodeDataOverrides,
+        onNodeUpdate,
+        (_status, error) => {
+          if (error) console.error('[ValueNode] NodeRun error:', error);
+        },
+      );
     },
-    [id, nodeType, effectiveValue, valueKey, setNodes, canRun],
+    [id, nodeType, effectiveValue, valueKey, setNodes, canRun, workflowId, onNodeUpdate, getNodes],
   );
 
   const borderColor =

@@ -5,7 +5,7 @@ import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
-import { NodeEventBus } from '../NodeEventBus';
+import { useWorkflowContext } from '../WorkflowContext';
 
 const PORT_COLORS: Record<string, string> = {
   'file-content': '#1890ff',
@@ -67,6 +67,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   open, onClose, nodeId, nodeType, icon, label, fields,
 }) => {
   const { setNodes, getEdges, getNodes } = useReactFlow();
+  const { workflowId, onNodeUpdate } = useWorkflowContext();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to live node data via useStore so any setNodes update re-renders this component
@@ -174,65 +175,52 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
     [nodeId, setNodes],
   );
 
-  const collectUpstreamInput = useCallback(() => {
-    const edges = getEdges();
-    const incoming = edges.filter((e) => e.target === nodeId && e.targetHandle);
-    const nodes = getNodes();
-    const input: Record<string, any> = {};
-    for (const edge of incoming) {
-      const srcNode = nodes.find((n) => n.id === edge.source);
-      if (!srcNode) continue;
-      const srcOutput = (srcNode.data as any)?._runOutput;
-      if (!srcOutput || srcOutput.error) continue;
-      if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-        input[edge.targetHandle || edge.sourceHandle] = srcOutput[edge.sourceHandle];
-      } else {
-        Object.assign(input, srcOutput);
-      }
-    }
-    return input;
-  }, [nodeId, getEdges, getNodes]);
-
   const handleRun = useCallback(async () => {
     if (!canRun) return;
 
+    if (!workflowId) {
+      console.warn('[NodeDetailModal] No workflowId, cannot run via WebSocket');
+      return;
+    }
+
+    // Mark this node as running immediately for visual feedback
     setNodes((nds) =>
       nds.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
       ),
     );
 
-    try {
-      const upstreamInput = collectUpstreamInput();
-      const cleanConfig: Record<string, any> = {};
-      for (const f of fields) {
-        if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
-          cleanConfig[f.key] = data[f.key];
+    // Build clean config for the current node
+    const cleanConfig: Record<string, any> = {};
+    for (const f of fields) {
+      if (data[f.key] !== undefined && data[f.key] !== null && String(data[f.key]).trim() !== '') {
+        cleanConfig[f.key] = data[f.key];
+      }
+    }
+
+    // Collect all other nodes' last known _runOutput as upstream context
+    const allNodes = getNodes();
+    const nodeDataOverrides: Record<string, any> = {};
+    nodeDataOverrides[nodeId] = cleanConfig;
+    for (const n of allNodes) {
+      if (n.id !== nodeId) {
+        const runOutput = (n.data as any)?._runOutput;
+        if (runOutput && !runOutput.error) {
+          nodeDataOverrides[n.id] = runOutput;
         }
       }
-      const result = await FlowApi.runNode(nodeType, cleanConfig, upstreamInput);
-      const output = result.output ?? result;
-      const newStatus = output?.error ? 'error' : 'success';
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: newStatus, _runOutput: output } }
-            : n,
-        ),
-      );
-      if (newStatus === 'success') {
-        NodeEventBus.emit(nodeId, output);
-      }
-    } catch (err: any) {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: 'error', _runOutput: { error: err.message } } }
-            : n,
-        ),
-      );
     }
-  }, [nodeId, nodeType, data, fields, setNodes, canRun, collectUpstreamInput]);
+
+    FlowApi.runNodeWS(
+      workflowId,
+      nodeId,
+      nodeDataOverrides,
+      onNodeUpdate,
+      (_status, error) => {
+        if (error) console.error('[NodeDetailModal] NodeRun error:', error);
+      },
+    );
+  }, [nodeId, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes]);
 
   const copyToClipboard = useCallback((text: string) => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
