@@ -18,7 +18,7 @@ import ReactFlow, {
   OnSelectionChangeFunc,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import Toolbox from './Toolbox';
 import PropertyPanel from './PropertyPanel';
 import Toolbar from './Toolbar';
@@ -186,47 +186,111 @@ function FlowEditorInner({
 
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
-      pushUndo();
-      const sourceNode = getNode(params.source!);
-      const targetNode = getNode(params.target!);
-
-      if (sourceNode && targetNode && params.sourceHandle && params.targetHandle) {
-        const sourcePort = getNodePorts(sourceNode.type || '').find(
-          (p) => p.key === params.sourceHandle && p.direction === 'output',
+      if (!params.target || !params.targetHandle) {
+        // No target handle info — fall through to default
+        pushUndo();
+        setEdges((eds) =>
+          addEdge({ ...params, type: 'flowing', data: { matchStatus: 'unknown', activated: false } }, eds),
         );
-        const targetPort = getNodePorts(targetNode.type || '').find(
-          (p) => p.key === params.targetHandle && p.direction === 'input',
-        );
-
-        if (sourcePort && targetPort) {
-          const compatible = isPortTypeCompatible(sourcePort.type, targetPort.type);
-          const edgeData = {
-            sourcePortType: sourcePort.type,
-            targetPortType: targetPort.type,
-            matchStatus: compatible ? 'matched' : 'mismatched',
-            activated: false,
-          };
-
-          if (!compatible) {
-            message.warning(`端口类型不兼容: ${sourcePort.type} → ${targetPort.type}，请检查连线`);
-          }
-
-          const newEdge = addEdge(
-            { ...params, type: 'flowing', data: edgeData },
-            edges,
-          );
-          setEdges(newEdge);
-          setIsDirty(true);
-          return;
-        }
+        setIsDirty(true);
+        return;
       }
 
-      setEdges((eds) =>
-        addEdge({ ...params, type: 'flowing', data: { matchStatus: 'unknown', activated: false } }, eds),
+      // Check if there's already an edge going to the same target handle (input port)
+      const existingEdge = edges.find(
+        (e) => e.target === params.target && e.targetHandle === params.targetHandle,
       );
-      setIsDirty(true);
+
+      /** Clear run state for a node and all its downstream nodes (BFS). */
+      const clearDownstreamRunState = (startNodeId: string, currentEdges: Edge[]) => {
+        const visited = new Set<string>();
+        const queue = [startNodeId];
+        while (queue.length) {
+          const nid = queue.shift()!;
+          if (visited.has(nid)) continue;
+          visited.add(nid);
+          currentEdges.forEach((e) => {
+            if (e.source === nid && !visited.has(e.target)) queue.push(e.target);
+          });
+        }
+        setNodes((nds) =>
+          nds.map((n) =>
+            visited.has(n.id)
+              ? { ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null } }
+              : n,
+          ),
+        );
+        // Also clear activated state on edges from cleared nodes
+        setEdges((eds) =>
+          eds.map((e) =>
+            visited.has(e.source) ? { ...e, data: { ...e.data, activated: false } } : e,
+          ),
+        );
+      };
+
+      const doConnect = (removeOldEdge: boolean, currentEdges: Edge[]) => {
+        pushUndo();
+        const sourceNode = getNode(params.source!);
+        const targetNode = getNode(params.target!);
+        let edgesAfterRemoval = currentEdges;
+
+        if (removeOldEdge && existingEdge) {
+          edgesAfterRemoval = currentEdges.filter((e) => e.id !== existingEdge.id);
+          // Clear run state for the target node and all downstream
+          clearDownstreamRunState(params.target!, edgesAfterRemoval);
+        }
+
+        if (sourceNode && targetNode && params.sourceHandle && params.targetHandle) {
+          const sourcePort = getNodePorts(sourceNode.type || '').find(
+            (p) => p.key === params.sourceHandle && p.direction === 'output',
+          );
+          const targetPort = getNodePorts(targetNode.type || '').find(
+            (p) => p.key === params.targetHandle && p.direction === 'input',
+          );
+
+          if (sourcePort && targetPort) {
+            const compatible = isPortTypeCompatible(sourcePort.type, targetPort.type);
+            const edgeData = {
+              sourcePortType: sourcePort.type,
+              targetPortType: targetPort.type,
+              matchStatus: compatible ? 'matched' : 'mismatched',
+              activated: false,
+            };
+
+            if (!compatible) {
+              message.warning(`端口类型不兼容: ${sourcePort.type} → ${targetPort.type}，请检查连线`);
+            }
+
+            setEdges(addEdge({ ...params, type: 'flowing', data: edgeData }, edgesAfterRemoval));
+            setIsDirty(true);
+            return;
+          }
+        }
+
+        setEdges(
+          addEdge(
+            { ...params, type: 'flowing', data: { matchStatus: 'unknown', activated: false } },
+            edgesAfterRemoval,
+          ),
+        );
+        setIsDirty(true);
+      };
+
+      if (existingEdge) {
+        // Ask user whether to replace the existing connection
+        Modal.confirm({
+          title: '端口已有连线',
+          content: `输入端口「${params.targetHandle}」已被其他节点连接。是否替换原有连线？`,
+          okText: '替换',
+          cancelText: '保留原连线（取消）',
+          onOk: () => doConnect(true, edges),
+          onCancel: () => { /* do nothing — keep existing edge */ },
+        });
+      } else {
+        doConnect(false, edges);
+      }
     },
-    [edges, setEdges, getNode, pushUndo],
+    [edges, setEdges, setNodes, getNode, pushUndo],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
@@ -236,6 +300,16 @@ function FlowEditorInner({
   const onNodeDragStart: NodeMouseHandler = useCallback((_, node) => {
     setSelectedNodeId(node.id);
   }, []);
+
+  // When a node finishes dragging, reset its zIndex back to default (0).
+  // This prevents pasted nodes from staying permanently on top after being moved.
+  const onNodeDragStop: NodeMouseHandler = useCallback((_, node) => {
+    if (node.zIndex) {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === node.id ? { ...n, zIndex: 0 } : n)),
+      );
+    }
+  }, [setNodes]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
@@ -473,7 +547,7 @@ function FlowEditorInner({
           if (!payload?.nodes?.length) return;
 
           pushUndo();
-          const OFFSET = 40;
+          const OFFSET = 50;
           // Build id remap: original id → new id
           const idMap: Record<string, string> = {};
           payload.nodes.forEach((n) => { idMap[n.id] = `${n.type}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; });
@@ -483,8 +557,11 @@ function FlowEditorInner({
             type: n.type,
             data: { ...n.data },  // no run state (already stripped on copy)
             position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+            zIndex: 1000,         // bring to front so they appear on top of existing nodes
+            selected: true,       // auto-select pasted nodes
           }));
 
+          // Strip edge activated state — pasted edges should be unactivated
           const newEdges: Edge[] = (payload.edges || []).map((e) => ({
             id: `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
             source: idMap[e.source] || e.source,
@@ -492,10 +569,14 @@ function FlowEditorInner({
             sourceHandle: e.sourceHandle,
             targetHandle: e.targetHandle,
             type: e.type || 'flowing',
-            data: e.data,
+            data: { ...e.data, activated: false },  // clear activation status
           }));
 
-          setNodes((nds) => [...nds, ...newNodes]);
+          // Deselect existing nodes, then add pasted ones on top
+          setNodes((nds) => [
+            ...nds.map((n) => ({ ...n, selected: false })),
+            ...newNodes,
+          ]);
           setEdges((eds) => [...eds, ...newEdges]);
           setIsDirty(true);
           e.preventDefault();
@@ -548,6 +629,7 @@ function FlowEditorInner({
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onNodeDragStart={onNodeDragStart}
+            onNodeDragStop={onNodeDragStop}
             onPaneClick={onPaneClick}
             onNodesDelete={onNodesDelete}
             onEdgesDelete={onEdgesDelete}

@@ -580,6 +580,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                               modified={String(runOutput.contentB ?? '')}
                               language="plaintext"
                               height={400}
+                              showToolbar
                             />
                           </Suspense>
                         ) : isJson ? (
