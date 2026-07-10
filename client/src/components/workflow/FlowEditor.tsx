@@ -42,6 +42,7 @@ interface FlowEditorProps {
   isFullscreen?: boolean;
   onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
+  onSwitchWorkflow?: (id: string) => void;
 }
 
 function FlowEditorInner({
@@ -55,6 +56,7 @@ function FlowEditorInner({
   isFullscreen,
   onFullscreenToggle,
   onSave,
+  onSwitchWorkflow,
 }: FlowEditorProps) {
   const initialNodes = initialData?.nodes || [];
 
@@ -609,6 +611,7 @@ function FlowEditorInner({
         workflowDescription={workflowDescription}
         workflowCreatedAt={workflowCreatedAt}
         workflowUpdatedAt={workflowUpdatedAt}
+        isDirty={isDirty}
         isFullscreen={isFullscreen}
         onFullscreenToggle={onFullscreenToggle}
         onSave={(id, name) => {
@@ -617,6 +620,7 @@ function FlowEditorInner({
         }}
         onRun={handleRun}
         runCancelFn={runCancelFn}
+        onSwitchWorkflow={onSwitchWorkflow}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => setIsDirty(true)} />

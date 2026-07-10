@@ -9,7 +9,8 @@ class P4FileExecutor(BaseNodeExecutor):
     type = "p4file"
 
     def execute(self, config: dict, input_data: dict) -> dict:
-        p4_path = config.get("p4Path", "")
+        # 连线输入优先，其次 config（支持从 String 节点连线提供路径）
+        p4_path = input_data.get('p4Path') or config.get('p4Path', '')
 
         if not p4_path:
             return {"error": "p4Path is required"}

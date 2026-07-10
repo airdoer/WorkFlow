@@ -3,7 +3,7 @@ import os
 import re
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 WORKFLOW_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow')
 
@@ -45,7 +45,7 @@ class WorkflowManager:
         """
         _ensure_dir()
         name_id = _sanitize_name(name)
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
         # Load existing record — prefer by name_id, fallback to old UUID-based id
         existing = WorkflowManager.get(name_id) or (WorkflowManager.get(workflow_id) if workflow_id else None)

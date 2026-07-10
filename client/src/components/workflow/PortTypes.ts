@@ -61,6 +61,7 @@ export function getEdgeMatchStatus(
  */
 export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   p4file: [
+    { key: 'p4Path', label: 'P4 路径', type: 'string', direction: 'input', maxConnections: 1 },
     { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'output' },
   ],
   excel: [

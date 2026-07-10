@@ -13,6 +13,8 @@ interface WorkflowMeta {
   createdAt?: string;
   updatedAt?: string;
   json?: WorkflowJSON;
+  // key forces FlowEditor to remount when switching workflows
+  key?: string;
 }
 
 const WorkflowPage: React.FC = () => {
@@ -20,34 +22,41 @@ const WorkflowPage: React.FC = () => {
   const [workflowData, setWorkflowData] = useState<WorkflowMeta>({});
   const [searchParams] = useSearchParams();
 
+  const loadWorkflow = async (workflowId: string) => {
+    setLoading(true);
+    try {
+      const workflow = await FlowApi.get(workflowId);
+      setWorkflowData({
+        key: workflowId,
+        id: workflow.id,
+        name: workflow.name,
+        author: workflow.author,
+        description: workflow.description,
+        createdAt: workflow.createdAt,
+        updatedAt: workflow.updatedAt,
+        json: workflow.json,
+      });
+    } catch (error) {
+      console.error('Failed to load workflow:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const workflowId = searchParams.get('id');
     if (workflowId) {
-      setLoading(true);
-      FlowApi.get(workflowId)
-        .then((workflow) => {
-          setWorkflowData({
-            id: workflow.id,
-            name: workflow.name,
-            author: workflow.author,
-            description: workflow.description,
-            createdAt: workflow.createdAt,
-            updatedAt: workflow.updatedAt,
-            json: workflow.json,
-          });
-        })
-        .catch((error) => {
-          console.error('Failed to load workflow:', error);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+      loadWorkflow(workflowId);
+    } else {
+      // New empty workflow
+      setWorkflowData({ key: '__new__' });
     }
   }, [searchParams]);
 
   const handleSave = (id: string, name: string) => {
+    if (!id) return; // guard against empty id from switch signal
     setWorkflowData((prev) => ({ ...prev, id, name }));
-    // Update URL so the ?id= param reflects the saved workflow (especially for new workflows)
+    // Update URL so ?id= reflects saved workflow (especially for new workflows)
     const currentPath = window.location.pathname;
     const currentId = searchParams.get('id');
     if (currentId !== id) {
@@ -55,19 +64,28 @@ const WorkflowPage: React.FC = () => {
     }
   };
 
+  const handleSwitchWorkflow = (id: string) => {
+    const currentPath = window.location.pathname;
+    if (id === '__new__') {
+      // Navigate to new empty workflow
+      history.push(currentPath);
+      setWorkflowData({ key: `new_${Date.now()}` });
+    } else {
+      history.push(`${currentPath}?id=${id}`);
+      loadWorkflow(id);
+    }
+  };
+
   const handleFullscreenToggle = () => {
-    const id = searchParams.get('id');
+    const id = searchParams.get('id') || workflowData.id;
     const isFullscreen = window.location.pathname === '/workflow/fullscreen';
     if (isFullscreen) {
-      // Exit fullscreen → go back to layout version
       history.push(`/workflow/editor${id ? `?id=${id}` : ''}`);
     } else {
-      // Enter fullscreen → go to layout:false version
       history.push(`/workflow/fullscreen${id ? `?id=${id}` : ''}`);
     }
   };
 
-  // Detect if currently in fullscreen route
   const isFullscreen = window.location.pathname === '/workflow/fullscreen';
 
   if (loading) {
@@ -81,6 +99,7 @@ const WorkflowPage: React.FC = () => {
   return (
     <div style={{ height: isFullscreen ? '100vh' : '100%', overflow: 'hidden' }}>
       <FlowEditor
+        key={workflowData.key}
         initialData={workflowData.json}
         workflowId={workflowData.id}
         workflowName={workflowData.name}
@@ -91,6 +110,7 @@ const WorkflowPage: React.FC = () => {
         isFullscreen={isFullscreen}
         onFullscreenToggle={handleFullscreenToggle}
         onSave={handleSave}
+        onSwitchWorkflow={handleSwitchWorkflow}
       />
     </div>
   );

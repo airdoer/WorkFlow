@@ -1,4 +1,4 @@
-import React, { useCallback, useState, lazy, Suspense, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
@@ -62,6 +62,65 @@ const PORT_COLORS: Record<string, string> = {
   'string': '#fa8c16',
   'number': '#13c2c2',
   'json-path': '#722ed1',
+};
+
+/* ── Local-state text inputs to prevent cursor-jump on every keystroke ── */
+interface FieldInputProps {
+  value: string;
+  disabled?: boolean;
+  placeholder?: string;
+  required?: boolean;
+  style?: React.CSSProperties;
+  lockedStyle?: React.CSSProperties;
+  locked?: boolean;
+  onChange: (v: string) => void;
+}
+
+const FieldTextInput: React.FC<FieldInputProps> = ({ value, disabled, placeholder, required, style, lockedStyle, locked, onChange }) => {
+  const [local, setLocal] = useState(value ?? '');
+  // Sync when external value changes (e.g. node loaded / wire connected)
+  const prevExternal = useRef(value);
+  useEffect(() => {
+    if (value !== prevExternal.current) {
+      prevExternal.current = value;
+      setLocal(value ?? '');
+    }
+  }, [value]);
+  return (
+    <input
+      className="nodrag"
+      type="text"
+      value={local}
+      disabled={disabled}
+      placeholder={placeholder}
+      onChange={(e) => { setLocal(e.target.value); }}
+      onBlur={() => { prevExternal.current = local; onChange(local); }}
+      style={locked ? lockedStyle : style}
+    />
+  );
+};
+
+const FieldTextarea: React.FC<FieldInputProps & { rows?: number }> = ({ value, disabled, placeholder, required, style, lockedStyle, locked, onChange, rows }) => {
+  const [local, setLocal] = useState(value ?? '');
+  const prevExternal = useRef(value);
+  useEffect(() => {
+    if (value !== prevExternal.current) {
+      prevExternal.current = value;
+      setLocal(value ?? '');
+    }
+  }, [value]);
+  return (
+    <textarea
+      className="nodrag"
+      value={local}
+      disabled={disabled}
+      placeholder={placeholder}
+      rows={rows || 3}
+      onChange={(e) => { setLocal(e.target.value); }}
+      onBlur={() => { prevExternal.current = local; onChange(local); }}
+      style={locked ? { ...(lockedStyle || {}), resize: 'vertical' } : { ...(style || {}), resize: 'vertical' }}
+    />
+  );
 };
 
 const BaseNode: React.FC<BaseNodeProps> = ({
@@ -362,21 +421,24 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           );
 
           if (f.type === 'textarea') {
+            const textareaStyle = {
+              width: '100%', fontSize: 11, padding: '3px 6px',
+              border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+              borderRadius: 3, boxSizing: 'border-box' as const,
+            };
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
-                <textarea
-                  className="nodrag"
-                  value={val}
+                <FieldTextarea
+                  value={String(val ?? '')}
                   disabled={locked}
-                  onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                  locked={locked}
                   placeholder={locked ? '由连线提供' : f.placeholder}
                   rows={f.rows || 3}
-                  style={locked ? { ...lockedStyle, resize: 'vertical' } : {
-                    width: '100%', fontSize: 11, padding: '3px 6px',
-                    border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                    borderRadius: 3, resize: 'vertical', boxSizing: 'border-box',
-                  }}
+                  required={f.required}
+                  style={textareaStyle}
+                  lockedStyle={{ ...lockedStyle, resize: 'vertical' }}
+                  onChange={(v) => !locked && handleFieldChange(f.key, v)}
                 />
               </div>
             );
@@ -483,21 +545,23 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           }
 
           // Default: text input
+          const textInputStyle = {
+            width: '100%', fontSize: 11, padding: '3px 6px',
+            border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
+            borderRadius: 3, boxSizing: 'border-box' as const,
+          };
           return (
             <div key={f.key} style={{ marginBottom: 6 }}>
               {fieldLabel}
-              <input
-                className="nodrag"
-                type="text"
-                value={val}
+              <FieldTextInput
+                value={String(val ?? '')}
                 disabled={locked}
-                onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                locked={locked}
                 placeholder={locked ? '由连线提供' : f.placeholder}
-                style={locked ? lockedStyle : {
-                  width: '100%', fontSize: 11, padding: '3px 6px',
-                  border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                  borderRadius: 3, boxSizing: 'border-box',
-                }}
+                required={f.required}
+                style={textInputStyle}
+                lockedStyle={lockedStyle}
+                onChange={(v) => !locked && handleFieldChange(f.key, v)}
               />
             </div>
           );

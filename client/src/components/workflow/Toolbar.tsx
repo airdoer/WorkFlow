@@ -1,21 +1,68 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Node, Edge } from 'reactflow';
 import { useReactFlow } from 'reactflow';
-import { Button, Space, Input, Popover, message } from 'antd';
 import {
-  SaveOutlined,
+  Button,
+  Input,
+  Popover,
+  Modal,
+  Table,
+  Space,
+  Tooltip,
+  message,
+  Popconfirm,
+} from 'antd';
+import {
   PlayCircleOutlined,
   StopOutlined,
-  ExportOutlined,
-  ImportOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
   InfoCircleOutlined,
+  UnorderedListOutlined,
+  LoadingOutlined,
+  EditOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  ExportOutlined,
+  ImportOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
 
-interface ToolbarProps {
+/* ─────────────────────────── helpers ─────────────────────────── */
+
+/** 相对时间：4h 内显示 "x小时y分钟前"，之后显示绝对时间（始终使用本地时间，修正时区偏差）*/
+function relativeTime(isoStr?: string): string {
+  if (!isoStr) return '';
+  // new Date() 会自动按本地时区解析 ISO 字符串，Date.now() 也是本地毫秒数，差值不含时区偏差
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  if (diff < 0) return '刚刚'; // 服务器时钟略快时保护
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins} 分钟前`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 4) return remMins > 0 ? `${hours} 小时 ${remMins} 分钟前` : `${hours} 小时前`;
+  // 超过 4 小时显示绝对本地时间
+  return d.toLocaleString('zh-CN', { hour12: false });
+}
+
+/* ─────────────────────────── types ─────────────────────────── */
+
+interface WorkflowRecord {
+  id: string;
+  name: string;
+  author?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ToolbarProps {
   nodes: Node[];
   edges: Edge[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -26,12 +73,17 @@ interface ToolbarProps {
   workflowDescription?: string;
   workflowCreatedAt?: string;
   workflowUpdatedAt?: string;
+  isDirty?: boolean;
   isFullscreen?: boolean;
   onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
   onRun?: (json: WorkflowJSON, workflowId?: string) => void;
   runCancelFn?: (() => void) | null;
+  /** Called when user picks a workflow from the library to switch to */
+  onSwitchWorkflow?: (id: string) => void;
 }
+
+/* ─────────────────────────── component ─────────────────────────── */
 
 const Toolbar: React.FC<ToolbarProps> = ({
   nodes,
@@ -44,95 +96,196 @@ const Toolbar: React.FC<ToolbarProps> = ({
   workflowDescription: initialDesc,
   workflowCreatedAt,
   workflowUpdatedAt,
+  isDirty = false,
   isFullscreen,
   onFullscreenToggle,
   onSave,
   onRun,
   runCancelFn,
+  onSwitchWorkflow,
 }) => {
-  const [saving, setSaving] = useState(false);
+  const reactFlowInstance = useReactFlow();
   const isRunning = !!runCancelFn;
+
+  // ── name inline editing ──────────────────────────────────────
   const [name, setName] = useState(initialName || '未命名工作流');
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const nameInputRef = useRef<any>(null);
+
+  // Keep name in sync when parent loads a new workflow
+  useEffect(() => { setName(initialName || '未命名工作流'); }, [initialName]);
+
+  const startEditName = () => {
+    setNameDraft(name);
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.select(), 50);
+  };
+  const commitName = () => {
+    const trimmed = nameDraft.trim() || '未命名工作流';
+    setName(trimmed);
+    setEditingName(false);
+  };
+  const cancelEditName = () => { setEditingName(false); };
+
+  // ── meta info ───────────────────────────────────────────────
   const [author, setAuthor] = useState(initialAuthor || '');
   const [description, setDescription] = useState(initialDesc || '');
-  const reactFlowInstance = useReactFlow();
+  useEffect(() => { setAuthor(initialAuthor || ''); }, [initialAuthor]);
+  useEffect(() => { setDescription(initialDesc || ''); }, [initialDesc]);
 
-  const handleSave = async () => {
+  // ── save ────────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | undefined>(workflowUpdatedAt);
+  const [tick, setTick] = useState(0); // force re-render for relative time
+
+  useEffect(() => { setLastSavedAt(workflowUpdatedAt); }, [workflowUpdatedAt]);
+
+  // Refresh relative time display every 30 s
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const handleSave = useCallback(async (nameOverride?: string) => {
     setSaving(true);
+    const saveName = nameOverride ?? name;
     try {
       const json = reactFlowInstance.toObject();
-      const result = await FlowApi.save(name, json, workflowId, { author, description });
-      onSave?.(result.id, name);
+      const result = await FlowApi.save(saveName, json, workflowId, { author, description });
+      const now = new Date().toISOString();
+      setLastSavedAt(now);
+      onSave?.(result.id, saveName);
       message.success('保存成功');
     } catch (err: any) {
       message.error(`保存失败: ${err.message}`);
     } finally {
       setSaving(false);
     }
-  };
+  }, [name, author, description, workflowId, reactFlowInstance, onSave]);
 
+  // ── run / stop ──────────────────────────────────────────────
   const handleRun = async () => {
-    if (!workflowId) {
-      message.warning('请先保存工作流');
-      return;
-    }
+    if (!workflowId) { message.warning('请先保存工作流'); return; }
     const json = reactFlowInstance.toObject();
     onRun?.(json, workflowId);
   };
+  const handleStop = () => { runCancelFn?.(); message.info('已请求停止运行'); };
 
-  const handleStop = async () => {
-    if (runCancelFn) {
-      runCancelFn();
-      message.info('已请求停止运行');
-    }
-  };
-
+  // ── import / export ─────────────────────────────────────────
   const handleExport = () => {
     const json = reactFlowInstance.toObject();
     const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${name}.json`;
-    a.click();
+    a.href = url; a.download = `${name}.json`; a.click();
     URL.revokeObjectURL(url);
   };
-
   const handleImport = () => {
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
+    input.type = 'file'; input.accept = '.json';
     input.onchange = (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const file = e.target.files?.[0]; if (!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
           const json = JSON.parse(ev.target?.result as string);
           if (json.nodes) setNodes(json.nodes as Node[]);
           if (json.edges) setEdges(json.edges as Edge[]);
-          if (json.viewport) {
-            reactFlowInstance.setViewport(json.viewport);
-          }
+          if (json.viewport) reactFlowInstance.setViewport(json.viewport);
           message.success('导入成功');
-        } catch {
-          message.error('JSON 解析失败');
-        }
+        } catch { message.error('JSON 解析失败'); }
       };
       reader.readAsText(file);
     };
     input.click();
   };
 
-  const formatTime = (t?: string) =>
-    t ? new Date(t).toLocaleString('zh-CN') : '-';
+  // ── workflow library modal ───────────────────────────────────
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryData, setLibraryData] = useState<WorkflowRecord[]>([]);
 
+  const fetchLibrary = async () => {
+    setLibraryLoading(true);
+    try {
+      const result = await FlowApi.list();
+      setLibraryData(result.list || []);
+    } catch (err: any) {
+      message.error(`加载失败: ${err.message}`);
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const openLibrary = () => { setLibraryOpen(true); fetchLibrary(); };
+
+  const handleDeleteWorkflow = async (id: string) => {
+    try {
+      await FlowApi.delete(id);
+      message.success('删除成功');
+      fetchLibrary();
+    } catch (err: any) {
+      message.error(`删除失败: ${err.message}`);
+    }
+  };
+
+  const handleSwitchTo = (targetId: string) => {
+    if (targetId === workflowId) { setLibraryOpen(false); return; }
+    const doSwitch = () => { setLibraryOpen(false); onSwitchWorkflow?.(targetId); };
+    if (isDirty) {
+      Modal.confirm({
+        title: '当前工作流未保存',
+        content: '是否先保存当前工作流再切换？',
+        okText: '保存并切换',
+        cancelText: '直接切换',
+        onOk: async () => { await handleSave(); doSwitch(); },
+        onCancel: doSwitch,
+      });
+    } else {
+      doSwitch();
+    }
+  };
+
+  const libraryColumns = [
+    {
+      title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
+      render: (v: string, r: WorkflowRecord) => (
+        <span style={{ fontWeight: r.id === workflowId ? 600 : 400, color: r.id === workflowId ? '#1890ff' : undefined }}>
+          {v}{r.id === workflowId ? ' （当前）' : ''}
+        </span>
+      ),
+    },
+    { title: '作者', dataIndex: 'author', key: 'author', width: 100, render: (v: string) => v || '-' },
+    {
+      title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 160,
+      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+      defaultSortOrder: 'descend' as const,
+      sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
+    },
+    {
+      title: '操作', key: 'action', width: 130,
+      render: (_: any, record: WorkflowRecord) => (
+        <Space size={4}>
+          <Button
+            type="primary" size="small"
+            disabled={record.id === workflowId}
+            onClick={() => handleSwitchTo(record.id)}
+          >
+            切换
+          </Button>
+          <Popconfirm title="确认删除？" onConfirm={() => handleDeleteWorkflow(record.id)} okText="删除" cancelText="取消">
+            <Button size="small" danger icon={<DeleteOutlined />} disabled={record.id === workflowId} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  // ── meta info popover ────────────────────────────────────────
+  const formatTime = (t?: string) => t ? new Date(t).toLocaleString('zh-CN') : '-';
   const metaContent = (
     <div style={{ width: 280 }}>
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 2 }}>名称</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} size="small" />
-      </div>
       <div style={{ marginBottom: 8 }}>
         <label style={{ display: 'block', fontSize: 11, color: '#888', marginBottom: 2 }}>作者</label>
         <Input value={author} onChange={(e) => setAuthor(e.target.value)} size="small" placeholder="可选" />
@@ -143,44 +296,132 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
       <div style={{ fontSize: 11, color: '#999' }}>
         <div>创建时间: {formatTime(workflowCreatedAt)}</div>
-        <div>最后更新: {formatTime(workflowUpdatedAt)}</div>
+        <div>最后保存: {formatTime(lastSavedAt)}</div>
       </div>
     </div>
   );
 
+  const savedLabel = ((_tick) => {
+    if (isDirty) return <span style={{ color: '#ffc53d', fontSize: 12 }}>未保存</span>;
+    if (!lastSavedAt) return null;
+    return <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>已保存 {relativeTime(lastSavedAt)}</span>;
+  })(tick);
+
   return (
-    <div
-      style={{
-        height: 44,
-        borderBottom: '1px solid #e8e8e8',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        background: '#fff',
-        gap: 4,
-      }}
-    >
-      <Space>
+    <div style={{
+      height: 48,
+      borderBottom: '1px solid #1d2a3a',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 12px',
+      background: '#1f2f3f',
+      gap: 0,
+      flexShrink: 0,
+      position: 'relative',
+    }}>
+      {/* ── 左区：工作流名称 + 保存状态 ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: 480 }}>
+        {editingName ? (
+          <Input
+            ref={nameInputRef}
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onPressEnter={commitName}
+            onKeyDown={(e) => e.key === 'Escape' && cancelEditName()}
+            size="small"
+            style={{ fontSize: 14, fontWeight: 600, minWidth: 160, width: `${Math.max(nameDraft.length * 9, 160)}px` }}
+            suffix={
+              <Space size={2}>
+                <CheckOutlined style={{ color: '#52c41a', cursor: 'pointer', fontSize: 12 }} onClick={commitName} />
+                <CloseOutlined style={{ color: '#ff4d4f', cursor: 'pointer', fontSize: 12 }} onClick={cancelEditName} />
+              </Space>
+            }
+          />
+        ) : (
+          <Tooltip title="点击编辑名称">
+            <span
+              onClick={startEditName}
+              style={{
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                color: '#e8edf2',
+                padding: '2px 4px', borderRadius: 4,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              {name}
+              <EditOutlined style={{ fontSize: 11, marginLeft: 4, color: 'rgba(255,255,255,0.3)' }} />
+            </span>
+          </Tooltip>
+        )}
+        <div style={{ flexShrink: 0 }}>{savedLabel}</div>
+      </div>
+
+      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
+
+      {/* ── 中左区：信息 + 运行/停止 ── */}
+      <Space size={8}>
         <Popover content={metaContent} title="工作流信息" trigger="click">
-          <Button icon={<InfoCircleOutlined />} size="small">
-            信息
-          </Button>
+          <Button icon={<InfoCircleOutlined />} size="small">信息</Button>
         </Popover>
-        <Button icon={<SaveOutlined />} loading={saving} onClick={handleSave} size="small">
+        {isRunning ? (
+          <Button
+            icon={<StopOutlined />}
+            size="small" danger
+            onClick={handleStop}
+          >
+            停止
+          </Button>
+        ) : (
+          <Button
+            type="primary"
+            icon={saving ? <LoadingOutlined /> : <PlayCircleOutlined />}
+            size="small"
+            disabled={saving}
+            onClick={handleRun}
+          >
+            运行
+          </Button>
+        )}
+        <Button
+          icon={saving ? <LoadingOutlined /> : undefined}
+          size="small"
+          loading={saving}
+          onClick={() => handleSave()}
+        >
           保存
         </Button>
-        <Button type="primary" icon={<PlayCircleOutlined />} loading={isRunning} onClick={handleRun} size="small" disabled={isRunning}>
-          运行
+      </Space>
+
+      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
+
+      {/* ── 中区：工作流库（绝对定位，基于整个 toolbar 居中）── */}
+      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <Button
+          icon={<UnorderedListOutlined />}
+          size="small"
+          onClick={openLibrary}
+          style={{ minWidth: 100 }}
+        >
+          工作流库
         </Button>
-        <Button icon={<StopOutlined />} size="small" disabled={!isRunning} onClick={handleStop} danger={isRunning}>
-          停止
-        </Button>
-        <Button icon={<ImportOutlined />} onClick={handleImport} size="small">
-          导入
-        </Button>
-        <Button icon={<ExportOutlined />} onClick={handleExport} size="small">
-          导出
-        </Button>
+      </div>
+
+      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
+
+      {/* ── 推右区到最右 */}
+      <div style={{ marginLeft: 'auto' }} />
+
+      {/* ── 右区：导入/导出 + 全屏 ── */}
+      <Space size={4}>
+        <Tooltip title="导入 JSON">
+          <Button icon={<ImportOutlined />} size="small" onClick={handleImport} />
+        </Tooltip>
+        <Tooltip title="导出 JSON">
+          <Button icon={<ExportOutlined />} size="small" onClick={handleExport} />
+        </Tooltip>
         <Button
           icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
           onClick={onFullscreenToggle}
@@ -190,9 +431,40 @@ const Toolbar: React.FC<ToolbarProps> = ({
           {isFullscreen ? '退出全屏' : '全屏'}
         </Button>
       </Space>
-      <span style={{ marginLeft: 16, color: '#666', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {name}
-      </span>
+
+      {/* ── 工作流库 Modal ── */}
+      <Modal
+        title="工作流库"
+        open={libraryOpen}
+        onCancel={() => setLibraryOpen(false)}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setLibraryOpen(false);
+                onSwitchWorkflow?.('__new__');
+              }}
+            >
+              新建工作流
+            </Button>
+            <Button onClick={() => setLibraryOpen(false)}>关闭</Button>
+          </div>
+        }
+        width={700}
+        destroyOnClose
+      >
+        <Table
+          columns={libraryColumns}
+          dataSource={libraryData}
+          rowKey="id"
+          loading={libraryLoading}
+          size="small"
+          pagination={{ pageSize: 8, showSizeChanger: false }}
+          rowClassName={(r) => r.id === workflowId ? 'workflow-lib-active-row' : ''}
+        />
+      </Modal>
     </div>
   );
 };
