@@ -110,6 +110,20 @@ function FlowEditorInner({
     [selectedNodeId, nodes],
   );
 
+  // ── Undo history ─────────────────────────────────────────────────────────
+  // Stack of { nodes, edges } snapshots. We push a snapshot before every
+  // meaningful structural change so Ctrl+Z can roll back.
+  const undoStack = useRef<Array<{ nodes: Node[]; edges: Edge[] }>>([]);
+  const isUndoing = useRef(false);
+
+  /** Push current state onto undo stack (call BEFORE applying the change). */
+  const pushUndo = useCallback(() => {
+    if (isUndoing.current) return;
+    undoStack.current.push({ nodes: getNodes(), edges: getEdges() });
+    // Keep at most 50 steps
+    if (undoStack.current.length > 50) undoStack.current.shift();
+  }, [getNodes, getEdges]);
+
   // ── Status map: backend → frontend ──────────────────────────────────────
   const statusMap: Record<string, string> = {
     idle: 'idle',
@@ -172,6 +186,7 @@ function FlowEditorInner({
 
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
+      pushUndo();
       const sourceNode = getNode(params.source!);
       const targetNode = getNode(params.target!);
 
@@ -211,7 +226,7 @@ function FlowEditorInner({
       );
       setIsDirty(true);
     },
-    [edges, setEdges, getNode],
+    [edges, setEdges, getNode, pushUndo],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
@@ -258,24 +273,30 @@ function FlowEditorInner({
   // Track node/edge changes as dirty
   const wrappedOnNodesChange: OnNodesChange = useCallback(
     (changes) => {
-      onNodesChange(changes);
       const meaningful = changes.some(
         (c) => c.type === 'add' || c.type === 'remove' || c.type === 'position',
       );
-      if (meaningful) setIsDirty(true);
+      if (meaningful) {
+        pushUndo();
+        setIsDirty(true);
+      }
+      onNodesChange(changes);
     },
-    [onNodesChange],
+    [onNodesChange, pushUndo],
   );
 
   const wrappedOnEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
-      onEdgesChange(changes);
       const meaningful = changes.some(
         (c) => c.type === 'add' || c.type === 'remove',
       );
-      if (meaningful) setIsDirty(true);
+      if (meaningful) {
+        pushUndo();
+        setIsDirty(true);
+      }
+      onEdgesChange(changes);
     },
-    [onEdgesChange],
+    [onEdgesChange, pushUndo],
   );
 
   /**
@@ -302,8 +323,12 @@ function FlowEditorInner({
     [getNode, setNodes],
   );
 
-  // ── Clipboard: Ctrl+C / Ctrl+V ──────────────────────────────────────
-  const clipboardRef = useRef<{ type: string; data: Record<string, any> } | null>(null);
+  // ── Clipboard: Ctrl+C / Ctrl+X / Ctrl+V (cross-tab via localStorage) ──────
+  // Payload format: { nodes: [...], edges: [...] }
+  // - nodes include position + clean data (no run state)
+  // - edges are filtered to only those connecting nodes within the selection
+  // localStorage makes it accessible from any tab/window on the same origin.
+  const CLIPBOARD_KEY = 'wf_clipboard';
 
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
@@ -374,64 +399,119 @@ function FlowEditorInner({
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-      // Ctrl+C: copy selected node(s) to clipboard
+      // ── Ctrl+Z: undo ──────────────────────────────────────────────────
+      if (ctrl && e.key === 'z' && !inInput) {
+        e.preventDefault();
+        const snapshot = undoStack.current.pop();
+        if (snapshot) {
+          isUndoing.current = true;
+          setNodes(snapshot.nodes);
+          setEdges(snapshot.edges);
+          setIsDirty(true);
+          isUndoing.current = false;
+          message.info('已撤销');
+        } else {
+          message.info('没有更多可撤销的操作');
+        }
+        return;
+      }
+
+      if (inInput) return;
+
+      const selectedNodes = nodes.filter((n) => n.selected);
+
+      // Helper: build clipboard payload including intra-selection edges
+      const buildPayload = (sNodes: Node[]) => {
+        const ids = new Set(sNodes.map((n) => n.id));
+        // Include edges where BOTH source and target are in selection
+        const sEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+        return {
+          nodes: sNodes.map((n) => {
+            const { _runStatus, _runOutput, ...cleanData } = n.data as any;
+            return { id: n.id, type: n.type || '', data: cleanData, position: n.position };
+          }),
+          edges: sEdges.map((e) => ({
+            source: e.source, target: e.target,
+            sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
+            type: e.type, data: e.data,
+          })),
+        };
+      };
+
+      // ── Ctrl+C: copy selected node(s) to localStorage clipboard ───────
       if (ctrl && e.key === 'c') {
-        // Don't intercept if user is typing in an input/textarea
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
-        const selectedNodes = nodes.filter((n) => n.selected);
         if (selectedNodes.length > 0) {
-          // Copy all selected nodes to clipboard
-          clipboardRef.current = {
-            type: selectedNodes[0].type || '',
-            data: (() => {
-              // For single node, copy its data
-              const { _runStatus, _runOutput, ...cleanData } = selectedNodes[0].data as any;
-              return cleanData;
-            })(),
-          };
+          try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(buildPayload(selectedNodes))); } catch (_) {}
           e.preventDefault();
           message.success(`已复制 ${selectedNodes.length} 个节点`);
         }
       }
 
-      // Ctrl+V: paste from clipboard
-      if (ctrl && e.key === 'v') {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
-        if (clipboardRef.current) {
-          const { type, data } = clipboardRef.current;
-          const id = `${type}_${Date.now()}`;
-          // Offset from current selected node or center of view
-          const srcNode = selectedNodeId ? getNode(selectedNodeId) : null;
-          const position = srcNode
-            ? { x: srcNode.position.x + 50, y: srcNode.position.y + 50 }
-            : { x: Math.random() * 300 + 100, y: Math.random() * 200 + 100 };
-
-          const newNode: Node = {
-            id,
-            type,
-            position,
-            data: { ...data },
-          };
-
-          setNodes((nds) => [...nds, newNode]);
+      // ── Ctrl+X: cut selected node(s) ─────────────────────────────────
+      if (ctrl && e.key === 'x') {
+        if (selectedNodes.length > 0) {
+          try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(buildPayload(selectedNodes))); } catch (_) {}
+          const ids = new Set(selectedNodes.map((n) => n.id));
+          pushUndo();
+          setNodes((nds) => nds.filter((n) => !ids.has(n.id)));
+          setEdges((eds) => eds.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
           setIsDirty(true);
           e.preventDefault();
-          message.success('已粘贴节点');
+          message.success(`已剪切 ${selectedNodes.length} 个节点`);
         }
       }
 
-      // Ctrl+D: duplicate selected node
+      // ── Ctrl+V: paste from localStorage clipboard ─────────────────────
+      if (ctrl && e.key === 'v') {
+        try {
+          const raw = localStorage.getItem(CLIPBOARD_KEY);
+          if (!raw) return;
+          const payload: { nodes: any[]; edges: any[] } = JSON.parse(raw);
+          if (!payload?.nodes?.length) return;
+
+          pushUndo();
+          const OFFSET = 40;
+          // Build id remap: original id → new id
+          const idMap: Record<string, string> = {};
+          payload.nodes.forEach((n) => { idMap[n.id] = `${n.type}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; });
+
+          const newNodes: Node[] = payload.nodes.map((n) => ({
+            id: idMap[n.id],
+            type: n.type,
+            data: { ...n.data },  // no run state (already stripped on copy)
+            position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+          }));
+
+          const newEdges: Edge[] = (payload.edges || []).map((e) => ({
+            id: `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            source: idMap[e.source] || e.source,
+            target: idMap[e.target] || e.target,
+            sourceHandle: e.sourceHandle,
+            targetHandle: e.targetHandle,
+            type: e.type || 'flowing',
+            data: e.data,
+          }));
+
+          setNodes((nds) => [...nds, ...newNodes]);
+          setEdges((eds) => [...eds, ...newEdges]);
+          setIsDirty(true);
+          e.preventDefault();
+          message.success(`已粘贴 ${newNodes.length} 个节点（无运行状态）`);
+        } catch (_) {
+          message.error('粘贴失败');
+        }
+      }
+
+      // ── Ctrl+D: duplicate selected node ──────────────────────────────
       if (ctrl && e.key === 'd' && selectedNodeId) {
         e.preventDefault();
         handleDuplicateNode(selectedNodeId);
       }
     },
-    [nodes, selectedNodeId, handleDuplicateNode, setNodes, getNode],
+    [nodes, edges, selectedNodeId, handleDuplicateNode, setNodes, setEdges, getNode, pushUndo],
   );
 
   return (
