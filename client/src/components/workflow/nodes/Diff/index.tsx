@@ -19,6 +19,7 @@ import { getNodePorts } from '../../PortTypes';
 import { useWorkflowContext } from '../../WorkflowContext';
 import NodeDetailModal from '../NodeDetailModal';
 import { NodeField, RunStatus } from '../BaseNode';
+import DiffSummary from './DiffSummary';
 
 const DiffRenderer = lazy(() => import('./DiffRenderer'));
 
@@ -270,27 +271,15 @@ function DiffNode({ data, id, selected }: NodeProps) {
         <div style={{ padding: '6px 8px' }}>
           {showDiff && (
             <div style={{ marginTop: 4 }}>
-              <div style={{
-                padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d',
-                display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4,
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
-                Diff 对比
-                {diffStats && (
-                  <span style={{ marginLeft: 4, fontWeight: 500 }}>
-                    <span style={{ color: '#52c41a' }}>+{diffStats.additions ?? 0}</span>
-                    <span style={{ margin: '0 3px', color: '#bfbfbf' }}>/</span>
-                    <span style={{ color: '#ff4d4f' }}>-{diffStats.deletions ?? 0}</span>
-                  </span>
-                )}
-              </div>
-              <Suspense fallback={
-                <div style={{ height: 200, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#999' }}>
-                  加载 Diff 编辑器...
-                </div>
-              }>
-                <DiffRenderer original={String(contentA)} modified={String(contentB)} language="plaintext" height={200} />
-              </Suspense>
+              <DiffSummary
+                contentA={String(contentA)}
+                contentB={String(contentB)}
+                isSame={!!isSameResult}
+                stats={diffStats as any}
+                unifiedDiff={runOutput?.unifiedDiff ?? ''}
+                maxLines={20}
+                height={160}
+              />
             </div>
           )}
 

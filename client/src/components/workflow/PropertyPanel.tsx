@@ -8,6 +8,7 @@ import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
 import { PanelSection } from './PanelSection';
+import DiffSummary from './nodes/Diff/DiffSummary';
 
 const DiffRenderer = lazy(() => import('./nodes/Diff/DiffRenderer'));
 
@@ -525,16 +526,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     </Button>
                   )}
                 </div>
-                {/* Content area: DiffRenderer for diff, pre for others */}
+                {/* Content area: DiffSummary for diff node (compact), pre for others */}
                 {hasDisplay && isDiffPort ? (
-                  <Suspense fallback={<div style={{ padding: 10, textAlign: 'center', color: '#999', fontSize: 11 }}>加载 Diff 编辑器...</div>}>
-                    <DiffRenderer
-                      original={String(runOutput.contentA ?? '')}
-                      modified={String(runOutput.contentB ?? '')}
-                      language="plaintext"
-                      height={200}
-                    />
-                  </Suspense>
+                  <DiffSummary
+                    contentA={String(runOutput.contentA ?? '')}
+                    contentB={String(runOutput.contentB ?? '')}
+                    isSame={!!runOutput.isSame}
+                    stats={runOutput.stats}
+                    unifiedDiff={runOutput.unifiedDiff ?? ''}
+                    maxLines={15}
+                    height={160}
+                  />
                 ) : hasDisplay && previewText ? (
                   <pre
                     style={{
