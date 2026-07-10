@@ -9,6 +9,10 @@ import BoolNode from './nodes/Bool';
 import StringNode from './nodes/String';
 import NumberNode from './nodes/Number';
 import DiffNode from './nodes/Diff';
+import C7ServerNode from './nodes/C7Server';
+import KdipNode from './nodes/Jenkins';
+import KimNotifyNode from './nodes/KimNotify';
+import BoolGateNode from './nodes/BoolGate';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -19,6 +23,10 @@ import BoolIcon from './nodes/Bool/icon';
 import StringIcon from './nodes/String/icon';
 import NumberIcon from './nodes/Number/icon';
 import DiffIcon from './nodes/Diff/icon';
+import C7ServerIcon from './nodes/C7Server/icon';
+import KdipIcon from './nodes/Jenkins/icon';
+import KimNotifyIcon from './nodes/KimNotify/icon';
+import BoolGateIcon from './nodes/BoolGate/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -30,6 +38,10 @@ export const nodeTypes: NodeTypes = {
   string: StringNode,
   number: NumberNode,
   diff: DiffNode,
+  c7server: C7ServerNode,
+  kdip: KdipNode,
+  kimnotify: KimNotifyNode,
+  boolgate: BoolGateNode,
 };
 
 export interface NodeRegistryEntry {
@@ -43,6 +55,7 @@ export interface NodeRegistryEntry {
 export const nodeRegistryList: NodeRegistryEntry[] = [
   // Data sources
   { type: 'p4file', label: 'P4 文件', icon: <P4FileIcon />, category: '数据源', description: '从 P4 获取文件内容，输出给下游渲染器' },
+  { type: 'c7server', label: 'C7 服务器', icon: <C7ServerIcon />, category: '数据源', description: '从下拉列表选择 C7 服务器或服务器分组，输出服务器名' },
   // Renderers
   { type: 'excel', label: 'Excel', icon: <ExcelIcon />, category: '渲染器', description: '接收文件内容，以表格形式渲染 Excel 数据' },
   { type: 'json', label: 'JSON', icon: <JsonIcon />, category: '渲染器', description: '接收文件内容，以 JSON 树形式渲染数据；JSON Path 支持手动输入或连线提供' },
@@ -55,6 +68,9 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'number', label: 'Number', icon: <NumberIcon />, category: '基础类型', description: '数值节点，可直接在节点上输入数字，或通过连线获取输入' },
   // Tool
   { type: 'diff', label: 'Diff', icon: <DiffIcon />, category: '工具', description: '对比两个字符串的差异，输出 diff 结果和是否相同布尔值' },
+  { type: 'kdip', label: 'KDIP', icon: <KdipIcon />, category: '工具', description: '在指定 C7 服务器上执行 KDIP 任务，输出成功与否及结果内容' },
+  { type: 'kimnotify', label: 'Kim 通知', icon: <KimNotifyIcon />, category: '工具', description: '通过 Kim 机器人发送消息给用户或群组，输出发送结果' },
+  { type: 'boolgate', label: 'Bool 门控', icon: <BoolGateIcon />, category: '工具', description: '当输入为 True 时放行执行后续节点，为 False 时报错中断' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

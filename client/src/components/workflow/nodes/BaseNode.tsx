@@ -26,6 +26,12 @@ export interface NodeField {
    *  When that port has an active connection, the field is locked (read-only).
    */
   linkedPortKey?: string;
+  /**
+   * Optional custom renderer for this field.
+   * When provided, replaces the default input/select rendering.
+   * Receives (value, onChange, locked) and should return a React element.
+   */
+  renderCustomField?: (value: any, onChange: (v: any) => void, locked: boolean) => React.ReactNode;
 }
 
 interface BaseNodeProps {
@@ -462,6 +468,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     );
                   })}
                 </div>
+              </div>
+            );
+          }
+
+          // Custom renderer — takes priority over all default rendering
+          if (f.renderCustomField) {
+            return (
+              <div key={f.key} style={{ marginBottom: 6 }}>
+                {fieldLabel}
+                {f.renderCustomField(val, (v) => !locked && handleFieldChange(f.key, v), locked)}
               </div>
             );
           }

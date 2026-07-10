@@ -81,6 +81,13 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
+  // C7 server list for dropdown
+  async getC7ServerOptions(): Promise<{ label: string; value: string; type: string }[]> {
+    const res = await fetch(`${API_BASE}/api/workflow/c7server/list`);
+    const data = await handleResponse<{ options: { label: string; value: string; type: string }[] }>(res);
+    return data.options || [];
+  },
+
   // Single-node run (REST, for node-level ▶ button)
   async runNode(type: string, config: any, input: any) {
     const res = await fetch(`${API_BASE}/api/workflow/node/run`, {

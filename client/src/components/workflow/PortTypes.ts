@@ -68,7 +68,7 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'tableData', label: '表格数据', type: 'table-data', direction: 'output' },
   ],
   json: [
-    { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'input' },
+    { key: 'fileContent', label: 'JSON 内容', type: 'file-content', direction: 'input' },
     { key: 'jsonPath', label: 'JSON Path', type: 'json-path', direction: 'input' },
     { key: 'jsonData', label: 'JSON 数据', type: 'json-data', direction: 'output' },
   ],
@@ -98,6 +98,29 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'contentA', label: '内容1', type: 'string', direction: 'input' },
     { key: 'contentB', label: '内容2', type: 'string', direction: 'input' },
     { key: 'isSame', label: '是否相同', type: 'boolean', direction: 'output' },
+  ],
+  // C7Server node — outputs server name string
+  c7server: [
+    { key: 'serverName', label: '服务器名', type: 'string', direction: 'output' },
+  ],
+  // KDIP node — runs a KDIP cmd on the server
+  kdip: [
+    { key: 'serverName', label: '服务器名', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'username', label: '用户名', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'success', label: '执行结果', type: 'boolean', direction: 'output' },
+    { key: 'result', label: '结果内容', type: 'any', direction: 'output' },
+  ],
+  // KimNotify node — sends a Kim message
+  kimnotify: [
+    { key: 'username', label: '用户名', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'groupId', label: 'GroupId', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'message', label: '消息内容', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'success', label: '发送结果', type: 'boolean', direction: 'output' },
+  ],
+  // BoolGate node — passes through if true, errors if false
+  boolgate: [
+    { key: 'valueIn', label: '布尔输入', type: 'boolean', direction: 'input', maxConnections: 1 },
+    { key: 'value', label: '通过结果', type: 'boolean', direction: 'output' },
   ],
 };
 

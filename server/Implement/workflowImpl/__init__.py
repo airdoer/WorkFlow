@@ -8,6 +8,10 @@ from Implement.workflowImpl.stringExecutor import StringExecutor
 from Implement.workflowImpl.boolExecutor import BoolExecutor
 from Implement.workflowImpl.numberExecutor import NumberExecutor
 from Implement.workflowImpl.diffExecutor import DiffExecutor
+from Implement.workflowImpl.c7ServerExecutor import C7ServerExecutor
+from Implement.workflowImpl.jenkinsExecutor import JenkinsExecutor
+from Implement.workflowImpl.kimNotifyExecutor import KimNotifyExecutor
+from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
 
 ExecutorManager.register(ExcelExecutor())
 ExecutorManager.register(JsonExecutor())
@@ -18,3 +22,7 @@ ExecutorManager.register(StringExecutor())
 ExecutorManager.register(BoolExecutor())
 ExecutorManager.register(NumberExecutor())
 ExecutorManager.register(DiffExecutor())
+ExecutorManager.register(C7ServerExecutor())
+ExecutorManager.register(JenkinsExecutor())
+ExecutorManager.register(KimNotifyExecutor())
+ExecutorManager.register(BoolGateExecutor())

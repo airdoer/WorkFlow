@@ -47,6 +47,12 @@ const WorkflowPage: React.FC = () => {
 
   const handleSave = (id: string, name: string) => {
     setWorkflowData((prev) => ({ ...prev, id, name }));
+    // Update URL so the ?id= param reflects the saved workflow (especially for new workflows)
+    const currentPath = window.location.pathname;
+    const currentId = searchParams.get('id');
+    if (currentId !== id) {
+      history.replace(`${currentPath}?id=${id}`);
+    }
   };
 
   const handleFullscreenToggle = () => {

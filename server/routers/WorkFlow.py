@@ -24,6 +24,10 @@ from Implement.workflowImpl.stringExecutor import StringExecutor
 from Implement.workflowImpl.boolExecutor import BoolExecutor
 from Implement.workflowImpl.numberExecutor import NumberExecutor
 from Implement.workflowImpl.diffExecutor import DiffExecutor
+from Implement.workflowImpl.c7ServerExecutor import C7ServerExecutor, _load_c7_server_list
+from Implement.workflowImpl.jenkinsExecutor import JenkinsExecutor
+from Implement.workflowImpl.kimNotifyExecutor import KimNotifyExecutor
+from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
 
 # region init
 
@@ -39,6 +43,10 @@ ExecutorManager.register(StringExecutor())
 ExecutorManager.register(BoolExecutor())
 ExecutorManager.register(NumberExecutor())
 ExecutorManager.register(DiffExecutor())
+ExecutorManager.register(C7ServerExecutor())
+ExecutorManager.register(JenkinsExecutor())
+ExecutorManager.register(KimNotifyExecutor())
+ExecutorManager.register(BoolGateExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 
@@ -325,6 +333,21 @@ def workflow_node_run():
         return jsonify({'output': output})
     except Exception as e:
         logger.exception("[workflow_node_run] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+# endregion
+
+
+# region Node Data APIs
+
+@app.route('/api/workflow/c7server/list', methods=['GET'])
+def workflow_c7server_list():
+    """Get C7 server and server group list for dropdown options"""
+    try:
+        options = _load_c7_server_list()
+        return jsonify({'options': options})
+    except Exception as e:
+        logger.exception("[workflow_c7server_list] Error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 # endregion

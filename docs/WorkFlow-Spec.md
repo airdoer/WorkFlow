@@ -43,7 +43,7 @@ scp ... diffExecutor.py ... && sudo docker restart work_flow_server_container
 
 ## 一、项目概述
 
-基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点以及 **String / Bool / Number** 三类基础值节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理等操作的流程化编排。
+基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点，**String / Bool / Number** 三类基础值节点，以及 **C7Server / Jenkins / KimNotify / BoolGate / Diff** 五类功能节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理、服务器操作和通知等操作的流程化编排。
 
 ### 技术选型
 
@@ -128,9 +128,29 @@ client/
                 │   ├── index.tsx             // 基于 ValueNode
                 │   └── executor.ts
                 │
-                └── Number/
-                    ├── index.tsx             // 基于 ValueNode
-                    └── executor.ts
+                ├── Number/
+                │   ├── index.tsx             // 基于 ValueNode
+                │   └── executor.ts
+                │
+                ├── C7Server/
+                │   ├── index.tsx             // C7 服务器选择节点（动态加载下拉列表）
+                │   ├── executor.ts
+                │   └── icon.tsx
+                │
+                ├── Jenkins/
+                │   ├── index.tsx             // KDIP 任务执行节点
+                │   ├── executor.ts
+                │   └── icon.tsx
+                │
+                ├── KimNotify/
+                │   ├── index.tsx             // Kim 机器人消息通知节点
+                │   ├── executor.ts
+                │   └── icon.tsx
+                │
+                └── BoolGate/
+                    ├── index.tsx             // 布尔门控节点（True 放行，False 报错）
+                    ├── executor.ts
+                    └── icon.tsx
 ```
 
 ### 2.2 后端
@@ -152,7 +172,11 @@ server/
 │       ├── promptExecutor.py                // Prompt 节点执行（调用 LLM API）
 │       ├── stringExecutor.py               // String 节点执行（输出字符串值）
 │       ├── boolExecutor.py                  // Bool 节点执行（输出布尔值）
-│       └── numberExecutor.py               // Number 节点执行（输出数值）
+│       ├── numberExecutor.py               // Number 节点执行（输出数值）
+│       ├── c7ServerExecutor.py             // C7Server 节点执行（读取 c7Server.json + c7ServerTags.json，带缓存）
+│       ├── jenkinsExecutor.py              // Jenkins 节点执行（调用 KdipClient.extend_cmd）
+│       ├── kimNotifyExecutor.py            // KimNotify 节点执行（调用 C7KimRobot.send_msg）
+│       └── boolGateExecutor.py             // BoolGate 节点执行（True 放行，False 抛异常）
 │
 ├── utility/
 │   └── p4Utils.py                          // P4 工具库（download_file / update_file / list_dir 等）
@@ -430,7 +454,167 @@ interface StringConfig {
 }
 ```
 
-### 3.11 ValueNode 通用基础值组件
+### 3.11 C7Server 节点（数据源）
+
+**设计原则：** C7Server 是 C7 游戏服务器选择器节点，通过下拉列表选择一个服务器（namespace）或服务器分组（tag key），输出服务器名字符串供下游节点（如 Jenkins）使用。
+
+**Schema:**
+
+```typescript
+interface C7ServerConfig {
+  serverName: string;   // 下拉选中的服务器 namespace 或 分组 tag key（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| output | serverName | 服务器名 | string |
+
+**前端行为：**
+- 节点加载时通过 `GET /api/workflow/c7server/list` 动态拉取服务器列表（含缓存）
+- 选项来源：`c7Server.json`（单台服务器，显示 name）+ `c7ServerTags.json`（分组，显示「[分组] name」）
+- 执行时输出选中的 namespace 或 tag key 字符串
+
+**后端 API:**
+
+`GET /api/workflow/c7server/list` → `{ options: [{ label, value, type }] }`
+
+**执行流程:**
+
+```
+1. 读取 config.serverName
+2. 校验非空
+3. 返回 { serverName: string }
+```
+
+**输出:** `{ serverName: string }`
+
+---
+
+### 3.12 KDIP 节点（工具）
+
+**设计原则：** KDIP 节点在指定 C7 服务器上执行 KDIP 扩展指令（白名单内）。通过输入端口接收 serverName（可从 C7Server 节点连线）和 username（可从 String 节点连线或手写），配置任务名，输出执行结果布尔值和结果内容。
+
+**Schema:**
+
+```typescript
+interface KdipConfig {
+  serverName?: string;   // 服务器名（可通过连线接收，也可手动填）
+  username?: string;     // 用户名（可通过连线接收，也可手动填，必填）
+  cmdKey: string;        // KDIP 指令 key，从下拉框选择（必填）
+  cmdParam?: string;     // 附加参数 JSON 字符串（可选）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | serverName | 服务器名 | string |
+| input | username | 用户名 | string |
+| output | success | 执行结果 | boolean |
+| output | result | 结果内容 | any |
+
+**任务名下拉选项（KDIP 指令白名单）：**
+
+- `kdip_game_get_config_for_qa`
+- `kdip_game_get_service_switch_state`
+- `kdip_game_get_hotfix_info`
+- `kdip_game_get_server_run_info`
+- `kdip_game_get_stall_metric_info`
+
+**执行流程（后端）：**
+
+```
+1. 从 input_data.serverName 或 config.serverName 获取服务器名（连线优先）
+2. 从 input_data.username 或 config.username 获取用户名（连线优先）
+3. 用 KdipClient.get_server_info(server_name) 查找 zone_id 和 server_id
+4. 调用 KdipClient.extend_cmd(zone_id, server_id, cmd_key, cmd_param, username)
+5. 成功 → { success: True, result: <KDIP响应> }
+6. 失败 → { success: False, result: <错误信息> }（不抛异常，由 BoolGate 判断）
+```
+
+**输出:** `{ success: bool, result: any }`
+
+---
+
+### 3.13 KimNotify 节点（工具）
+
+**设计原则：** KimNotify 节点通过 Kim 机器人发送消息给指定用户或群组（二选一）。输入端口支持连线接收用户名、groupId 和消息内容，输出发送结果布尔值。
+
+**Schema:**
+
+```typescript
+interface KimNotifyConfig {
+  username?: string;   // 接收消息的用户名（与 groupId 二选一）
+  groupId?: string;    // 接收消息的群组 ID（与 username 二选一）
+  message: string;     // 消息内容（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | username | 用户名 | string |
+| input | groupId | GroupId | string |
+| input | message | 消息内容 | string |
+| output | success | 发送结果 | boolean |
+
+**执行逻辑：**
+- 优先从 input_data 获取，其次从 config
+- username 和 groupId 二选一，都填时优先用 username
+- 调用 `C7KimRobot.send_msg_to_user(username, msg)` 或 `send_msg_to_group(group_id, msg)`
+
+**执行流程（后端）：**
+
+```
+1. 合并 input_data + config 获取 username / groupId / message
+2. 校验 message 非空、username/groupId 至少一个非空
+3. 如有 username → send_msg_to_user(username, message)
+4. 否则 → send_msg_to_group(group_id, message)
+5. 返回 { success: bool, message: str }
+```
+
+**输出:** `{ success: bool, message: str }`
+
+---
+
+### 3.14 BoolGate 节点（工具）
+
+**设计原则：** BoolGate 是流程控制节点，作用是"当输入 Bool 为 True 时放行，为 False 时报错中断流程"。典型用法：接在 Jenkins / KimNotify 节点的 `success` 输出端口之后，确保执行成功才继续后续流程。
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | valueIn | 布尔输入 | boolean |
+| output | value | 通过结果 | boolean |
+
+**执行逻辑：**
+
+```python
+if not bool_val:
+    raise ValueError("BoolGate: 输入值为 False，流程中断")
+return { 'value': True }
+```
+
+**执行流程（后端）：**
+
+```
+1. 从 input_data.valueIn 或 config.value 获取布尔值
+2. 规范化：str("true"/"1"/"yes") → True
+3. 若为 False → 抛出 ValueError（节点状态变为 error，流程中断）
+4. 若为 True  → 返回 { value: True }，继续执行下游节点
+```
+
+**输出:** `{ value: bool }` （仅 True 时才返回）
+
+---
+
+### 3.15 ValueNode 通用基础值组件
 
 String / Bool / Number 三类节点共用 `ValueNode` 组件，支持两种输入模式（互斥）：
 
@@ -503,6 +687,11 @@ const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
 | Bool | valueIn (boolean) | value (boolean) |
 | Number | valueIn (number) | value (number) |
 | Diff | contentA (string), contentB (string) | isSame (boolean) |
+| C7Server | — | serverName (string) |
+| Jenkins | serverName (string) | success (boolean) |
+| KDIP | serverName (string), username (string) | success (boolean), result (any) |
+| KimNotify | username (string), groupId (string), message (string) | success (boolean) |
+| BoolGate | valueIn (boolean) | value (boolean) |
 
 ### 4.4 端口颜色
 
@@ -665,6 +854,10 @@ interface NodeField {
 | String | 📝 | 基础值 | value(text, **required**) — 使用 ValueNode |
 | Bool | 🔘 | 基础值 | value(boolean, **required**) — 使用 ValueNode |
 | Number | 🔢 | 基础值 | value(number, **required**) — 使用 ValueNode |
+| C7Server | 🖥️ | 数据源 | serverName(select, **required**, 动态从后端加载) |
+| KDIP | ⚙️ | 工具 | serverName(text, linkedPortKey='serverName'), cmdKey(select, **required**), username(text, **required**, linkedPortKey='username'), cmdParam(textarea) |
+| KimNotify | 💬 | 工具 | username(text, linkedPortKey='username'), groupId(text, linkedPortKey='groupId'), message(textarea, **required**, linkedPortKey='message') |
+| BoolGate | 🚦 | 工具 | 无配置字段，完全由连线提供输入 |
 
 ### 6.5 节点类型注册
 
@@ -679,10 +872,16 @@ export const nodeTypes: NodeTypes = {
   string: StringNode,
   bool: BoolNode,
   number: NumberNode,
+  diff: DiffNode,
+  c7server: C7ServerNode,
+  jenkins: JenkinsNode,
+  kimnotify: KimNotifyNode,
+  boolgate: BoolGateNode,
 };
 
 export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'p4file', label: 'P4 文件', icon: <P4FileIcon />, category: '数据源' },
+  { type: 'c7server', label: 'C7 服务器', icon: <C7ServerIcon />, category: '数据源' },
   { type: 'excel', label: 'Excel', icon: <ExcelIcon />, category: '渲染器' },
   { type: 'json', label: 'JSON', icon: <JsonIcon />, category: '渲染器' },
   { type: 'lua', label: 'Lua', icon: <LuaIcon />, category: '渲染器' },
@@ -690,6 +889,10 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'string', label: 'String', icon: <StringIcon />, category: '基础值' },
   { type: 'bool', label: 'Bool', icon: <BoolIcon />, category: '基础值' },
   { type: 'number', label: 'Number', icon: <NumberIcon />, category: '基础值' },
+  { type: 'diff', label: 'Diff', icon: <DiffIcon />, category: '工具' },
+  { type: 'kdip', label: 'KDIP', icon: <KdipIcon />, category: '工具' },
+  { type: 'kimnotify', label: 'Kim 通知', icon: <KimNotifyIcon />, category: '工具' },
+  { type: 'boolgate', label: 'Bool 门控', icon: <BoolGateIcon />, category: '工具' },
 ];
 ```
 

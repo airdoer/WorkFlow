@@ -37,7 +37,11 @@ class JsonExecutor(BaseNodeExecutor):
             return {"error": "No input content. Connect an upstream node or provide content."}
 
         try:
-            data = json.loads(file_content)
+            # If upstream already gave us a parsed dict/list, use it directly
+            if isinstance(file_content, (dict, list)):
+                data = file_content
+            else:
+                data = json.loads(file_content)
 
             # If jsonPath is specified, filter the data
             if json_path:
