@@ -6,12 +6,17 @@ import logging
 from datetime import datetime, timezone
 
 WORKFLOW_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow')
+WORKFLOW_TRASH_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow_trash')
 
 logger = logging.getLogger(__name__)
 
 
 def _ensure_dir():
     os.makedirs(WORKFLOW_DATA_DIR, exist_ok=True)
+
+
+def _ensure_trash_dir():
+    os.makedirs(WORKFLOW_TRASH_DIR, exist_ok=True)
 
 
 def _sanitize_name(name: str) -> str:
@@ -28,10 +33,18 @@ def _workflow_path(workflow_id: str) -> str:
     return os.path.join(WORKFLOW_DATA_DIR, f"{workflow_id}.json")
 
 
+def _trash_path(workflow_id: str) -> str:
+    return os.path.join(WORKFLOW_TRASH_DIR, f"{workflow_id}.json")
+
+
 def _get_socketio():
     """Lazily import socketio to avoid circular imports at module load time."""
     import g
     return getattr(g, 'socketio', None)
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
 
 class WorkflowManager:
@@ -45,7 +58,7 @@ class WorkflowManager:
         """
         _ensure_dir()
         name_id = _sanitize_name(name)
-        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        now = _now_utc()
 
         # Load existing record — prefer by name_id, fallback to old UUID-based id
         existing = WorkflowManager.get(name_id) or (WorkflowManager.get(workflow_id) if workflow_id else None)
@@ -113,19 +126,88 @@ class WorkflowManager:
         return result
 
     @staticmethod
-    def delete(workflow_id):
-        # Try direct path first
-        path = _workflow_path(workflow_id)
-        if os.path.exists(path):
-            os.remove(path)
-            return True
-        # Fallback: find by name
+    def delete(workflow_id) -> bool:
+        """Move workflow to trash instead of permanently deleting."""
+        _ensure_trash_dir()
+
+        # Find the record first
         record = WorkflowManager.get(workflow_id)
-        if record:
-            p = _workflow_path(record['id'])
-            if os.path.exists(p):
-                os.remove(p)
-                return True
+        if not record:
+            # Try direct path
+            path = _workflow_path(workflow_id)
+            if not os.path.exists(path):
+                return False
+            with open(path) as f:
+                record = json.load(f)
+
+        # Add deletedAt timestamp and move to trash
+        record['deletedAt'] = _now_utc()
+        trash_file = _trash_path(record['id'])
+        with open(trash_file, 'w') as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+
+        # Remove from active directory
+        src = _workflow_path(record['id'])
+        if os.path.exists(src):
+            os.remove(src)
+            logger.info("[WorkflowManager.delete] Moved to trash: %r", record['id'])
+            return True
+
+        return False
+
+    # ── Trash operations ─────────────────────────────────────────
+
+    @staticmethod
+    def list_trash():
+        """Return all workflows in the trash."""
+        _ensure_trash_dir()
+        result = []
+        for fname in os.listdir(WORKFLOW_TRASH_DIR):
+            if fname.endswith('.json'):
+                fp = os.path.join(WORKFLOW_TRASH_DIR, fname)
+                try:
+                    with open(fp) as f:
+                        data = json.load(f)
+                    result.append({
+                        'id': data.get('id'),
+                        'name': data.get('name'),
+                        'author': data.get('author', ''),
+                        'deletedAt': data.get('deletedAt', ''),
+                        'updatedAt': data.get('updatedAt', ''),
+                    })
+                except Exception:
+                    pass
+        result.sort(key=lambda x: x.get('deletedAt', ''), reverse=True)
+        return result
+
+    @staticmethod
+    def restore(workflow_id) -> bool:
+        """Restore a workflow from trash back to active directory."""
+        _ensure_dir()
+        trash_file = _trash_path(workflow_id)
+        if not os.path.exists(trash_file):
+            return False
+        with open(trash_file) as f:
+            record = json.load(f)
+
+        # Remove deletedAt and restore
+        record.pop('deletedAt', None)
+        active_file = _workflow_path(record['id'])
+        with open(active_file, 'w') as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+
+        os.remove(trash_file)
+        logger.info("[WorkflowManager.restore] Restored from trash: %r", workflow_id)
+        return True
+
+    @staticmethod
+    def purge(workflow_id) -> bool:
+        """Permanently delete a workflow from trash."""
+        trash_file = _trash_path(workflow_id)
+        if os.path.exists(trash_file):
+            os.remove(trash_file)
+            logger.info("[WorkflowManager.purge] Permanently deleted: %r", workflow_id)
+            return True
         return False
 
 

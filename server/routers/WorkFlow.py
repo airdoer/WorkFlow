@@ -286,17 +286,54 @@ def workflow_list():
 
 @app.route('/api/workflow/<workflow_id>', methods=['DELETE'])
 def workflow_delete(workflow_id):
-    """Delete a workflow"""
+    """Move a workflow to trash"""
     logger.info("[workflow_delete] Request for workflow_id=%r", workflow_id)
     try:
         success = WorkflowManager.delete(workflow_id)
         if not success:
             logger.warning("[workflow_delete] Workflow not found: id=%r", workflow_id)
             return jsonify({'error': 'Workflow not found'}), 404
-        logger.info("[workflow_delete] Deleted: id=%r", workflow_id)
+        logger.info("[workflow_delete] Moved to trash: id=%r", workflow_id)
         return jsonify({'success': True})
     except Exception as e:
         logger.exception("[workflow_delete] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/trash/list', methods=['GET'])
+def workflow_trash_list():
+    """List all workflows in trash"""
+    try:
+        items = WorkflowManager.list_trash()
+        return jsonify({'list': items})
+    except Exception as e:
+        logger.exception("[workflow_trash_list] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/trash/<workflow_id>/restore', methods=['POST'])
+def workflow_trash_restore(workflow_id):
+    """Restore a workflow from trash"""
+    try:
+        success = WorkflowManager.restore(workflow_id)
+        if not success:
+            return jsonify({'error': 'Workflow not found in trash'}), 404
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("[workflow_trash_restore] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/trash/<workflow_id>/purge', methods=['DELETE'])
+def workflow_trash_purge(workflow_id):
+    """Permanently delete a workflow from trash"""
+    try:
+        success = WorkflowManager.purge(workflow_id)
+        if not success:
+            return jsonify({'error': 'Workflow not found in trash'}), 404
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("[workflow_trash_purge] Unexpected error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 # endregion

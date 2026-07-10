@@ -81,6 +81,23 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
+  // Trash operations
+  async listTrash(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/api/workflow/trash/list`);
+    const data = await handleResponse<{ list: any[] }>(res);
+    return data.list || [];
+  },
+
+  async restoreFromTrash(id: string) {
+    const res = await fetch(`${API_BASE}/api/workflow/trash/${id}/restore`, { method: 'POST' });
+    return handleResponse(res);
+  },
+
+  async purgeFromTrash(id: string) {
+    const res = await fetch(`${API_BASE}/api/workflow/trash/${id}/purge`, { method: 'DELETE' });
+    return handleResponse(res);
+  },
+
   // C7 server list for dropdown
   async getC7ServerOptions(): Promise<{ label: string; value: string; type: string }[]> {
     const res = await fetch(`${API_BASE}/api/workflow/c7server/list`);

@@ -27,6 +27,9 @@ import {
   DeleteOutlined,
   ExportOutlined,
   ImportOutlined,
+  LinkOutlined,
+  RestOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
@@ -223,8 +226,46 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const handleDeleteWorkflow = async (id: string) => {
     try {
       await FlowApi.delete(id);
-      message.success('删除成功');
+      message.success('已移入垃圾箱');
       fetchLibrary();
+    } catch (err: any) {
+      message.error(`删除失败: ${err.message}`);
+    }
+  };
+
+  // ── Trash ────────────────────────────────────────────────────
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashData, setTrashData] = useState<any[]>([]);
+
+  const fetchTrash = async () => {
+    setTrashLoading(true);
+    try {
+      const list = await FlowApi.listTrash();
+      setTrashData(list);
+    } catch (err: any) {
+      message.error(`加载垃圾箱失败: ${err.message}`);
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await FlowApi.restoreFromTrash(id);
+      message.success('还原成功');
+      fetchTrash();
+      fetchLibrary();
+    } catch (err: any) {
+      message.error(`还原失败: ${err.message}`);
+    }
+  };
+
+  const handlePurge = async (id: string) => {
+    try {
+      await FlowApi.purgeFromTrash(id);
+      message.success('已彻底删除');
+      fetchTrash();
     } catch (err: any) {
       message.error(`删除失败: ${err.message}`);
     }
@@ -251,33 +292,41 @@ const Toolbar: React.FC<ToolbarProps> = ({
     {
       title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
       render: (v: string, r: WorkflowRecord) => (
-        <span style={{ fontWeight: r.id === workflowId ? 600 : 400, color: r.id === workflowId ? '#1890ff' : undefined }}>
-          {v}{r.id === workflowId ? ' （当前）' : ''}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Tooltip title="在新标签页打开">
+            <LinkOutlined
+              style={{ color: '#1890ff', cursor: 'pointer', flexShrink: 0 }}
+              onClick={() => {
+                const base = window.location.pathname.includes('fullscreen')
+                  ? '/workflow/fullscreen'
+                  : '/workflow/editor';
+                window.open(`${base}?id=${r.id}`, '_blank');
+              }}
+            />
+          </Tooltip>
+          <span style={{ fontWeight: r.id === workflowId ? 600 : 400, color: r.id === workflowId ? '#1890ff' : undefined }}>
+            {v}{r.id === workflowId ? ' （当前）' : ''}
+          </span>
+        </div>
       ),
     },
-    { title: '作者', dataIndex: 'author', key: 'author', width: 100, render: (v: string) => v || '-' },
+    { title: '作者', dataIndex: 'author', key: 'author', width: 90, render: (v: string) => v || '-' },
     {
-      title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 160,
+      title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 155,
+      render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+    },
+    {
+      title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 155,
       render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
       defaultSortOrder: 'descend' as const,
       sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
     },
     {
-      title: '操作', key: 'action', width: 130,
+      title: '操作', key: 'action', width: 70,
       render: (_: any, record: WorkflowRecord) => (
-        <Space size={4}>
-          <Button
-            type="primary" size="small"
-            disabled={record.id === workflowId}
-            onClick={() => handleSwitchTo(record.id)}
-          >
-            切换
-          </Button>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDeleteWorkflow(record.id)} okText="删除" cancelText="取消">
-            <Button size="small" danger icon={<DeleteOutlined />} disabled={record.id === workflowId} />
-          </Popconfirm>
-        </Space>
+        <Popconfirm title="确认删除？" onConfirm={() => handleDeleteWorkflow(record.id)} okText="删除" cancelText="取消">
+          <Button size="small" danger icon={<DeleteOutlined />} disabled={record.id === workflowId} />
+        </Popconfirm>
       ),
     },
   ];
@@ -434,26 +483,39 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* ── 工作流库 Modal ── */}
       <Modal
-        title="工作流库"
+        title={
+          <span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>
+            🗂️ 工作流库
+          </span>
+        }
         open={libraryOpen}
         onCancel={() => setLibraryOpen(false)}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setLibraryOpen(false);
-                onSwitchWorkflow?.('__new__');
-              }}
-            >
-              新建工作流
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setLibraryOpen(false);
+                  onSwitchWorkflow?.('__new__');
+                }}
+              >
+                新建工作流
+              </Button>
+              <Button
+                icon={<RestOutlined />}
+                onClick={() => { setTrashOpen(true); fetchTrash(); }}
+              >
+                垃圾箱
+              </Button>
+            </Space>
             <Button onClick={() => setLibraryOpen(false)}>关闭</Button>
           </div>
         }
-        width={700}
+        width={820}
         destroyOnClose
+        styles={{ body: { background: '#f0f4f8', padding: '16px 16px 8px' } }}
       >
         <Table
           columns={libraryColumns}
@@ -463,6 +525,72 @@ const Toolbar: React.FC<ToolbarProps> = ({
           size="small"
           pagination={{ pageSize: 8, showSizeChanger: false }}
           rowClassName={(r) => r.id === workflowId ? 'workflow-lib-active-row' : ''}
+          onRow={(record) => ({
+            onClick: () => handleSwitchTo(record.id),
+            style: { cursor: 'pointer' },
+          })}
+        />
+      </Modal>
+
+      {/* ── 垃圾箱 Modal ── */}
+      <Modal
+        title={
+          <span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>
+            🗑️ 垃圾箱
+          </span>
+        }
+        open={trashOpen}
+        onCancel={() => setTrashOpen(false)}
+        footer={<Button onClick={() => setTrashOpen(false)}>关闭</Button>}
+        width={680}
+        destroyOnClose
+        styles={{ body: { background: '#fff7f0', padding: '16px 16px 8px' } }}
+      >
+        <Table
+          dataSource={trashData}
+          rowKey="id"
+          loading={trashLoading}
+          size="small"
+          pagination={{ pageSize: 8, showSizeChanger: false }}
+          locale={{ emptyText: '垃圾箱是空的' }}
+          columns={[
+            {
+              title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
+              render: (v: string) => <span style={{ color: '#595959' }}>{v}</span>,
+            },
+            { title: '作者', dataIndex: 'author', key: 'author', width: 90, render: (v: string) => v || '-' },
+            {
+              title: '删除时间', dataIndex: 'deletedAt', key: 'deletedAt', width: 155,
+              render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
+              defaultSortOrder: 'descend' as const,
+              sorter: (a: any, b: any) => (a.deletedAt || '').localeCompare(b.deletedAt || ''),
+            },
+            {
+              title: '操作', key: 'action', width: 120,
+              render: (_: any, record: any) => (
+                <Space size={4}>
+                  <Tooltip title="还原到工作流库">
+                    <Button
+                      size="small"
+                      icon={<RollbackOutlined />}
+                      onClick={() => handleRestore(record.id)}
+                    >
+                      还原
+                    </Button>
+                  </Tooltip>
+                  <Popconfirm
+                    title="彻底删除后无法恢复，确认吗？"
+                    onConfirm={() => handlePurge(record.id)}
+                    okText="彻底删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button size="small" danger icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
         />
       </Modal>
     </div>
