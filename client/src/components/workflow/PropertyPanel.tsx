@@ -7,6 +7,7 @@ import { FlowApi } from './services/FlowApi';
 import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
+import { PanelSection } from './PanelSection';
 
 const DiffRenderer = lazy(() => import('./nodes/Diff/DiffRenderer'));
 
@@ -19,32 +20,12 @@ const PORT_COLORS: Record<string, string> = {
   'json-data': '#13c2c2',
 };
 
-/** Section wrapper */
-function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ marginBottom: 12, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{
-          padding: '6px 10px',
-          background: '#fafafa',
-          fontWeight: 600,
-          fontSize: 12,
-          color: '#333',
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-        }}
-      >
-        <span>{title}</span>
-        <span style={{ fontSize: 10, color: '#999' }}>{open ? '▼' : '▶'}</span>
-      </div>
-      {open && <div style={{ padding: '8px 10px' }}>{children}</div>}
-    </div>
-  );
-}
+/** Section wrapper — 已迁移到 PanelSection，此函数保留为 compact 别名 */
+const Section = ({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => (
+  <PanelSection title={title} defaultOpen={defaultOpen} compact>
+    {children}
+  </PanelSection>
+);
 
 interface PropertyPanelProps {
   selectedNode: Node | null;
@@ -508,8 +489,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const hasValue = portValue !== undefined && portValue !== null;
             const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
             const hasDisplay = displayValue !== undefined && displayValue !== null;
-            // For Diff node: show side-by-side diff instead of raw JSON string
-            const isDiffPort = nodeType === 'diff' && p.key === 'diffResult' && runOutput?.stringA !== undefined && runOutput?.stringB !== undefined;
+            // For Diff node: show side-by-side diff instead of raw output
+            const isDiffPort = nodeType === 'diff' && p.key === 'isSame' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
             const previewText = hasDisplay && !isDiffPort
               ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
               : null;
@@ -548,8 +529,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                 {hasDisplay && isDiffPort ? (
                   <Suspense fallback={<div style={{ padding: 10, textAlign: 'center', color: '#999', fontSize: 11 }}>加载 Diff 编辑器...</div>}>
                     <DiffRenderer
-                      original={String(runOutput.stringA ?? '')}
-                      modified={String(runOutput.stringB ?? '')}
+                      original={String(runOutput.contentA ?? '')}
+                      modified={String(runOutput.contentB ?? '')}
                       language="plaintext"
                       height={200}
                     />

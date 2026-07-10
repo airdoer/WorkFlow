@@ -93,11 +93,10 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'valueIn', label: '输入值', type: 'number', direction: 'input', maxConnections: 1 },
     { key: 'value', label: '数值', type: 'number', direction: 'output' },
   ],
-  // Diff node — compares two strings
+  // Diff node — compares two strings, outputs isSame boolean
   diff: [
-    { key: 'stringA', label: '字符串 A', type: 'string', direction: 'input' },
-    { key: 'stringB', label: '字符串 B', type: 'string', direction: 'input' },
-    { key: 'diffResult', label: 'Diff 结果', type: 'json-data', direction: 'output' },
+    { key: 'contentA', label: '内容1', type: 'string', direction: 'input' },
+    { key: 'contentB', label: '内容2', type: 'string', direction: 'input' },
     { key: 'isSame', label: '是否相同', type: 'boolean', direction: 'output' },
   ],
 };

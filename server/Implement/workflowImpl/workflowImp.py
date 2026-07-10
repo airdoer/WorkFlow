@@ -1,6 +1,6 @@
 import json
 import os
-import uuid
+import re
 import asyncio
 import logging
 from datetime import datetime
@@ -14,7 +14,17 @@ def _ensure_dir():
     os.makedirs(WORKFLOW_DATA_DIR, exist_ok=True)
 
 
-def _workflow_path(workflow_id):
+def _sanitize_name(name: str) -> str:
+    """Convert a workflow name to a safe filename (keep alphanumeric, CJK, hyphen, underscore)."""
+    # Replace spaces and common separators with underscore
+    s = name.strip().replace(' ', '_').replace('/', '_').replace('\\', '_')
+    # Remove characters that are unsafe in filenames
+    s = re.sub(r'[<>:"|?*]', '', s)
+    # If empty after sanitizing, fallback
+    return s or 'untitled'
+
+
+def _workflow_path(workflow_id: str) -> str:
     return os.path.join(WORKFLOW_DATA_DIR, f"{workflow_id}.json")
 
 
@@ -27,18 +37,28 @@ def _get_socketio():
 class WorkflowManager:
     @staticmethod
     def save(name, workflow_json, workflow_id=None, author=None, description=None):
+        """Save or update a workflow.
+
+        The workflow is stored as <name>.json where name is sanitized.
+        If workflow_id is provided and differs from the sanitized name, the old file
+        is migrated (renamed) to the new name-based path.
+        """
         _ensure_dir()
-        is_new = not workflow_id
-        if not workflow_id:
-            workflow_id = str(uuid.uuid4())
+        name_id = _sanitize_name(name)
         now = datetime.now().isoformat()
 
-        existing = None
-        if not is_new:
-            existing = WorkflowManager.get(workflow_id)
+        # Load existing record — prefer by name_id, fallback to old UUID-based id
+        existing = WorkflowManager.get(name_id) or (WorkflowManager.get(workflow_id) if workflow_id else None)
+
+        # Migrate old UUID file if needed
+        if workflow_id and workflow_id != name_id:
+            old_path = _workflow_path(workflow_id)
+            if os.path.exists(old_path):
+                os.remove(old_path)
+                logger.info("[WorkflowManager.save] Migrated %r → %r", workflow_id, name_id)
 
         record = {
-            'id': workflow_id,
+            'id': name_id,
             'name': name,
             'json': workflow_json,
             'author': author or (existing.get('author', '') if existing else ''),
@@ -46,17 +66,32 @@ class WorkflowManager:
             'createdAt': existing.get('createdAt', now) if existing else now,
             'updatedAt': now,
         }
-        with open(_workflow_path(workflow_id), 'w') as f:
+        with open(_workflow_path(name_id), 'w') as f:
             json.dump(record, f, ensure_ascii=False, indent=2)
-        return {'id': workflow_id, 'name': name}
+        return {'id': name_id, 'name': name}
 
     @staticmethod
     def get(workflow_id):
-        path = _workflow_path(workflow_id)
-        if not os.path.exists(path):
+        if not workflow_id:
             return None
-        with open(path) as f:
-            return json.load(f)
+        path = _workflow_path(workflow_id)
+        if os.path.exists(path):
+            with open(path) as f:
+                return json.load(f)
+        # Fallback: scan by name field (handles legacy UUID-based IDs in URLs)
+        _ensure_dir()
+        for fname in os.listdir(WORKFLOW_DATA_DIR):
+            if not fname.endswith('.json'):
+                continue
+            fp = os.path.join(WORKFLOW_DATA_DIR, fname)
+            try:
+                with open(fp) as f:
+                    data = json.load(f)
+                if data.get('id') == workflow_id or data.get('name') == workflow_id:
+                    return data
+            except Exception:
+                pass
+        return None
 
     @staticmethod
     def list_all():
@@ -79,11 +114,19 @@ class WorkflowManager:
 
     @staticmethod
     def delete(workflow_id):
+        # Try direct path first
         path = _workflow_path(workflow_id)
-        if not os.path.exists(path):
-            return False
-        os.remove(path)
-        return True
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+        # Fallback: find by name
+        record = WorkflowManager.get(workflow_id)
+        if record:
+            p = _workflow_path(record['id'])
+            if os.path.exists(p):
+                os.remove(p)
+                return True
+        return False
 
 
 class WorkflowRuntime:

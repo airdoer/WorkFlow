@@ -1,7 +1,7 @@
 /**
  * DiffNode
- * - 接受两个 string 输入（stringA / stringB）
- * - 输出 diffResult（JSON string 格式的 diff 信息）和 isSame（bool 值）
+ * - 接受两个 string 输入（内容1 = contentA / 内容2 = contentB）
+ * - 输出 isSame（bool）
  * - 运行后用 Monaco DiffEditor 展示 side-by-side diff
  */
 
@@ -30,10 +30,9 @@ const STATUS_CONFIG = {
 };
 
 const PORT_COLORS: Record<string, string> = {
-  'string': '#fa8c16',
-  'json-data': '#13c2c2',
-  'boolean': '#eb2f96',
-  'any': '#8c8c8c',
+  string: '#fa8c16',
+  boolean: '#eb2f96',
+  any: '#8c8c8c',
 };
 
 function DiffNode({ data, id, selected }: NodeProps) {
@@ -46,122 +45,103 @@ function DiffNode({ data, id, selected }: NodeProps) {
   const runOutput = nodeData._runOutput as any;
   const statusCfg = STATUS_CONFIG[runStatus];
 
-  // Whether this node is part of a multi-selection
   const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
 
   const ports = getNodePorts('diff');
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
 
-  // 检测输入端口是否有连线
-  const hasStringAEdge = useStore(
-    useCallback((s) => s.edges.some((e) => e.target === id && e.targetHandle === 'stringA'), [id]),
+  const hasContentAEdge = useStore(
+    useCallback((s) => s.edges.some((e) => e.target === id && e.targetHandle === 'contentA'), [id]),
   );
-  const hasStringBEdge = useStore(
-    useCallback((s) => s.edges.some((e) => e.target === id && e.targetHandle === 'stringB'), [id]),
+  const hasContentBEdge = useStore(
+    useCallback((s) => s.edges.some((e) => e.target === id && e.targetHandle === 'contentB'), [id]),
   );
 
-  const canRun = runStatus !== 'running' && (hasStringAEdge || hasStringBEdge || !!workflowId);
+  const canRun = runStatus !== 'running' && (hasContentAEdge || hasContentBEdge || !!workflowId);
 
   const handleRun = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (!canRun) return;
 
-      // Ensure workflow is saved before running
       const savedId = await ensureSaved();
       if (!savedId) return;
 
-      // Mark this node as running
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
         ),
       );
 
-      // Build node data overrides
       const allNodes = getNodes();
       const nodeDataOverrides: Record<string, any> = {};
       nodeDataOverrides[id] = {};
-
       for (const n of allNodes) {
         if (n.id !== id) {
-          const runOutput = (n.data as any)?._runOutput;
-          if (runOutput && !runOutput.error) {
-            nodeDataOverrides[n.id] = runOutput;
-          }
+          const out = (n.data as any)?._runOutput;
+          if (out && !out.error) nodeDataOverrides[n.id] = out;
         }
       }
 
-      FlowApi.runNodeWS(
-        savedId,
-        id,
-        nodeDataOverrides,
-        onNodeUpdate,
-        (_status, error) => {
-          if (error) console.error('[DiffNode] NodeRun error:', error);
-        },
-      );
+      FlowApi.runNodeWS(savedId, id, nodeDataOverrides, onNodeUpdate, (_status, error) => {
+        if (error) console.error('[DiffNode] run error:', error);
+      });
     },
-    [id, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes, hasStringAEdge, hasStringBEdge],
+    [id, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
   );
 
-  // 获取上游输入的值（用于预览）
-  const upstreamStringA = useStore(
+  // Retrieve upstream string values for display before run
+  const upstreamContentA = useStore(
     useCallback(
       (s) => {
-        if (!hasStringAEdge) return undefined;
-        const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'stringA');
+        if (!hasContentAEdge) return undefined;
+        const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'contentA');
         if (!edge) return undefined;
         const srcNode = s.nodeInternals.get(edge.source);
-        if (!srcNode) return undefined;
-        const srcOutput = (srcNode.data as any)?._runOutput;
-        if (!srcOutput) return undefined;
-        if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-          return String(srcOutput[edge.sourceHandle]);
-        }
-        return srcOutput.value !== undefined ? String(srcOutput.value) : undefined;
+        const out = (srcNode?.data as any)?._runOutput;
+        if (!out) return undefined;
+        return edge.sourceHandle && out[edge.sourceHandle] !== undefined
+          ? String(out[edge.sourceHandle])
+          : out.value !== undefined ? String(out.value) : undefined;
       },
-      [id, hasStringAEdge],
+      [id, hasContentAEdge],
     ),
   );
 
-  const upstreamStringB = useStore(
+  const upstreamContentB = useStore(
     useCallback(
       (s) => {
-        if (!hasStringBEdge) return undefined;
-        const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'stringB');
+        if (!hasContentBEdge) return undefined;
+        const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'contentB');
         if (!edge) return undefined;
         const srcNode = s.nodeInternals.get(edge.source);
-        if (!srcNode) return undefined;
-        const srcOutput = (srcNode.data as any)?._runOutput;
-        if (!srcOutput) return undefined;
-        if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
-          return String(srcOutput[edge.sourceHandle]);
-        }
-        return srcOutput.value !== undefined ? String(srcOutput.value) : undefined;
+        const out = (srcNode?.data as any)?._runOutput;
+        if (!out) return undefined;
+        return edge.sourceHandle && out[edge.sourceHandle] !== undefined
+          ? String(out[edge.sourceHandle])
+          : out.value !== undefined ? String(out.value) : undefined;
       },
-      [id, hasStringBEdge],
+      [id, hasContentBEdge],
     ),
   );
 
   const borderColor =
-    runStatus === 'success'
-      ? '#52c41a'
-      : runStatus === 'error'
-        ? '#ff4d4f'
-        : runStatus === 'running'
-          ? '#1890ff'
-          : selected
-            ? '#1890ff'
-            : '#d9d9d9';
+    runStatus === 'success' ? '#52c41a'
+    : runStatus === 'error' ? '#ff4d4f'
+    : runStatus === 'running' ? '#1890ff'
+    : selected ? '#1890ff'
+    : '#d9d9d9';
+
+  const isSameResult = runOutput?.isSame;
+  const diffStats = runOutput?.stats as { additions?: number; deletions?: number } | undefined;
+
+  // Content to pass to DiffRenderer — from runOutput or upstream preview
+  const contentA = runOutput?.contentA ?? upstreamContentA ?? '';
+  const contentB = runOutput?.contentB ?? upstreamContentB ?? '';
+  const showDiff = runOutput && runStatus === 'success';
 
   const fields: NodeField[] = [];
-
-  // Parse diff output for rendering
-  const stringA = runOutput?.stringA ?? upstreamStringA ?? '';
-  const stringB = runOutput?.stringB ?? upstreamStringB ?? '';
-  const isSameResult = runOutput?.isSame;
 
   return (
     <>
@@ -179,29 +159,20 @@ function DiffNode({ data, id, selected }: NodeProps) {
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 10px 6px',
-            borderBottom: '1px solid #f0f0f0',
-          }}
-        >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 10px 6px', borderBottom: '1px solid #f0f0f0',
+        }}>
           <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ fontSize: 16 }}>🔀</span>
             <span>Diff</span>
             {isSameResult !== undefined && (
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  borderRadius: 8,
-                  background: isSameResult ? '#f6ffed' : '#fff2f0',
-                  color: isSameResult ? '#52c41a' : '#ff4d4f',
-                  border: `1px solid ${isSameResult ? '#b7eb8f' : '#ffccc7'}`,
-                }}
-              >
+              <span style={{
+                fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                background: isSameResult ? '#f6ffed' : '#fff2f0',
+                color: isSameResult ? '#52c41a' : '#ff4d4f',
+                border: `1px solid ${isSameResult ? '#b7eb8f' : '#ffccc7'}`,
+              }}>
                 {isSameResult ? '相同' : '不同'}
               </span>
             )}
@@ -222,15 +193,14 @@ function DiffNode({ data, id, selected }: NodeProps) {
             <button
               onClick={handleRun}
               disabled={!canRun}
-              title={!canRun ? '请先连接输入或配置工作流' : statusCfg.title}
+              title={!canRun ? '请先连接输入' : statusCfg.title}
               style={{
                 width: 24, height: 24, borderRadius: 4, border: 'none',
                 background: !canRun ? '#f5f5f5' : statusCfg.bg,
                 color: !canRun ? '#d9d9d9' : statusCfg.color,
                 cursor: !canRun ? 'not-allowed' : runStatus === 'running' ? 'wait' : 'pointer',
                 fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 0, flexShrink: 0,
-                opacity: !canRun ? 0.5 : 1,
+                padding: 0, flexShrink: 0, opacity: !canRun ? 0.5 : 1,
               }}
             >
               {React.createElement(canRun ? statusCfg.icon : PlayCircleOutlined, { spin: canRun && runStatus === 'running' })}
@@ -243,39 +213,23 @@ function DiffNode({ data, id, selected }: NodeProps) {
           {/* Input ports */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 22, position: 'relative' }}>
             {inputPorts.map((p) => (
-              <div
-                key={p.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontSize: 10,
-                  color: PORT_COLORS[p.type] || '#999',
-                  position: 'relative',
-                  height: 20,
-                }}
-              >
+              <div key={p.key} style={{
+                display: 'flex', alignItems: 'center', fontSize: 10,
+                color: PORT_COLORS[p.type] || '#999', position: 'relative', height: 20,
+              }}>
                 <Handle
                   type="target"
                   position={Position.Left}
                   id={p.key}
                   style={{
-                    position: 'absolute',
-                    left: -15,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 10,
-                    height: 10,
-                    background: PORT_COLORS[p.type] || '#d9d9d9',
-                    border: '2px solid #fff',
-                    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                    position: 'absolute', left: -15, top: '50%', transform: 'translateY(-50%)',
+                    width: 10, height: 10, background: PORT_COLORS[p.type] || '#d9d9d9',
+                    border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
                   }}
                 />
                 <span>
                   {p.label}
-                  {p.key === 'stringA' && hasStringAEdge && (
-                    <span style={{ color: '#2f54eb', marginLeft: 4 }}>🔗</span>
-                  )}
-                  {p.key === 'stringB' && hasStringBEdge && (
+                  {((p.key === 'contentA' && hasContentAEdge) || (p.key === 'contentB' && hasContentBEdge)) && (
                     <span style={{ color: '#2f54eb', marginLeft: 4 }}>🔗</span>
                   )}
                 </span>
@@ -285,18 +239,10 @@ function DiffNode({ data, id, selected }: NodeProps) {
           {/* Output ports */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, paddingRight: 22, textAlign: 'right', position: 'relative' }}>
             {outputPorts.map((p) => (
-              <div
-                key={p.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  fontSize: 10,
-                  color: PORT_COLORS[p.type] || '#999',
-                  position: 'relative',
-                  height: 20,
-                }}
-              >
+              <div key={p.key} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', fontSize: 10,
+                color: PORT_COLORS[p.type] || '#999', position: 'relative', height: 20,
+              }}>
                 <span>
                   {p.label}
                   {p.key === 'isSame' && isSameResult !== undefined && (
@@ -310,15 +256,9 @@ function DiffNode({ data, id, selected }: NodeProps) {
                   position={Position.Right}
                   id={p.key}
                   style={{
-                    position: 'absolute',
-                    right: -15,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 10,
-                    height: 10,
-                    background: PORT_COLORS[p.type] || '#d9d9d9',
-                    border: '2px solid #fff',
-                    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                    position: 'absolute', right: -15, top: '50%', transform: 'translateY(-50%)',
+                    width: 10, height: 10, background: PORT_COLORS[p.type] || '#d9d9d9',
+                    border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
                   }}
                 />
               </div>
@@ -326,39 +266,37 @@ function DiffNode({ data, id, selected }: NodeProps) {
           </div>
         </div>
 
-        {/* Content: Diff output with Monaco DiffEditor */}
+        {/* Content: Diff output or idle state */}
         <div style={{ padding: '6px 8px' }}>
-          {runOutput && runStatus === 'success' && stringA !== undefined && stringB !== undefined && (
+          {showDiff && (
             <div style={{ marginTop: 4 }}>
-              <div
-                style={{
-                  padding: '3px 6px',
-                  fontWeight: 600,
-                  fontSize: 10,
-                  color: '#389e0d',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  marginBottom: 4,
-                }}
-              >
+              <div style={{
+                padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d',
+                display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4,
+              }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#52c41a', display: 'inline-block' }} />
                 Diff 对比
+                {diffStats && (
+                  <span style={{ marginLeft: 4, fontWeight: 500 }}>
+                    <span style={{ color: '#52c41a' }}>+{diffStats.additions ?? 0}</span>
+                    <span style={{ margin: '0 3px', color: '#bfbfbf' }}>/</span>
+                    <span style={{ color: '#ff4d4f' }}>-{diffStats.deletions ?? 0}</span>
+                  </span>
+                )}
               </div>
-              <Suspense
-                fallback={
-                  <div style={{ height: 200, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#999' }}>
-                    加载 Diff 编辑器...
-                  </div>
-                }
-              >
-                <DiffRenderer
-                  original={String(stringA)}
-                  modified={String(stringB)}
-                  language="plaintext"
-                  height={200}
-                />
+              <Suspense fallback={
+                <div style={{ height: 200, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#999' }}>
+                  加载 Diff 编辑器...
+                </div>
+              }>
+                <DiffRenderer original={String(contentA)} modified={String(contentB)} language="plaintext" height={200} />
               </Suspense>
+            </div>
+          )}
+
+          {!showDiff && (hasContentAEdge || hasContentBEdge) && runStatus === 'idle' && (
+            <div style={{ fontSize: 10, color: '#bfbfbf', textAlign: 'center', padding: '4px 0' }}>
+              点击 ▶ 运行以查看差异
             </div>
           )}
 

@@ -6,6 +6,7 @@ import type { NodeField, RunStatus } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
+import { PanelSection } from '../PanelSection';
 
 const PORT_COLORS: Record<string, string> = {
   'file-content': '#1890ff',
@@ -43,30 +44,16 @@ interface NodeDetailModalProps {
   fields: NodeField[];
 }
 
-/** Collapsible section with deeper header */
-function DetailSection({ title, defaultOpen = true, children, extra }: {
+/** Collapsible section — 已迁移到 PanelSection，此函数保留为别名 */
+const DetailSection = ({
+  title, defaultOpen = true, children, extra,
+}: {
   title: string; children: React.ReactNode; defaultOpen?: boolean; extra?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ marginBottom: 12, border: '1px solid #d9d9d9', borderRadius: 6, overflow: 'hidden' }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{
-          padding: '10px 14px', background: '#e6e6e6', fontWeight: 700, fontSize: 13, color: '#333',
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none',
-        }}
-      >
-        <span>{title}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {extra}
-          <span style={{ fontSize: 10, color: '#666' }}>{open ? '▼' : '▶'}</span>
-        </span>
-      </div>
-      {open && <div style={{ padding: '12px 14px', background: '#fff' }}>{children}</div>}
-    </div>
-  );
-}
+}) => (
+  <PanelSection title={title} defaultOpen={defaultOpen} extra={extra}>
+    {children}
+  </PanelSection>
+);
 
 const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   open, onClose, nodeId, nodeType, icon, label, fields,
@@ -564,8 +551,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
                 // Determine renderer based on port type
-                // Diff node: check if runOutput has stringA + stringB (MUST be checked before isJson)
-                const isDiff = nodeType === 'diff' && runOutput?.stringA !== undefined && runOutput?.stringB !== undefined;
+                // Diff node: check if runOutput has contentA + contentB (MUST be checked before isJson)
+                const isDiff = nodeType === 'diff' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
                 const isExcel = p.type === 'table-data' && displayValue?.columns;
                 const isJson = !isDiff && p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
@@ -589,8 +576,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                         ) : isDiff ? (
                           <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#999' }}>加载 Diff 编辑器...</div>}>
                             <DiffRenderer
-                              original={String(runOutput.stringA ?? '')}
-                              modified={String(runOutput.stringB ?? '')}
+                              original={String(runOutput.contentA ?? '')}
+                              modified={String(runOutput.contentB ?? '')}
                               language="plaintext"
                               height={400}
                             />

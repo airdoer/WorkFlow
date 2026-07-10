@@ -1,5 +1,46 @@
 # WorkFlow Spec 设计文档
 
+---
+
+## 〇、AI Agent 使用规范（重要）
+
+> 本节由用户明确写入，作为 AI Agent 在协助开发时必须遵守的行为准则。
+
+### 0.1 调试行为规范
+
+**规则：AI Agent 默认不执行调试操作，仅在用户明确请求时才进行调试。**
+
+| 调试动作 | 默认行为 | 触发条件 |
+|---------|---------|---------|
+| 打开浏览器访问页面 | **禁止** | 用户明确说"帮我调试"、"打开浏览器确认" |
+| 运行节点/执行工作流 | **禁止** | 用户明确要求验证功能 |
+| 查看 Docker 日志 | **禁止** | 用户说"看一下日志"或报告了具体错误 |
+| SSH 连接服务器操作 | 仅做文件同步（scp） | 需要执行命令时必须告知用户 |
+| `browser_agent` 工具 | **禁止** | 用户说"帮我验证" / "测试一下" |
+
+**正确做法：**
+- 代码修改完成后，直接通过 scp 同步到远端，告知用户"已部署，请自行验证"
+- 不主动打开浏览器或运行测试脚本
+- 确需调试时，先告知用户并等待明确授权
+
+### 0.2 文件同步规范
+
+所有代码修改完成后，应通过以下方式同步到开发服务器：
+
+```bash
+# 前端文件同步
+scp -i "C:\Users\Administrator\.ssh\id_rsa" -o StrictHostKeyChecking=no \
+  <本地文件路径> chenzhixu@172.28.200.60:<远端路径>
+
+# 后端文件同步 + 重启服务
+scp ... diffExecutor.py ... && sudo docker restart work_flow_server_container
+```
+
+- 前端文件同步后，dev server 会自动热更新，无需重启
+- 后端 Python 文件修改后需要重启 `work_flow_server_container`
+
+---
+
 ## 一、项目概述
 
 基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点以及 **String / Bool / Number** 三类基础值节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理等操作的流程化编排。
@@ -347,7 +388,49 @@ interface StringConfig {
 
 **输出:** `{ value: number }`
 
-### 3.10 ValueNode 通用基础值组件
+### 3.10 Diff 节点（代码差异对比）
+
+**设计原则：** Diff 节点接受两个字符串输入（内容1 / 内容2），运行后在节点内嵌的 Monaco DiffEditor 中展示 side-by-side 差异。输出唯一一个 `isSame`（布尔值）端口供下游节点使用。
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | contentA | 内容1 | string |
+| input | contentB | 内容2 | string |
+| output | isSame | 是否相同 | boolean |
+
+**前端展示：**
+- 节点画布内嵌 `Monaco DiffEditor`（side-by-side 模式，height=200px）
+- 运行成功后标题栏显示 `+N / -M` 行变更统计
+- `isSame` 端口旁显示 ✅ 或 ❌ 标识
+
+**执行流程（后端）：**
+
+```
+1. 从 input_data 获取 contentA、contentB
+2. 计算 is_same = contentA == contentB
+3. 用 difflib.unified_diff 生成 unified diff
+4. 统计 additions / deletions 行数
+5. 返回:
+   - isSame: bool               → 输出端口，可连到下游节点
+   - contentA / contentB: str   → 前端 DiffRenderer 消费，不对外暴露为端口
+   - unifiedDiff: str           → 前端内部使用
+   - stats: { additions, deletions, changedLines, lengthA, lengthB }
+```
+
+**输出（完整 runOutput）：**
+```json
+{
+  "isSame": false,
+  "contentA": "...",
+  "contentB": "...",
+  "unifiedDiff": "--- 内容1\n+++ 内容2\n...",
+  "stats": { "additions": 3, "deletions": 1, "changedLines": 4, "lengthA": 100, "lengthB": 102 }
+}
+```
+
+### 3.11 ValueNode 通用基础值组件
 
 String / Bool / Number 三类节点共用 `ValueNode` 组件，支持两种输入模式（互斥）：
 
@@ -419,6 +502,7 @@ const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
 | String | valueIn (string) | value (string) |
 | Bool | valueIn (boolean) | value (boolean) |
 | Number | valueIn (number) | value (number) |
+| Diff | contentA (string), contentB (string) | isSame (boolean) |
 
 ### 4.4 端口颜色
 

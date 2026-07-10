@@ -360,13 +360,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
                 <textarea
+                  className="nodrag"
                   value={val}
                   disabled={locked}
                   onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
                   placeholder={locked ? '由连线提供' : f.placeholder}
                   rows={f.rows || 3}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                   style={locked ? { ...lockedStyle, resize: 'vertical' } : {
                     width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
@@ -382,14 +381,13 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
                 <input
+                  className="nodrag"
                   type="number"
                   value={val}
                   disabled={locked}
                   onChange={(e) => !locked && handleFieldChange(f.key, parseFloat(e.target.value) || 0)}
                   placeholder={locked ? '由连线提供' : f.placeholder}
                   step={f.step}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                   style={locked ? lockedStyle : {
                     width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
@@ -405,11 +403,10 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
                 <select
+                  className="nodrag"
                   value={val}
                   disabled={locked}
                   onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                   style={locked ? lockedStyle : {
                     width: '100%', fontSize: 11, padding: '3px 6px',
                     border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
@@ -431,9 +428,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
                 <div
+                  className="nodrag"
                   style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 100, overflowY: 'auto', opacity: locked ? 0.5 : 1 }}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                 >
                   {f.options.length === 0 && (
                     <span style={{ fontSize: 10, color: '#999' }}>运行后加载选项</span>
@@ -475,13 +471,12 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             <div key={f.key} style={{ marginBottom: 6 }}>
               {fieldLabel}
               <input
+                className="nodrag"
                 type="text"
                 value={val}
                 disabled={locked}
                 onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
                 placeholder={locked ? '由连线提供' : f.placeholder}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
                 style={locked ? lockedStyle : {
                   width: '100%', fontSize: 11, padding: '3px 6px',
                   border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,

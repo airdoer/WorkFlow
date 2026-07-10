@@ -218,6 +218,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ fontSize: 11, color: hasIncomingEdge ? '#aaa' : '#333', cursor: hasIncomingEdge ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
+              className="nodrag"
               type="checkbox"
               checked={!!boolVal}
               disabled={hasIncomingEdge}
@@ -225,8 +226,6 @@ const ValueNode: React.FC<ValueNodeProps> = ({
                 e.stopPropagation();
                 handleValueChange(e.target.checked);
               }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
               style={{ cursor: hasIncomingEdge ? 'not-allowed' : 'pointer' }}
             />
             <span>{boolVal ? 'true' : 'false'}</span>
@@ -238,12 +237,11 @@ const ValueNode: React.FC<ValueNodeProps> = ({
     if (inputType === 'number') {
       return (
         <input
+          className="nodrag"
           type="number"
           value={hasIncomingEdge ? (upstreamValue ?? '') : ((data[valueKey] as number) ?? '')}
           disabled={hasIncomingEdge}
           onChange={(e) => handleValueChange(parseFloat(e.target.value) || 0)}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
           style={inputStyle}
           placeholder={hasIncomingEdge ? '由连线提供' : '输入数值'}
         />
@@ -252,12 +250,11 @@ const ValueNode: React.FC<ValueNodeProps> = ({
 
     return (
       <input
+        className="nodrag"
         type="text"
         value={hasIncomingEdge ? (upstreamValue ?? '') : ((data[valueKey] as string) ?? '')}
         disabled={hasIncomingEdge}
         onChange={(e) => handleValueChange(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
         style={inputStyle}
         placeholder={hasIncomingEdge ? '由连线提供' : '输入字符串'}
       />

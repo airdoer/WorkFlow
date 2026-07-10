@@ -348,12 +348,11 @@ function JsonNode({ data, id, selected }: NodeProps) {
               )}
             </label>
             <input
+              className="nodrag"
               type="text"
               value={hasJsonPathEdge ? (upstreamJsonPath ?? '...等待上游运行') : (manualJsonPath ?? '')}
               disabled={hasJsonPathEdge}
               onChange={(e) => handleJsonPathChange(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
               placeholder={hasJsonPathEdge ? '由连线提供' : '$.data.items（可选）'}
               style={{
                 width: '100%',
