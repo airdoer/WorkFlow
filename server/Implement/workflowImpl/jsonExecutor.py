@@ -41,7 +41,18 @@ class JsonExecutor(BaseNodeExecutor):
             if isinstance(file_content, (dict, list)):
                 data = file_content
             else:
-                data = json.loads(file_content)
+                # Try to parse as JSON; if it's a plain string that isn't JSON,
+                # try a second json.loads in case it's a double-encoded JSON string
+                try:
+                    data = json.loads(file_content)
+                    # If the result is still a string (double-encoded JSON), decode again
+                    if isinstance(data, str):
+                        try:
+                            data = json.loads(data)
+                        except Exception:
+                            pass  # keep as string if second decode fails
+                except json.JSONDecodeError as e:
+                    return {"error": f"Invalid JSON content: {str(e)}"}
 
             # If jsonPath is specified, filter the data
             if json_path:
@@ -49,7 +60,13 @@ class JsonExecutor(BaseNodeExecutor):
                 if data is None:
                     return {"error": f"JSON path '{json_path}' returned no results"}
 
-            return {"jsonData": data, "jsonStr": json.dumps(data, ensure_ascii=False)}
+            return {
+                "jsonData": data,
+                # If data is already a string (e.g. jsonPath extracted a string field),
+                # keep it as-is so downstream JSON node can json.loads it directly.
+                # If data is a dict/list, serialize to string for string-typed ports.
+                "jsonStr": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False),
+            }
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON content: {str(e)}"}
         except Exception as e:

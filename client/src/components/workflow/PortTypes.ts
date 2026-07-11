@@ -69,10 +69,10 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'tableData', label: '表格数据', type: 'table-data', direction: 'output' },
   ],
   json: [
-    { key: 'fileContent', label: 'JSON 内容', type: 'file-content', direction: 'input' },
+    { key: 'fileContent', label: 'JSON String', type: 'string', direction: 'input' },
     { key: 'jsonPath', label: 'JSON Path', type: 'json-path', direction: 'input' },
     { key: 'jsonData', label: 'JSON 数据', type: 'json-data', direction: 'output' },
-    { key: 'jsonStr', label: 'JSON 字符串', type: 'string', direction: 'output' },
+    { key: 'jsonStr', label: 'JSON String', type: 'string', direction: 'output' },
   ],
   lua: [
     { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'input' },
