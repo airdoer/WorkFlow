@@ -2,11 +2,13 @@
  * TableNode
  * - 接受上游数据（tableInput 端口：string / json-data / any）
  * - 解析为结构化表格：数组 → 单表，字典 → 多表
- * - 在节点卡片中直接渲染表格预览
+ * - 在节点卡片中直接渲染 antd Table，支持搜索筛选
  */
 
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback, useState, useMemo } from 'react';
 import { NodeProps, Handle, Position, useReactFlow } from 'reactflow';
+import { Table, Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import {
   PlayCircleOutlined,
   LoadingOutlined,
@@ -43,73 +45,111 @@ interface TableData {
   rows: string[][];
 }
 
-function MiniTable({ table, maxRows = 20 }: { table: TableData; maxRows?: number }) {
-  const { title, columns, rows } = table;
-  const visibleRows = rows.slice(0, maxRows);
-  const truncated = rows.length > maxRows;
+/** Convert columns + rows to antd-compatible dataSource & columns */
+function buildAntdTable(table: TableData, searchText: string, maxRows: number) {
+  const { columns, rows } = table;
+
+  const filtered = searchText.trim()
+    ? rows.filter((row) => row.some((cell) => String(cell ?? '').toLowerCase().includes(searchText.toLowerCase())))
+    : rows;
+
+  const visibleRows = filtered.slice(0, maxRows);
+
+  const antColumns = columns.map((col, colIdx) => ({
+    title: col,
+    dataIndex: `col_${colIdx}`,
+    key: `col_${colIdx}`,
+    ellipsis: true,
+    width: 120,
+    render: (val: string) => (
+      <span title={val} style={{ fontSize: 11 }}>{val}</span>
+    ),
+  }));
+
+  const dataSource = visibleRows.map((row, rowIdx) => {
+    const obj: Record<string, string> = { key: String(rowIdx) };
+    columns.forEach((_, colIdx) => {
+      obj[`col_${colIdx}`] = row[colIdx] ?? '';
+    });
+    return obj;
+  });
+
+  return { antColumns, dataSource, filteredCount: filtered.length, totalCount: rows.length };
+}
+
+function MiniTable({ table, maxRows = 50, compact = false }: { table: TableData; maxRows?: number; compact?: boolean }) {
+  const [search, setSearch] = useState('');
+  const { title } = table;
+
+  const { antColumns, dataSource, filteredCount, totalCount } = useMemo(
+    () => buildAntdTable(table, search, maxRows),
+    [table, search, maxRows],
+  );
+
+  const truncated = filteredCount > maxRows;
 
   return (
-    <div style={{ marginBottom: 8 }}>
+    <div style={{ marginBottom: compact ? 6 : 12 }} className="nowheel nopan">
+      {/* Title bar */}
       {title && (
         <div style={{
-          fontSize: 10, fontWeight: 600, color: '#595959',
-          padding: '2px 4px', background: '#f0f5ff',
-          borderRadius: '3px 3px 0 0', borderBottom: '1px solid #d6e4ff',
+          fontSize: 11, fontWeight: 600, color: '#fff',
+          padding: '3px 8px', background: '#1890ff',
+          borderRadius: '4px 4px 0 0', letterSpacing: 0.3,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          {title}
+          <span>{title}</span>
+          <span style={{ fontWeight: 400, opacity: 0.85, fontSize: 10 }}>{totalCount} 行</span>
         </div>
       )}
-      <div style={{ overflowX: 'auto' }} className="nowheel nopan">
-        <table style={{
-          width: '100%', borderCollapse: 'collapse',
-          fontSize: 10, tableLayout: 'auto',
-        }}>
-          <thead>
-            <tr>
-              {columns.map((col, i) => (
-                <th key={i} style={{
-                  padding: '2px 6px', background: '#fafafa',
-                  border: '1px solid #e8e8e8', color: '#262626',
-                  fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'left',
-                }}>
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} style={{
-                  padding: '4px 6px', border: '1px solid #e8e8e8',
-                  color: '#bfbfbf', textAlign: 'center', fontStyle: 'italic',
-                }}>
-                  (空)
-                </td>
-              </tr>
-            ) : (
-              visibleRows.map((row, ri) => (
-                <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  {row.map((cell, ci) => (
-                    <td key={ci} style={{
-                      padding: '2px 6px', border: '1px solid #e8e8e8',
-                      color: '#262626', maxWidth: 160,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+
+      {/* Search input */}
+      <div style={{
+        background: '#f5f5f5',
+        padding: '4px 6px',
+        borderBottom: '1px solid #e8e8e8',
+        borderTop: title ? undefined : '1px solid #e8e8e8',
+        borderLeft: '1px solid #e8e8e8',
+        borderRight: '1px solid #e8e8e8',
+        borderRadius: title ? undefined : '4px 4px 0 0',
+      }}>
+        <Input
+          prefix={<SearchOutlined style={{ color: '#bfbfbf', fontSize: 11 }} />}
+          placeholder="搜索..."
+          size="small"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          allowClear
+          style={{ fontSize: 11, height: 22 }}
+        />
       </div>
-      {truncated && (
-        <div style={{ fontSize: 9, color: '#8c8c8c', padding: '2px 4px' }}>
-          … 仅显示前 {maxRows} 行，共 {rows.length} 行
-        </div>
-      )}
+
+      {/* Antd Table */}
+      <div style={{
+        border: '1px solid #e8e8e8',
+        borderTop: 'none',
+        borderRadius: '0 0 4px 4px',
+        overflow: 'hidden',
+      }}>
+        <Table
+          columns={antColumns}
+          dataSource={dataSource}
+          pagination={false}
+          size="small"
+          scroll={{ x: 'max-content', y: compact ? 150 : 240 }}
+          style={{ fontSize: 11 }}
+          locale={{ emptyText: '(空)' }}
+          rowClassName={(_, idx) => idx % 2 === 0 ? '' : 'ant-table-row-striped'}
+        />
+        {truncated && (
+          <div style={{
+            fontSize: 10, color: '#8c8c8c', padding: '3px 8px',
+            borderTop: '1px solid #f0f0f0', background: '#fafafa',
+          }}>
+            已过滤 {filteredCount} 条，显示前 {maxRows} 行（共 {totalCount} 行）
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -187,8 +227,8 @@ function TableNode({ data, id, selected }: NodeProps) {
           background: '#fff',
           border: `2px solid ${borderColor}`,
           borderRadius: 8,
-          minWidth: 240,
-          maxWidth: 420,
+          minWidth: 280,
+          maxWidth: 480,
           fontSize: 12,
           position: 'relative',
         }}
@@ -299,11 +339,11 @@ function TableNode({ data, id, selected }: NodeProps) {
             </div>
           )}
 
-          {/* Tables */}
+          {/* Tables — antd Table with search */}
           {tables && tables.length > 0 && (
-            <div style={{ maxHeight: 320, overflowY: 'auto' }} className="nowheel nopan">
+            <div className="nowheel nopan">
               {tables.map((t, i) => (
-                <MiniTable key={i} table={t} maxRows={50} />
+                <MiniTable key={i} table={t} maxRows={50} compact={tables.length > 1} />
               ))}
             </div>
           )}
@@ -330,4 +370,6 @@ function TableNode({ data, id, selected }: NodeProps) {
   );
 }
 
+export { MiniTable };
+export type { TableData };
 export default memo(TableNode);

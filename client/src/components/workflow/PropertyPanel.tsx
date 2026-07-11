@@ -9,6 +9,8 @@ import type { RunStatus } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
 import { PanelSection } from './PanelSection';
 import DiffSummary from './nodes/Diff/DiffSummary';
+import { MiniTable } from './nodes/Table/index';
+import type { TableData } from './nodes/Table/index';
 
 const DiffRenderer = lazy(() => import('./nodes/Diff/DiffRenderer'));
 
@@ -492,7 +494,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const hasDisplay = displayValue !== undefined && displayValue !== null;
             // For Diff node: show side-by-side diff instead of raw output
             const isDiffPort = nodeType === 'diff' && p.key === 'isSame' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
-            const previewText = hasDisplay && !isDiffPort
+            // For Table node: 'tables' port is an array of {title, columns, rows}
+            const isTablesPort = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
+            const previewText = hasDisplay && !isDiffPort && !isTablesPort
               ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
               : null;
 
@@ -526,8 +530,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     </Button>
                   )}
                 </div>
-                {/* Content area: DiffSummary for diff node (compact), pre for others */}
-                {hasDisplay && isDiffPort ? (
+                {/* Content area: Tables for table node, DiffSummary for diff node, pre for others */}
+                {hasDisplay && isTablesPort ? (
+                  <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 3, overflow: 'hidden' }}>
+                    {(displayValue as TableData[]).map((t: TableData, i: number) => (
+                      <MiniTable key={i} table={t} maxRows={20} compact />
+                    ))}
+                  </div>
+                ) : hasDisplay && isDiffPort ? (
                   <DiffSummary
                     contentA={String(runOutput.contentA ?? '')}
                     contentB={String(runOutput.contentB ?? '')}

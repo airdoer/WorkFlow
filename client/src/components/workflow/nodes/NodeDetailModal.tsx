@@ -8,6 +8,8 @@ import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
 import { PanelSection } from '../PanelSection';
+import { MiniTable } from './Table/index';
+import type { TableData } from './Table/index';
 
 const PORT_COLORS: Record<string, string> = {
   'file-content': '#1890ff',
@@ -554,11 +556,13 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 // Determine renderer based on port type
                 // Diff node: check if runOutput has contentA + contentB (MUST be checked before isJson)
                 const isDiff = nodeType === 'diff' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
-                const isExcel = p.type === 'table-data' && displayValue?.columns;
-                const isJson = !isDiff && p.type === 'json-data';
+                // Table node: 'tables' is an array of {title, columns, rows}
+                const isTables = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
+                const isExcel = !isTables && p.type === 'table-data' && displayValue?.columns;
+                const isJson = !isDiff && !isTables && p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
-                const isFileContent = typeof displayValue === 'string';
-                const isPre = !isExcel && !isJson && !isLua && !isDiff && typeof displayValue === 'object';
+                const isFileContent = !isTables && typeof displayValue === 'string';
+                const isPre = !isTables && !isExcel && !isJson && !isLua && !isDiff && typeof displayValue === 'object';
 
                 return (
                   <div key={p.key} style={{ marginBottom: 10, padding: '8px 10px', background: '#f9f9f9', borderRadius: 4, border: '1px solid #e8e8e8' }}>
@@ -570,7 +574,13 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                     </div>
                     {hasDisplay && (
                       <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
-                        {isExcel ? (
+                        {isTables ? (
+                          <div style={{ padding: '4px 0' }}>
+                            {(displayValue as TableData[]).map((t: TableData, i: number) => (
+                              <MiniTable key={i} table={t} maxRows={100} />
+                            ))}
+                          </div>
+                        ) : isExcel ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
                             <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
                           </Suspense>

@@ -127,7 +127,8 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   // Table node — renders list/dict data as tables
   table: [
     { key: 'tableInput', label: '数据输入', type: 'any', direction: 'input', maxConnections: 1 },
-    { key: 'tableStr', label: '文本输出', type: 'string', direction: 'output' },
+    { key: 'tables',    label: '表格数据', type: 'table-data', direction: 'output' },
+    { key: 'tableStr',  label: '文本输出', type: 'string', direction: 'output' },
   ],
 };
 
