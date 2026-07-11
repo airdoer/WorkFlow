@@ -300,6 +300,23 @@ def workflow_delete(workflow_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/workflow/<workflow_id>/duplicate', methods=['POST'])
+def workflow_duplicate(workflow_id):
+    """Duplicate a workflow with a new name"""
+    body = request.get_json(force=True, silent=True) or {}
+    new_name = (body.get('name') or '').strip()
+    if not new_name:
+        return jsonify({'error': 'name is required'}), 400
+    try:
+        result = WorkflowManager.duplicate(workflow_id, new_name)
+        if not result:
+            return jsonify({'error': 'Source workflow not found'}), 404
+        return jsonify({'success': True, 'id': result['id'], 'name': result['name']})
+    except Exception as e:
+        logger.exception("[workflow_duplicate] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/workflow/trash/list', methods=['GET'])
 def workflow_trash_list():
     """List all workflows in trash"""

@@ -210,6 +210,23 @@ class WorkflowManager:
             return True
         return False
 
+    @staticmethod
+    def duplicate(source_id: str, new_name: str) -> dict | None:
+        """Duplicate an existing workflow with a new name."""
+        source = WorkflowManager.get(source_id)
+        if not source:
+            return None
+        import copy
+        new_json = copy.deepcopy(source.get('json', {}))
+        result = WorkflowManager.save(
+            name=new_name,
+            workflow_json=new_json,
+            author=source.get('author', ''),
+            description=source.get('description', ''),
+        )
+        logger.info("[WorkflowManager.duplicate] %r → %r", source_id, result.get('id'))
+        return result
+
 
 class WorkflowRuntime:
     """DAG-based workflow execution runtime with Socket.IO real-time push.

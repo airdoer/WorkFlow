@@ -76,9 +76,9 @@ client/
     └── components/
         └── workflow/
             ├── FlowEditor.tsx               // ReactFlow 初始化 + 选中节点管理 + handleNodeUpdate
-            ├── Toolbar.tsx                  // 保存 / 导入 / 导出 / 运行
+            ├── Toolbar.tsx                  // 深色工具栏：名称内联编辑 + 自动保存时间 + 工作流库（含搜索/垃圾箱）+ 全屏
             ├── PropertyPanel.tsx             // 右侧属性面板（五段式）+ 运行按钮（runNodeWS）+ 弹窗查看
-            ├── Toolbox.tsx                  // 左侧节点工具箱（分类 + 点击创建节点）
+            ├── Toolbox.tsx                  // 左侧节点工具箱（分类 + 关键词筛选 + 点击/拖拽创建节点）
             ├── NodeRegistry.tsx             // 注册所有节点类型 → NodeComponent / Icon / Category
             ├── PortTypes.ts                 // 端口类型系统 + 兼容性矩阵
             ├── WorkflowContext.tsx           // React Context：提供 workflowId + onNodeUpdate 回调
@@ -1759,7 +1759,20 @@ class WorkflowRuntime:
 9. ~~后端 CORS 允许 DELETE 方法（修复工作流删除失败）~~ ✅
 10. ~~路由 name 使用英文 key 匹配 locale 翻译（修复 React Intl missing message）~~ ✅
 
-### Phase 9: 增强（待实现）
+### Phase 9: UI 增强 ✅（已完成）
+
+1. ~~Toolbar 重新设计：深色背景 (#1f2f3f)，工作流名称内联编辑~~  ✅
+2. ~~自动保存时间显示：4h 内显示相对时间（x分钟前/x小时前），超过显示绝对时间~~ ✅
+3. ~~工作流库 Modal：搜索（名称/作者/描述）、Ctrl+点击名称新开标签页、切换前检查 isDirty~~ ✅
+4. ~~垃圾箱机制：删除→移入 workflow_trash/，支持还原/彻底删除~~ ✅
+5. ~~后端时间戳统一改为 UTC+Z（修复 8 小时偏差）~~ ✅
+6. ~~左侧 Toolbox 增加关键词搜索筛选节点~~ ✅
+7. ~~C7Server 下拉框用 React Portal 解决 ReactFlow 裁剪问题，支持滚动不操作画布~~ ✅
+8. ~~BaseNode text/textarea 用局部 state + onBlur 提交，修复光标跳到末尾的问题~~ ✅
+9. ~~P4File 节点 p4Path 支持连线输入（linkedPortKey）~~ ✅
+10. ~~JSON 节点改名 "文件内容" → "JSON 内容"，executor 支持接收 dict 类型输入~~ ✅
+
+### Phase 10: 增强（待实现）
 1. 节点拖拽排序（React Flow dnd 支持）
 2. 运行历史记录
 3. 错误处理与重试

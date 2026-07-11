@@ -30,6 +30,7 @@ import {
   LinkOutlined,
   RestOutlined,
   RollbackOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import type { WorkflowJSON } from './types';
@@ -208,6 +209,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryData, setLibraryData] = useState<WorkflowRecord[]>([]);
+  const [librarySearch, setLibrarySearch] = useState('');
 
   const fetchLibrary = async () => {
     setLibraryLoading(true);
@@ -230,6 +232,31 @@ const Toolbar: React.FC<ToolbarProps> = ({
       fetchLibrary();
     } catch (err: any) {
       message.error(`删除失败: ${err.message}`);
+    }
+  };
+
+  // ── Duplicate ────────────────────────────────────────────────
+  const [dupTarget, setDupTarget] = useState<WorkflowRecord | null>(null);
+  const [dupName, setDupName] = useState('');
+  const [dupLoading, setDupLoading] = useState(false);
+
+  const openDup = (record: WorkflowRecord) => {
+    setDupTarget(record);
+    setDupName(`${record.name}_副本`);
+  };
+
+  const handleDuplicate = async () => {
+    if (!dupTarget || !dupName.trim()) return;
+    setDupLoading(true);
+    try {
+      await FlowApi.duplicateWorkflow(dupTarget.id, dupName.trim());
+      message.success(`已复制为「${dupName.trim()}」`);
+      setDupTarget(null);
+      fetchLibrary();
+    } catch (err: any) {
+      message.error(`复制失败: ${err.message}`);
+    } finally {
+      setDupLoading(false);
     }
   };
 
@@ -291,24 +318,31 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const libraryColumns = [
     {
       title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
-      render: (v: string, r: WorkflowRecord) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Tooltip title="在新标签页打开">
-            <LinkOutlined
-              style={{ color: '#1890ff', cursor: 'pointer', flexShrink: 0 }}
-              onClick={() => {
-                const base = window.location.pathname.includes('fullscreen')
-                  ? '/workflow/fullscreen'
-                  : '/workflow/editor';
-                window.open(`${base}?id=${r.id}`, '_blank');
-              }}
-            />
-          </Tooltip>
-          <span style={{ fontWeight: r.id === workflowId ? 600 : 400, color: r.id === workflowId ? '#1890ff' : undefined }}>
+      render: (v: string, r: WorkflowRecord) => {
+        const base = window.location.pathname.includes('fullscreen')
+          ? '/workflow/fullscreen'
+          : '/workflow/editor';
+        const href = `${base}?id=${r.id}`;
+        return (
+          <a
+            href={href}
+            style={{
+              fontWeight: r.id === workflowId ? 600 : 400,
+              color: '#1890ff',
+              textDecoration: 'underline',
+              textUnderlineOffset: 2,
+              cursor: 'pointer',
+            }}
+            onClick={(e) => {
+              if (e.ctrlKey || e.metaKey) return; // 浏览器原生处理新开标签页
+              e.preventDefault();
+              handleSwitchTo(r.id);
+            }}
+          >
             {v}{r.id === workflowId ? ' （当前）' : ''}
-          </span>
-        </div>
-      ),
+          </a>
+        );
+      },
     },
     { title: '作者', dataIndex: 'author', key: 'author', width: 90, render: (v: string) => v || '-' },
     {
@@ -322,11 +356,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
       sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
     },
     {
-      title: '操作', key: 'action', width: 70,
+      title: '操作', key: 'action', width: 90,
       render: (_: any, record: WorkflowRecord) => (
-        <Popconfirm title="确认删除？" onConfirm={() => handleDeleteWorkflow(record.id)} okText="删除" cancelText="取消">
-          <Button size="small" danger icon={<DeleteOutlined />} disabled={record.id === workflowId} />
-        </Popconfirm>
+        <Space size={4}>
+          <Tooltip title="复制">
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => openDup(record)}
+            />
+          </Tooltip>
+          <Popconfirm title="确认删除？" onConfirm={() => handleDeleteWorkflow(record.id)} okText="删除" cancelText="取消">
+            <Button size="small" danger icon={<DeleteOutlined />} disabled={record.id === workflowId} />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -489,7 +532,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </span>
         }
         open={libraryOpen}
-        onCancel={() => setLibraryOpen(false)}
+        onCancel={() => { setLibraryOpen(false); setLibrarySearch(''); }}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Space>
@@ -510,25 +553,36 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 垃圾箱
               </Button>
             </Space>
-            <Button onClick={() => setLibraryOpen(false)}>关闭</Button>
+            <Button onClick={() => { setLibraryOpen(false); setLibrarySearch(''); }}>关闭</Button>
           </div>
         }
         width={820}
         destroyOnClose
         styles={{ body: { background: '#f0f4f8', padding: '16px 16px 8px' } }}
       >
+        <Input.Search
+          placeholder="搜索工作流名称、作者..."
+          allowClear
+          value={librarySearch}
+          onChange={(e) => setLibrarySearch(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
         <Table
           columns={libraryColumns}
-          dataSource={libraryData}
+          dataSource={libraryData.filter((r) => {
+            if (!librarySearch.trim()) return true;
+            const q = librarySearch.toLowerCase();
+            return (
+              (r.name || '').toLowerCase().includes(q) ||
+              (r.author || '').toLowerCase().includes(q) ||
+              (r.description || '').toLowerCase().includes(q)
+            );
+          })}
           rowKey="id"
           loading={libraryLoading}
           size="small"
           pagination={{ pageSize: 8, showSizeChanger: false }}
           rowClassName={(r) => r.id === workflowId ? 'workflow-lib-active-row' : ''}
-          onRow={(record) => ({
-            onClick: () => handleSwitchTo(record.id),
-            style: { cursor: 'pointer' },
-          })}
         />
       </Modal>
 
@@ -591,6 +645,32 @@ const Toolbar: React.FC<ToolbarProps> = ({
               ),
             },
           ]}
+        />
+      </Modal>
+      {/* ── 复制工作流 Modal ── */}
+      <Modal
+        title={<span style={{ fontWeight: 700 }}>复制工作流</span>}
+        open={!!dupTarget}
+        onCancel={() => setDupTarget(null)}
+        onOk={handleDuplicate}
+        okText="确认复制"
+        cancelText="取消"
+        confirmLoading={dupLoading}
+        width={420}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 8, color: '#595959', fontSize: 13 }}>
+          来源：<strong>{dupTarget?.name}</strong>
+        </div>
+        <div style={{ marginBottom: 6, fontSize: 13, color: '#595959' }}>新工作流名称</div>
+        <Input
+          value={dupName}
+          onChange={(e) => setDupName(e.target.value)}
+          onPressEnter={handleDuplicate}
+          placeholder="请输入新名称"
+          autoFocus
+          maxLength={80}
+          showCount
         />
       </Modal>
     </div>

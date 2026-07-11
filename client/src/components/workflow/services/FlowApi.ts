@@ -81,6 +81,16 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
+  // Duplicate workflow
+  async duplicateWorkflow(sourceId: string, newName: string) {
+    const res = await fetch(`${API_BASE}/api/workflow/${sourceId}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    return handleResponse(res);
+  },
+
   // Trash operations
   async listTrash(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/api/workflow/trash/list`);
