@@ -104,15 +104,19 @@ class ExcelExecutor(BaseNodeExecutor):
                 all_rows.append(list(row))
 
             # 应用筛选
-            filtered_rows = self._apply_row_filter(all_rows, filter_rows)
+            filtered_rows = self._apply_row_filter(all_rows, filter_rows, columns)
             filtered_columns, filtered_rows = self._apply_column_filter_indexed(columns, filtered_rows, filter_columns)
 
             rows_dict = [{filtered_columns[i]: (row[i] if i < len(row) else None) for i in range(len(filtered_columns))} for row in filtered_rows]
 
             table_data = {'title': None, 'columns': filtered_columns, 'rows': rows_dict}
+            # allColumns / allRows 保留原始完整数据，供前端筛选 options 使用
+            all_rows_dict = [{columns[i]: (row[i] if i < len(row) else None) for i in range(len(columns))} for row in all_rows]
             return {
                 'columns': filtered_columns,
                 'rows': rows_dict,
+                'allColumns': columns,
+                'allRows': all_rows_dict,
                 'sheetNames': list(wb.sheetnames),
                 'tableData': table_data,
                 'selectedRows': [],
@@ -134,17 +138,31 @@ class ExcelExecutor(BaseNodeExecutor):
             return [v.strip() for v in value.split(sep) if v.strip()]
         return []
 
-    def _apply_row_filter(self, rows: list, filter_rows: list) -> list:
+    def _apply_row_filter(self, rows: list, filter_rows: list, columns: list = None) -> list:
         if not filter_rows:
             return rows
         indices = set()
+        string_keys = set()
         for r in filter_rows:
             try:
                 idx = int(r) - 1  # 1-based → 0-based
                 if 0 <= idx < len(rows):
                     indices.add(idx)
+                else:
+                    # 数字超出范围，尝试作为字符串 key 匹配第一列
+                    string_keys.add(r)
             except ValueError:
-                pass
+                string_keys.add(r)
+
+        # 字符串 key → 在第一列中匹配
+        if string_keys and columns:
+            for i, row in enumerate(rows):
+                if i in indices:
+                    continue
+                first_val = str(row[0]) if len(row) > 0 else ''
+                if first_val in string_keys:
+                    indices.add(i)
+
         return [rows[i] for i in sorted(indices)]
 
     def _apply_column_filter_indexed(self, columns: list, rows: list, filter_columns: list):
@@ -167,7 +185,7 @@ class ExcelExecutor(BaseNodeExecutor):
     def _apply_filters_raw(self, rows: list, columns: list, config: dict) -> list:
         """对 raw rows（列表格式）应用行/列过滤。"""
         filter_rows = self._parse_list(config.get('filterRows', ''))
-        rows = self._apply_row_filter(rows, filter_rows)
+        rows = self._apply_row_filter(rows, filter_rows, columns)
         return rows
 
     def _parse_csv(self, content: str, filter_rows: list, filter_columns: list) -> dict:

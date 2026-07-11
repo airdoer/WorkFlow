@@ -1,6 +1,6 @@
 import React, { memo, useMemo, useState, useCallback, useEffect } from 'react';
 import { NodeProps, useReactFlow } from 'reactflow';
-import { Table, Input, Tag } from 'antd';
+import { Table, Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import BaseNode, { type NodeField } from '../BaseNode';
 
@@ -156,15 +156,6 @@ function ExcelRenderer({ data, nodeId, compact = false }: ExcelRendererProps) {
 
   return (
     <div className="nowheel nopan">
-      {/* Sheet 标签 */}
-      {sheetNames.length > 1 && (
-        <div style={{ padding: '2px 4px 4px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {sheetNames.map((s) => (
-            <Tag key={s} style={{ fontSize: 10, cursor: 'default' }}>{s}</Tag>
-          ))}
-        </div>
-      )}
-
       {/* 搜索框 */}
       <div style={{
         padding: '4px 6px', background: '#f5f5f5',
@@ -211,24 +202,51 @@ function ExcelNode({ data, id, selected }: NodeProps) {
   const nodeData = data as Record<string, unknown>;
   const runOutput = nodeData._runOutput as any;
 
+  // 动态 options：运行后才有列/行信息
+  const rowOptions = useMemo(() => {
+    const rows = runOutput?.rows as Record<string, any>[] | undefined;
+    const cols = runOutput?.columns as string[] | undefined;
+    if (!rows || !cols || cols.length === 0) return [];
+    const firstCol = cols[0]; // 第一列作为行标识
+    return rows.map((row, i) => {
+      const label = String(row[firstCol] ?? `第 ${i + 1} 行`);
+      return { label, value: label }; // value 也用第一列值，便于后端匹配
+    });
+  }, [runOutput]);
+
+  const colOptions = useMemo(() => {
+    if (!runOutput?.columns) return [];
+    return (runOutput.columns as string[]).map((c: string) => ({ label: c, value: c }));
+  }, [runOutput]);
+
+  const sheetOptions = useMemo(() => {
+    const names = runOutput?.sheetNames as string[] | undefined;
+    if (!names || names.length === 0) return [];
+    return names.map((s: string) => ({ label: s, value: s }));
+  }, [runOutput]);
+
   const EXCEL_FIELDS: NodeField[] = [
     {
       key: 'sheetName',
       label: 'Sheet 名',
-      placeholder: '工作表名（可选；有连线时由连线提供）',
+      type: 'select',
+      options: sheetOptions,
+      placeholder: '选择工作表（有连线时由连线提供）',
       linkedPortKey: 'sheetName',
-    },
-    {
-      key: 'filterColumns',
-      label: '筛选列',
-      type: 'textarea',
-      placeholder: '每行一个列名，空则显示全部',
     },
     {
       key: 'filterRows',
       label: '筛选行',
-      type: 'textarea',
-      placeholder: '每行一个行号（1-based），空则显示全部',
+      type: 'multiselect',
+      options: rowOptions,
+      placeholder: '选择行（空则显示全部）',
+    },
+    {
+      key: 'filterColumns',
+      label: '筛选列',
+      type: 'multiselect',
+      options: colOptions,
+      placeholder: '选择列（空则显示全部）',
     },
   ];
 

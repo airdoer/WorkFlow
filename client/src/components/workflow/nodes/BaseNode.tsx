@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
+import { Select } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts } from '../PortTypes';
@@ -485,22 +486,23 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
-                <select
-                  className="nodrag"
-                  value={val}
-                  disabled={locked}
-                  onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
-                  style={locked ? lockedStyle : {
-                    width: '100%', fontSize: 11, padding: '3px 6px',
-                    border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                    borderRadius: 3, boxSizing: 'border-box', background: '#fff',
-                  }}
+                <div
+                  className="nodrag nopan nowheel"
+                  onWheel={(e) => e.stopPropagation()}
                 >
-                  <option value="">-- 选择 --</option>
-                  {f.options.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  <Select
+                    size="small"
+                    disabled={locked}
+                    value={val || undefined}
+                    onChange={(v) => !locked && handleFieldChange(f.key, v)}
+                    options={f.options}
+                    placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                    style={{ width: '100%', fontSize: 11 }}
+                    allowClear
+                    getPopupContainer={(node) => node.parentElement || document.body}
+                    dropdownStyle={{ fontSize: 11 }}
+                  />
+                </div>
               </div>
             );
           }
@@ -511,39 +513,24 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
                 <div
-                  className="nodrag"
-                  style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 100, overflowY: 'auto', opacity: locked ? 0.5 : 1 }}
+                  className="nodrag nopan nowheel"
+                  onWheel={(e) => e.stopPropagation()}
                 >
-                  {f.options.length === 0 && (
-                    <span style={{ fontSize: 10, color: '#999' }}>运行后加载选项</span>
-                  )}
-                  {f.options.map((opt) => {
-                    const isSelected = selectedVals.includes(opt.value);
-                    return (
-                      <span
-                        key={opt.value}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (locked) return;
-                          const next = isSelected
-                            ? selectedVals.filter((s) => s !== opt.value)
-                            : [...selectedVals, opt.value];
-                          handleFieldChange(f.key, next);
-                        }}
-                        style={{
-                          padding: '2px 8px', fontSize: 10,
-                          border: `1px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
-                          borderRadius: 3,
-                          background: isSelected ? '#e6f7ff' : '#fff',
-                          color: isSelected ? '#1890ff' : '#666',
-                          cursor: locked ? 'not-allowed' : 'pointer',
-                          userSelect: 'none',
-                        }}
-                      >
-                        {opt.label}
-                      </span>
-                    );
-                  })}
+                  <Select
+                    mode="multiple"
+                    size="small"
+                    disabled={locked}
+                    value={selectedVals}
+                    onChange={(v) => !locked && handleFieldChange(f.key, v)}
+                    options={f.options}
+                    placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                    style={{ width: '100%', fontSize: 11 }}
+                    maxTagCount={2}
+                    maxTagTextLength={8}
+                    allowClear
+                    getPopupContainer={(node) => node.parentElement || document.body}
+                    dropdownStyle={{ fontSize: 11 }}
+                  />
                 </div>
               </div>
             );

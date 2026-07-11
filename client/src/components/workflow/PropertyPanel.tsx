@@ -1,7 +1,7 @@
 import React, { useCallback, useState, lazy, Suspense } from 'react';
 import type { Node, Edge } from 'reactflow';
 import { getNodeRegistry } from './NodeRegistry';
-import { Button, Tag, Modal, message } from 'antd';
+import { Button, Tag, Modal, message, Select } from 'antd';
 import { ExpandOutlined, CopyOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { useWorkflowContext } from './WorkflowContext';
@@ -299,17 +299,32 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         )}
         {nodeType === 'excel' && (
           <>
-            <FieldInput label="工作表名（可选）" value={(nodeData.sheet as string) || ''} onChange={(v) => handleFieldChange('sheet', v)} placeholder="工作表名" />
-            <FieldMultiSelect
-              label="行筛选"
-              value={(nodeData.rowFilter as string[]) || []}
-              onChange={(v) => handleFieldChange('rowFilter', v)}
-              options={runOutput?.columns ? Array.from({ length: runOutput.rows?.length || 0 }, (_, i) => ({ label: `第 ${i + 1} 行`, value: String(i + 1) })) : []}
+            <FieldSelect
+              label="Sheet 名"
+              value={(nodeData.sheetName as string) || ''}
+              onChange={(v) => handleFieldChange('sheetName', v)}
+              options={runOutput?.sheetNames ? (runOutput.sheetNames as string[]).map((s: string) => ({ label: s, value: s })) : []}
+              placeholder={runOutput?.sheetNames ? '选择工作表' : '运行后加载选项'}
             />
             <FieldMultiSelect
-              label="列筛选"
-              value={(nodeData.columnFilter as string[]) || []}
-              onChange={(v) => handleFieldChange('columnFilter', v)}
+              label="筛选行"
+              value={(nodeData.filterRows as string[]) || []}
+              onChange={(v) => handleFieldChange('filterRows', v)}
+              options={(() => {
+                const rows = runOutput?.rows as Record<string, any>[] | undefined;
+                const cols = runOutput?.columns as string[] | undefined;
+                if (!rows || !cols || cols.length === 0) return [];
+                const firstCol = cols[0];
+                return rows.map((row: Record<string, any>, i: number) => {
+                  const label = String(row[firstCol] ?? `第 ${i + 1} 行`);
+                  return { label, value: label };
+                });
+              })()}
+            />
+            <FieldMultiSelect
+              label="筛选列"
+              value={(nodeData.filterColumns as string[]) || []}
+              onChange={(v) => handleFieldChange('filterColumns', v)}
               options={runOutput?.columns ? runOutput.columns.map((c: string) => ({ label: c, value: c })) : []}
             />
           </>
@@ -693,6 +708,33 @@ function FieldTextarea({ label, value, onChange, placeholder, rows = 3, required
   );
 }
 
+function FieldSelect({ label, value, onChange, options, placeholder }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { label: string; value: string }[];
+  placeholder?: string;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: 'block', marginBottom: 4, fontSize: 11, color: '#666' }}>
+        {label}
+      </label>
+      <Select
+        size="small"
+        value={value || undefined}
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder || (options.length === 0 ? '运行节点后加载选项' : '选择...')}
+        style={{ width: '100%', fontSize: 11 }}
+        allowClear
+        getPopupContainer={(node) => node.parentElement || document.body}
+        dropdownStyle={{ fontSize: 11 }}
+      />
+    </div>
+  );
+}
+
 function FieldMultiSelect({ label, value, onChange, options }: {
   label: string;
   value: string[];
@@ -705,37 +747,20 @@ function FieldMultiSelect({ label, value, onChange, options }: {
         {label}
         {value.length > 0 && <span style={{ color: '#1890ff', marginLeft: 6 }}>({value.length} 项)</span>}
       </label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
-        {options.length === 0 && (
-          <span style={{ fontSize: 10, color: '#999' }}>运行节点后加载选项</span>
-        )}
-        {options.map((opt) => {
-          const isSelected = value.includes(opt.value);
-          return (
-            <span
-              key={opt.value}
-              onClick={() => {
-                const next = isSelected
-                  ? value.filter((v) => v !== opt.value)
-                  : [...value, opt.value];
-                onChange(next);
-              }}
-              style={{
-                padding: '2px 8px',
-                fontSize: 10,
-                border: `1px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
-                borderRadius: 3,
-                background: isSelected ? '#e6f7ff' : '#fff',
-                color: isSelected ? '#1890ff' : '#666',
-                cursor: 'pointer',
-                userSelect: 'none',
-              }}
-            >
-              {opt.label}
-            </span>
-          );
-        })}
-      </div>
+      <Select
+        mode="multiple"
+        size="small"
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={options.length === 0 ? '运行节点后加载选项' : '选择...'}
+        style={{ width: '100%', fontSize: 11 }}
+        allowClear
+        maxTagCount={3}
+        maxTagTextLength={10}
+        getPopupContainer={(node) => node.parentElement || document.body}
+        dropdownStyle={{ fontSize: 11 }}
+      />
     </div>
   );
 }

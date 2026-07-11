@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo, lazy, Suspense, useRef } from 'react';
-import { Modal, Button, Tag, message } from 'antd';
+import { Modal, Button, Tag, message, Select } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
@@ -386,21 +386,16 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 return (
                   <div key={f.key}>
                     {fieldLabel}
-                    <select
-                      value={val}
+                    <Select
                       disabled={locked}
-                      onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
-                      style={locked ? lockedInputStyle : {
-                        width: '100%', fontSize: 13, padding: '8px 12px',
-                        border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
-                        borderRadius: 4, boxSizing: 'border-box', background: '#fff',
-                      }}
-                    >
-                      <option value="">-- 选择 --</option>
-                      {f.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                      value={val || undefined}
+                      onChange={(v) => !locked && handleFieldChange(f.key, v)}
+                      options={f.options}
+                      placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                      style={{ width: '100%', fontSize: 13 }}
+                      allowClear
+                      getPopupContainer={(node) => node.parentElement || document.body}
+                    />
                   </div>
                 );
               }
@@ -410,33 +405,17 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 return (
                   <div key={f.key}>
                     {fieldLabel}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, opacity: locked ? 0.5 : 1 }}>
-                      {f.options.length === 0 && <span style={{ fontSize: 11, color: '#999' }}>运行后加载选项</span>}
-                      {f.options.map((opt) => {
-                        const isSelected = selected.includes(opt.value);
-                        return (
-                          <span
-                            key={opt.value}
-                            onClick={() => {
-                              if (locked) return;
-                              const next = isSelected
-                                ? selected.filter((s) => s !== opt.value)
-                                : [...selected, opt.value];
-                              handleFieldChange(f.key, next);
-                            }}
-                            style={{
-                              padding: '4px 12px', fontSize: 12,
-                              border: `1px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
-                              borderRadius: 4, background: isSelected ? '#e6f7ff' : '#fff',
-                              color: isSelected ? '#1890ff' : '#666',
-                              cursor: locked ? 'not-allowed' : 'pointer', userSelect: 'none',
-                            }}
-                          >
-                            {opt.label}
-                          </span>
-                        );
-                      })}
-                    </div>
+                    <Select
+                      mode="multiple"
+                      disabled={locked}
+                      value={selected}
+                      onChange={(v) => !locked && handleFieldChange(f.key, v)}
+                      options={f.options}
+                      placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                      style={{ width: '100%', fontSize: 13 }}
+                      allowClear
+                      getPopupContainer={(node) => node.parentElement || document.body}
+                    />
                   </div>
                 );
               }
