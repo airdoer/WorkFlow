@@ -7,6 +7,7 @@ from Implement.kdipImpl.kdip_config import KDIP_CMD_WHITELIST
 # {server_id} 会被替换为实际的 server_id 字符串
 _CMD_DEFAULT_PARAMS = {
     "kdip_game_get_service_switch_state": {"server_id": "{server_id}"},
+    "kdip_game_get_stall_metric_info": {"server_id": "{server_id}"},
 }
 
 
