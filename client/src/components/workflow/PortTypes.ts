@@ -124,6 +124,11 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'valueIn', label: '布尔输入', type: 'boolean', direction: 'input', maxConnections: 1 },
     { key: 'value', label: '通过结果', type: 'boolean', direction: 'output' },
   ],
+  // Table node — renders list/dict data as tables
+  table: [
+    { key: 'tableInput', label: '数据输入', type: 'any', direction: 'input', maxConnections: 1 },
+    { key: 'tableStr', label: '文本输出', type: 'string', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {

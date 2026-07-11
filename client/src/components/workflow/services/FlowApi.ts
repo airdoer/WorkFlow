@@ -118,9 +118,9 @@ export const FlowApi = {
   },
 
   // C7 server list for dropdown
-  async getC7ServerOptions(): Promise<{ label: string; value: string; type: string }[]> {
+  async getC7ServerOptions(): Promise<{ label: string; value: string; type: string; namespace?: string; server_id?: number | string }[]> {
     const res = await fetch(`${API_BASE}/api/workflow/c7server/list`);
-    const data = await handleResponse<{ options: { label: string; value: string; type: string }[] }>(res);
+    const data = await handleResponse<{ options: { label: string; value: string; type: string; namespace?: string; server_id?: number | string }[] }>(res);
     return data.options || [];
   },
 

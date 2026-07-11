@@ -167,20 +167,70 @@ function FlowEditorInner({
         ),
       );
       if (nodeStatus === 'success') {
-        setEdges((eds) =>
-          eds.map((e) =>
-            e.source === nodeId && e.data?.matchStatus === 'matched'
-              ? { ...e, data: { ...e.data, activated: true } }
-              : e,
-          ),
-        );
+        setEdges((eds) => {
+          // Build a quick lookup of node _runOutput from current nodes state
+          // We need to use the functional form of setNodes/setEdges to get latest state,
+          // so we read nodes via getNodes() here.
+          const allNodes = getNodes();
+          const nodeOutputMap: Record<string, any> = {};
+          for (const n of allNodes) {
+            // Include the just-succeeded node's output too
+            if (n.id === nodeId) {
+              nodeOutputMap[n.id] = output;
+            } else {
+              const ro = (n.data as any)?._runOutput;
+              if (ro && !ro.error) nodeOutputMap[n.id] = ro;
+            }
+          }
+
+          return eds.map((e) => {
+            // Activate out-edges of the succeeded node (original logic)
+            if (e.source === nodeId && e.data?.matchStatus === 'matched') {
+              return { ...e, data: { ...e.data, activated: true } };
+            }
+            // Also activate in-edges of the succeeded node whose source already has valid output
+            // This handles the case where an upstream node was run previously (cached output)
+            // but the edge was added after that run (e.g. X ran → new Y added → X→Y edge connected → Y ran)
+            if (
+              e.target === nodeId &&
+              e.data?.matchStatus === 'matched' &&
+              nodeOutputMap[e.source]
+            ) {
+              return { ...e, data: { ...e.data, activated: true } };
+            }
+            return e;
+          });
+        });
       }
     },
-    [setNodes, setEdges],
+    [setNodes, setEdges, getNodes],
   );
 
   /**
+   * Perform an actual save regardless of dirty state.
+   * Returns the saved workflow ID, or undefined on failure.
+   */
+  const doSave = useCallback(async (): Promise<string | undefined> => {
+    if (!workflowId) return undefined;
+    try {
+      const json = toObject();
+      const result = await FlowApi.save(workflowName || '未命名工作流', json, workflowId, {
+        author: workflowAuthor || '',
+        description: workflowDescription || '',
+      });
+      lastSavedJsonRef.current = JSON.stringify(json);
+      setIsDirty(false);
+      onSave?.(result.id, workflowName || '未命名工作流');
+      return result.id;
+    } catch (err: any) {
+      console.warn('[FlowEditor] Auto-save failed:', err.message);
+      return undefined;
+    }
+  }, [workflowId, workflowName, workflowAuthor, workflowDescription, toObject, onSave]);
+
+  /**
    * Ensure the workflow is saved before running.
+   * If dirty, saves first; otherwise returns the current workflowId.
    */
   const ensureSaved = useCallback(async (): Promise<string | undefined> => {
     if (!workflowId) {
@@ -188,22 +238,14 @@ function FlowEditorInner({
       return undefined;
     }
     if (isDirty) {
-      try {
-        const json = toObject();
-        const result = await FlowApi.save(workflowName || '未命名工作流', json, workflowId, {
-          author: workflowAuthor || '',
-          description: workflowDescription || '',
-        });
-        lastSavedJsonRef.current = JSON.stringify(json);
-        setIsDirty(false);
-        onSave?.(result.id, workflowName || '未命名工作流');
-      } catch (err: any) {
-        message.error(`自动保存失败: ${err.message}`);
-        return undefined;
+      const savedId = await doSave();
+      if (!savedId) {
+        message.error('自动保存失败，请手动保存后重试');
       }
+      return savedId;
     }
     return workflowId;
-  }, [workflowId, workflowName, workflowAuthor, workflowDescription, isDirty, toObject, onSave]);
+  }, [workflowId, isDirty, doSave]);
 
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
@@ -214,6 +256,7 @@ function FlowEditorInner({
           addEdge({ ...params, type: 'flowing', data: { matchStatus: 'unknown', activated: false } }, eds),
         );
         setIsDirty(true);
+        setTimeout(() => doSave(), 100);
         return;
       }
 
@@ -284,6 +327,7 @@ function FlowEditorInner({
 
             setEdges(addEdge({ ...params, type: 'flowing', data: edgeData }, edgesAfterRemoval));
             setIsDirty(true);
+            setTimeout(() => doSave(), 100);
             return;
           }
         }
@@ -295,6 +339,7 @@ function FlowEditorInner({
           ),
         );
         setIsDirty(true);
+        setTimeout(() => doSave(), 100);
       };
 
       if (existingEdge) {
@@ -311,7 +356,7 @@ function FlowEditorInner({
         doConnect(false, edges);
       }
     },
-    [edges, setEdges, setNodes, getNode, pushUndo],
+    [edges, setEdges, setNodes, getNode, pushUndo, doSave],
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
@@ -487,8 +532,10 @@ function FlowEditorInner({
 
       setNodes((nds) => [...nds, newNode]);
       setIsDirty(true);
+      // Auto-save after React has committed the new node to ReactFlow state
+      setTimeout(() => doSave(), 100);
     },
-    [setNodes, screenToFlowPosition],
+    [setNodes, screenToFlowPosition, doSave],
   );
 
   // Keyboard shortcuts — must be on the ReactFlow pane, not on a random div
@@ -645,8 +692,8 @@ function FlowEditorInner({
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => {
           setIsDirty(true);
-          // Debounced auto-save after adding a node
-          setTimeout(() => ensureSaved(), 800);
+          // Auto-save after React has committed the new node to ReactFlow state
+          setTimeout(() => doSave(), 100);
         }} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
           <ReactFlow

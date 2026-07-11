@@ -1777,3 +1777,484 @@ class WorkflowRuntime:
 2. 运行历史记录
 3. 错误处理与重试
 4. Undo / Redo 支持
+
+---
+
+## 十六、新节点规格（Phase 11）
+
+### 16.1 Table 节点（渲染器）— 修订版
+
+> **状态：已实现基础版，本节为修订规格**
+
+**设计原则：** Table 节点接收任意上游数据（数组 / 字典 / JSON 字符串），将其解析为结构化表格并在节点卡片中直接展示。支持数组→单表、字典→多表两种模式。
+
+**Schema:**
+
+```typescript
+interface TableConfig {
+  // 无配置参数，完全由上游数据决定
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| input | tableInput | 数据输入 | any | 接收数组、字典、JSON字符串或任意字符串 |
+| output | success | 成功与否 | boolean | 执行是否成功（无解析错误） |
+| output | tables | 表格数据 | table-data | 结构化表格列表，供下游节点使用 |
+| output | tableStr | 文本输出 | string | 纯文本格式的表格摘要，供下游连线 |
+
+**输入格式支持：**
+
+| 输入数据 | 渲染结果 |
+|---------|---------|
+| `["a", "b", "c"]` | 单表，列：`#` + `值` |
+| `[{"name":"x","ver":1}, ...]` | 单表，每个 key 是列名 |
+| `{"hotfix": [...], "client": [...]}` | 多表，每个 key 是表标题 |
+| `{"key": "scalar_val"}` | 多个单行表，Key/Value 列 |
+| 非 JSON 字符串 | 按行拆分，单列表格 |
+
+**执行流程（后端）：**
+
+```
+1. 从 input_data 获取数据：tableInput > fileContent > jsonStr > value
+2. 如果是 Python dict/list（上游已解析）直接用
+3. 否则尝试 json.loads 解析字符串
+   - 失败 → 按行切分为单列表
+4. 根据类型分发：
+   - list  → _list_to_table：元素是 dict 时自动合并 key 为列名；普通值用 # + 值
+   - dict  → 每个 key 生成一个子表（list值→表格，dict值→Key/Value表，标量→单行表）
+   - 其他  → 单行单列
+5. 返回 { success, tables, tableStr }
+```
+
+**输出（完整 runOutput）：**
+
+```json
+{
+  "success": true,
+  "tables": [
+    {
+      "title": "serverHotfixInfo",
+      "columns": ["#", "值"],
+      "rows": [["1", "hotfix_nongtanggao_320269"], ["2", "hotfix_liufeng_320636"]]
+    },
+    {
+      "title": "clientHotfixInfo",
+      "columns": ["#", "值"],
+      "rows": [["1", "hotfix_taohongyu_320813"]]
+    }
+  ],
+  "tableStr": "=== serverHotfixInfo ===\n# | 值\n..."
+}
+```
+
+**前端渲染（节点卡片内）：**
+
+- 多表垂直排列，每表有标题栏（蓝色背景）
+- 条纹行样式（奇偶行背景色交替）
+- 默认最多显示 50 行，超出时显示 "… 仅显示前50行，共N行"
+- 空表显示 `(空)` 占位
+- 整体可滚动，最大高度 320px
+
+**PortTypes 修订（`table` 节点）：**
+
+```typescript
+table: [
+  { key: 'tableInput', label: '数据输入',  type: 'any',        direction: 'input',  maxConnections: 1 },
+  { key: 'success',    label: '成功与否',  type: 'boolean',    direction: 'output' },
+  { key: 'tables',     label: '表格数据',  type: 'table-data', direction: 'output' },
+  { key: 'tableStr',   label: '文本输出',  type: 'string',     direction: 'output' },
+],
+```
+
+---
+
+### 16.2 ExcelSearch 节点（数据源）
+
+**设计原则：** ExcelSearch 是 Excel 文件选择器节点，类似 C7Server 节点的交互模式。通过带搜索/筛选功能的下拉框选择一个本地路径或 P4 路径下的 Excel 文件，输出文件内容供下游 Excel 渲染节点使用。
+
+**数据来源：** `server/data/Excel/excelFiles.json`（类似 c7Server.json），格式如下：
+
+```json
+{
+  "balance_table": {
+    "name": "数值平衡表",
+    "local_path": "/data/excel/balance.xlsx",
+    "p4_path": "//C7/Development/Mainline/Design/balance.xlsx",
+    "description": "游戏数值平衡配置"
+  },
+  "hotfix_config": {
+    "name": "热更配置表",
+    "local_path": "",
+    "p4_path": "//C7/Development/Mainline/Config/hotfix.xlsx",
+    "description": "服务器热更配置"
+  }
+}
+```
+
+**Schema:**
+
+```typescript
+interface ExcelSearchConfig {
+  fileKey: string;       // 选中的文件 key（必填）
+  sheetName?: string;    // 默认 Sheet 名（可选，也可从下拉搜索选择）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| output | fileContent | 文件内容 | file-content | Excel 文件的原始内容（base64 或 bytes） |
+| output | localPath | 本地路径 | string | 文件的本地绝对路径（供 Excel 节点直接读取） |
+| output | fileName | 文件名 | string | 文件名（不含路径） |
+| output | sheetNames | Sheet列表 | any | 工作表名称列表 |
+
+**前端交互（下拉框）：**
+
+```
+┌─────────────────────────────────────────┐
+│ 🔍 搜索 name / key / description / path  │
+├─────────────────────────────────────────┤
+│ 📊 [数值平衡表]  balance_table           │
+│    /data/excel/balance.xlsx              │
+│                                         │
+│ 📊 [热更配置表]  hotfix_config           │
+│    //C7/Development/.../hotfix.xlsx      │
+└─────────────────────────────────────────┘
+```
+
+- 支持按 **name**、**key**、**description**、**local_path**、**p4_path** 搜索
+- 选中项在触发器中展示 name + key 信息
+- 方向键 ↑↓ 导航，Enter 确认，Escape 关闭
+
+**后端 API:**
+
+`GET /api/workflow/excelsearch/list` → `{ options: [{ label, value, localPath, p4Path, description }] }`
+
+**执行流程（后端）：**
+
+```
+1. 读取 config.fileKey
+2. 从 excelFiles.json 查找对应记录
+3. 优先使用 local_path（文件已存在）
+4. 若 local_path 不存在或为空 → 使用 p4_path 同步下载（p4Utils.update_file）
+5. 读取文件，获取 sheetNames（openpyxl）
+6. 返回 { fileContent, localPath, fileName, sheetNames }
+```
+
+**输出:** `{ fileContent: str, localPath: str, fileName: str, sheetNames: str[] }`
+
+**目录结构新增文件：**
+
+```
+client/src/components/workflow/nodes/ExcelSearch/
+├── index.tsx      // ExcelSearch 节点（Portal 下拉框 + 搜索筛选 + 方向键）
+└── icon.tsx       // 图标（SearchOutlined，绿色）
+
+server/
+├── Implement/workflowImpl/excelSearchExecutor.py
+└── data/Excel/excelFiles.json
+```
+
+---
+
+### 16.3 Excel 节点（渲染器）— 重大改进
+
+> **当前版本使用 antd Table；本节描述改进后的规格**
+
+#### 16.3.1 设计变更概述
+
+| 维度 | 当前版本 | 改进版本 |
+|------|---------|---------|
+| 渲染引擎 | antd Table | **Univer** (电子表格引擎) |
+| 输入兼容 | 仅 file-content | **file-content + table-data (Table节点输出)** |
+| Sheet 选择 | 手动输入 | **手写 OR 连线提供**（`sheetName` 端口） |
+| 筛选列 | 无 | **filterColumns**：列表，只显示列表中的列 |
+| 筛选行 | 无 | **filterRows**：列表，只显示列表中的行（1-based 编号） |
+| 单元格选中 | 不支持 | **点选/框选**，高亮样式，输出选中信息 |
+| 输出端口 | tableData (table-data) | **增加 selectedRows/selectedCols/selectedValues** |
+
+#### 16.3.2 Schema（改进版）
+
+```typescript
+interface ExcelConfig {
+  sheetName?: string;        // 工作表名（手动输入，可选；连线输入时覆盖）
+  filterColumns?: string[];  // 列筛选列表：只显示这些列名，空则显示全部
+  filterRows?: number[];     // 行筛选列表：只显示这些行号（1-based），空则显示全部
+}
+```
+
+#### 16.3.3 端口定义（改进版）
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| input | fileContent | 文件内容 | file-content | 来自 P4File / ExcelSearch 的文件内容（原始路径信息） |
+| input | tableData | 表格数据 | table-data | 来自 Table 节点的结构化表格数据 |
+| input | sheetName | Sheet名 | string | 从 String 节点连线提供 Sheet 名（优先于手动输入） |
+| output | tableData | 表格数据 | table-data | 解析后的完整表格数据（列+行） |
+| output | selectedRows | 选中行 | any | 当前框选区域的行索引列表（1-based） |
+| output | selectedCols | 选中列 | any | 当前框选区域的列名列表 |
+| output | selectedValues | 选中值 | any | 当前框选区域的单元格值（二维数组 or 单值） |
+
+**端口兼容性更新：**
+
+```typescript
+'table-data': ['table-data', 'any'],  // Excel 的 tableData 输入接受 Table 节点输出
+```
+
+#### 16.3.4 输入来源处理策略
+
+```
+优先级（从高到低）：
+1. tableData 端口（来自 Table 节点，直接用 tables[0] 渲染）
+2. fileContent 端口（来自 P4File / ExcelSearch）
+   - 检查 input_data.localPath → openpyxl 直接读取 xlsx
+   - 无 localPath → 尝试 BytesIO 加载或 CSV 解析
+3. 两者都无 → 报错 "No input. Connect P4File, ExcelSearch, or Table node."
+```
+
+#### 16.3.5 前端渲染（Univer）
+
+**渲染引擎选型：**
+
+- 使用 [`@univerjs/core`](https://univer.ai/) + `@univerjs/sheets` + `@univerjs/sheets-ui`
+- 嵌入到节点卡片的 content 区域（默认高度 300px）
+- 在 NodeDetailModal 中以更大尺寸展示（60vh）
+
+**npm 依赖（新增）：**
+
+```json
+{
+  "@univerjs/core": "^0.6.x",
+  "@univerjs/sheets": "^0.6.x",
+  "@univerjs/sheets-ui": "^0.6.x",
+  "@univerjs/ui": "^0.6.x",
+  "@univerjs/design": "^0.6.x"
+}
+```
+
+**Univer 初始化流程：**
+
+```typescript
+import { Univer, UniverSheetPlugin, UniverSheetsUIPlugin } from '@univerjs/...';
+
+// 1. 创建 Univer 实例，挂载到 DOM ref
+const univerRef = useRef<HTMLDivElement>(null);
+useEffect(() => {
+  const univer = new Univer({ ... });
+  univer.registerPlugin(UniverSheetPlugin);
+  univer.registerPlugin(UniverSheetsUIPlugin, { container: univerRef.current });
+
+  // 2. 加载数据
+  univer.createUnit(UnitType.WORKBOOK, workbookData);
+
+  return () => univer.dispose();
+}, []);
+```
+
+**数据转换（后端输出 → Univer Workbook 格式）：**
+
+```typescript
+// 后端输出（经过 filterColumns / filterRows 后）
+{
+  columns: ['name', 'version', 'status'],
+  rows: [['hotfix_a', '1.0', 'active'], ...]
+}
+
+// 转换为 Univer IWorkbookData
+{
+  sheets: {
+    'Sheet1': {
+      cellData: {
+        0: { 0: { v: 'name' }, 1: { v: 'version' }, 2: { v: 'status' } },  // header
+        1: { 0: { v: 'hotfix_a' }, 1: { v: '1.0' }, 2: { v: 'active' } },
+        ...
+      }
+    }
+  }
+}
+```
+
+#### 16.3.6 单元格选中交互
+
+**点选（单元格）：**
+- 点击某个单元格 → 该单元格高亮（Univer 默认选中样式：蓝色边框）
+- 输出端口更新：
+  - `selectedRows`: `[rowIndex]`（1-based）
+  - `selectedCols`: `[colName]`
+  - `selectedValues`: `cellValue`（标量）
+
+**框选（区域）：**
+- 拖拽选择多个单元格 → 选中区域高亮（Univer 蓝色覆盖层）
+- 输出端口更新：
+  - `selectedRows`: `[r1, r2, ...]`（去重排序，1-based）
+  - `selectedCols`: `[col1, col2, ...]`（去重排序）
+  - `selectedValues`: `[[v11, v12], [v21, v22], ...]`（二维数组，按行×列）
+
+**特殊样式：**
+
+```typescript
+// 选中单元格：蓝色背景高亮
+{
+  bg: { rgb: '#e6f4ff' },
+  bd: { t: { s: 1, cl: { rgb: '#1890ff' } }, b: { s: 1, cl: { rgb: '#1890ff' } }, ... }
+}
+
+// 选中行：行头高亮（淡蓝）
+// 选中列：列头高亮（淡蓝）
+```
+
+**输出端口监听（React 侧）：**
+
+```typescript
+// Univer selection change event
+univerAPI.onSelectionChange((selections) => {
+  const { rows, cols, values } = extractSelectionData(selections);
+  setSelectedRows(rows);
+  setSelectedCols(cols);
+  setSelectedValues(values);
+  // 同步到 node.data（通过 setNodes）
+  setNodes(nds => nds.map(n =>
+    n.id === id
+      ? { ...n, data: { ...n.data,
+          _selectedRows: rows,
+          _selectedCols: cols,
+          _selectedValues: values
+        }}
+      : n
+  ));
+});
+```
+
+#### 16.3.7 执行流程（后端改进版）
+
+```
+1. 确定输入来源（优先级见 16.3.4）
+2. 从 tableData 输入来时：直接使用 tables[0] 的 columns + rows（跳过 Excel 解析）
+3. 从 fileContent 来时：
+   a. 尝试 localPath → openpyxl.load_workbook
+   b. 无 localPath → BytesIO 加载
+   c. 选择 sheet（config.sheetName 或连线 sheetName 或第一个）
+4. 应用筛选：
+   - filterColumns（非空时）：只保留列表中的列
+   - filterRows（非空时）：只保留列表中的行号（1-based，忽略越界）
+5. None 列头安全处理：None → "Col{i+1}"
+6. 返回 { columns, rows, sheetNames, tableData, selectedRows, selectedCols, selectedValues }
+   - selectedRows/selectedCols/selectedValues 初始为空（[]），由前端交互后更新
+```
+
+**输出（完整 runOutput）：**
+
+```json
+{
+  "columns": ["name", "version", "status"],
+  "rows": [["hotfix_a", "1.0", "active"], ...],
+  "sheetNames": ["Sheet1", "配置", "备注"],
+  "tableData": {
+    "title": null,
+    "columns": ["name", "version", "status"],
+    "rows": [["hotfix_a", "1.0", "active"]]
+  },
+  "selectedRows": [],
+  "selectedCols": [],
+  "selectedValues": null
+}
+```
+
+#### 16.3.8 fields 定义（改进版）
+
+| field key | label | type | 说明 |
+|-----------|-------|------|------|
+| `sheetName` | Sheet 名 | text | 手动输入；有 sheetName 连线时禁用，显示「🔗 由连线提供」 |
+| `filterColumns` | 筛选列 | textarea | 每行一个列名，空则显示全部列 |
+| `filterRows` | 筛选行 | textarea | 每行一个行号（1-based），空则显示全部行 |
+
+#### 16.3.9 目录结构新增文件
+
+```
+client/src/components/workflow/nodes/Excel/
+├── index.tsx          // Excel 节点主组件（改进版，接入 Univer）
+├── UniverRenderer.tsx  // Univer 电子表格渲染器（新增）
+├── ExcelRenderer.tsx   // 旧 antd Table 渲染器（保留，兼容 NodeDetailModal）
+└── icon.tsx
+
+server/Implement/workflowImpl/
+└── excelExecutor.py    // 改进：支持 tableData 输入 + filterColumns/filterRows
+```
+
+#### 16.3.10 PortTypes 修订（`excel` 节点）
+
+```typescript
+excel: [
+  { key: 'fileContent', label: '文件内容',  type: 'file-content', direction: 'input' },
+  { key: 'tableData',   label: '表格数据',  type: 'table-data',   direction: 'input' },
+  { key: 'sheetName',   label: 'Sheet名',   type: 'string',       direction: 'input',  maxConnections: 1 },
+  { key: 'tableData',   label: '表格数据',  type: 'table-data',   direction: 'output' },
+  { key: 'selectedRows',   label: '选中行', type: 'any',          direction: 'output' },
+  { key: 'selectedCols',   label: '选中列', type: 'any',          direction: 'output' },
+  { key: 'selectedValues', label: '选中值', type: 'any',          direction: 'output' },
+],
+```
+
+> **注意：** `tableData` 同时作为输入和输出端口存在，key 相同但 direction 不同，ReactFlow 通过 `id` + `type="source"/"target"` 区分。
+
+---
+
+### 16.4 端口类型系统更新（Phase 11）
+
+**新增兼容关系：**
+
+```typescript
+'table-data': ['table-data', 'any'],   // 已有，保持
+'file-content': ['file-content', 'string', 'text', 'any'],  // 已有
+```
+
+**节点端口汇总更新（补充）：**
+
+| 节点 | Input Ports | Output Ports |
+|------|-------------|-------------|
+| Table | tableInput (any) | success (boolean), tables (table-data), tableStr (string) |
+| ExcelSearch | — | fileContent (file-content), localPath (string), fileName (string), sheetNames (any) |
+| Excel (改进) | fileContent (file-content), tableData (table-data), sheetName (string) | tableData (table-data), selectedRows (any), selectedCols (any), selectedValues (any) |
+
+---
+
+### 16.5 实施计划（Phase 11）
+
+#### Step 1：Table 节点出参修订 ✅（已部分实现）
+
+- [x] 后端 tableExecutor.py 已实现基础逻辑
+- [ ] 修订出参：增加 `success` (boolean) 和 `tables` (table-data) 端口
+- [ ] 前端 Table/index.tsx 更新端口定义
+- [ ] 更新 PortTypes.ts 中 `table` 节点的端口定义
+
+#### Step 2：ExcelSearch 节点
+
+- [ ] 创建 `server/data/Excel/excelFiles.json` 示例数据
+- [ ] 实现 `server/Implement/workflowImpl/excelSearchExecutor.py`
+- [ ] 添加后端路由 `GET /api/workflow/excelsearch/list`
+- [ ] 实现前端 `nodes/ExcelSearch/index.tsx`（复用 C7Server 下拉框交互模式）
+- [ ] 实现前端 `nodes/ExcelSearch/icon.tsx`
+- [ ] 注册端口类型（PortTypes.ts）+ 节点（NodeRegistry.tsx）
+- [ ] 后端 __init__.py 注册 ExcelSearchExecutor
+
+#### Step 3：Excel 节点改进
+
+- [ ] 安装 Univer 相关 npm 依赖
+- [ ] 实现 `nodes/Excel/UniverRenderer.tsx`（Univer 电子表格组件）
+- [ ] 更新 `nodes/Excel/index.tsx`：
+  - 新增 `tableData` 输入端口（接收来自 Table 节点）
+  - 新增 `sheetName` 输入端口（连线提供 Sheet 名）
+  - 新增 `filterColumns` / `filterRows` 字段
+  - 集成 UniverRenderer 替换 antd Table
+  - 实现单元格选中回调 → 更新 `_selectedRows` / `_selectedCols` / `_selectedValues`
+  - 新增三个输出端口：`selectedRows` / `selectedCols` / `selectedValues`
+- [ ] 更新 `server/Implement/workflowImpl/excelExecutor.py`：
+  - 支持 `tableData` 输入（来自 Table 节点的 `tables` 输出）
+  - 支持 `sheetName` 连线输入（优先于 config.sheetName）
+  - 实现 `filterColumns` / `filterRows` 过滤逻辑
+  - 初始返回 `selectedRows=[]` / `selectedCols=[]` / `selectedValues=null`
+- [ ] 更新 PortTypes.ts 中 `excel` 节点端口定义

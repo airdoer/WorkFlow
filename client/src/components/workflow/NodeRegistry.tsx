@@ -13,6 +13,7 @@ import C7ServerNode from './nodes/C7Server';
 import KdipNode from './nodes/Jenkins';
 import KimNotifyNode from './nodes/KimNotify';
 import BoolGateNode from './nodes/BoolGate';
+import TableNode from './nodes/Table';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -27,6 +28,7 @@ import C7ServerIcon from './nodes/C7Server/icon';
 import KdipIcon from './nodes/Jenkins/icon';
 import KimNotifyIcon from './nodes/KimNotify/icon';
 import BoolGateIcon from './nodes/BoolGate/icon';
+import TableIcon from './nodes/Table/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -42,6 +44,7 @@ export const nodeTypes: NodeTypes = {
   kdip: KdipNode,
   kimnotify: KimNotifyNode,
   boolgate: BoolGateNode,
+  table: TableNode,
 };
 
 export interface NodeRegistryEntry {
@@ -71,6 +74,8 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'kdip', label: 'KDIP', icon: <KdipIcon />, category: '工具', description: '在指定 C7 服务器上执行 KDIP 任务，输出成功与否及结果内容' },
   { type: 'kimnotify', label: 'Kim 通知', icon: <KimNotifyIcon />, category: '工具', description: '通过 Kim 机器人发送消息给用户或群组，输出发送结果' },
   { type: 'boolgate', label: 'Bool 门控', icon: <BoolGateIcon />, category: '工具', description: '当输入为 True 时放行执行后续节点，为 False 时报错中断' },
+  // Renderers
+  { type: 'table', label: 'Table 表格', icon: <TableIcon />, category: '渲染器', description: '接收上游数据，将数组/字典渲染为表格；数组→单表，字典→多表' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

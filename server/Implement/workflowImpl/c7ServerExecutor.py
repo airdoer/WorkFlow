@@ -40,6 +40,8 @@ def _load_c7_server_list():
                 'label': info.get('name', namespace),
                 'value': namespace,
                 'type': 'server',
+                'namespace': namespace,
+                'server_id': info.get('server_id'),
             })
     except Exception as e:
         pass
