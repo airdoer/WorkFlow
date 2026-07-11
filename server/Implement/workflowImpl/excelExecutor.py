@@ -27,7 +27,11 @@ class ExcelExecutor(BaseNodeExecutor):
         """
 
         # ── 1. tableData 输入（来自 Table 节点 tables 端口） ──────────────────
-        table_data_input = input_data.get('tableData')
+        # 只在没有 fileContent/localPath 时才走 tableData 路径，
+        # 避免 excel 自身上次输出的 tableData 通过端口映射污染本次输入
+        local_path_check = input_data.get('localPath', '')
+        file_content_check = input_data.get('fileContent', '')
+        table_data_input = input_data.get('tableData') if not local_path_check and not file_content_check else None
         if table_data_input:
             # table_data_input 可能是 tables 列表的第一个元素，或 Table 节点直接输出的 tables 列表
             if isinstance(table_data_input, list) and len(table_data_input) > 0:
@@ -38,14 +42,17 @@ class ExcelExecutor(BaseNodeExecutor):
                 first = None
 
             if first and isinstance(first, dict) and 'columns' in first and 'rows' in first:
-                columns = [str(c) for c in first.get('columns', [])]
+                all_columns = [str(c) for c in first.get('columns', [])]
                 raw_rows = first.get('rows', [])
-                rows = self._apply_filters_raw(raw_rows, columns, config)
-                columns = self._apply_column_filter(columns, config)
-                rows = [{columns[i]: row[i] for i in range(len(columns)) if i < len(row)} for row in rows]
-                table_data = {'title': first.get('title'), 'columns': columns, 'rows': rows}
+                # allRows_dict: 完整未筛选数据（字典格式）
+                all_rows_dict = [{all_columns[i]: (row[i] if isinstance(row, list) and i < len(row) else row.get(all_columns[i]) if isinstance(row, dict) else None) for i in range(len(all_columns))} for row in raw_rows]
+                filtered_raw = self._apply_filters_raw(raw_rows, all_columns, config)
+                filtered_columns = self._apply_column_filter(all_columns, config)
+                rows = [{filtered_columns[i]: (row[i] if isinstance(row, list) and i < len(row) else row.get(filtered_columns[i]) if isinstance(row, dict) else None) for i in range(len(filtered_columns))} for row in filtered_raw]
+                table_data = {'title': first.get('title'), 'columns': filtered_columns, 'rows': rows}
                 return {
-                    'columns': columns, 'rows': rows,
+                    'columns': filtered_columns, 'rows': rows,
+                    'allColumns': all_columns, 'allRows': all_rows_dict,
                     'sheetNames': [], 'tableData': table_data,
                     'selectedRows': [], 'selectedCols': [], 'selectedValues': None,
                 }

@@ -13,6 +13,7 @@ import { MiniTable } from './nodes/Table/index';
 import type { TableData } from './nodes/Table/index';
 
 const DiffRenderer = lazy(() => import('./nodes/Diff/DiffRenderer'));
+const UniverRenderer = lazy(() => import('./nodes/Excel/UniverRenderer'));
 
 const PORT_COLORS: Record<string, string> = {
   'file-content': '#1890ff',
@@ -311,8 +312,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               value={(nodeData.filterRows as string[]) || []}
               onChange={(v) => handleFieldChange('filterRows', v)}
               options={(() => {
-                const rows = runOutput?.rows as Record<string, any>[] | undefined;
-                const cols = runOutput?.columns as string[] | undefined;
+                const rows = (runOutput?.allRows ?? runOutput?.rows) as Record<string, any>[] | undefined;
+                const cols = (runOutput?.allColumns ?? runOutput?.columns) as string[] | undefined;
                 if (!rows || !cols || cols.length === 0) return [];
                 const firstCol = cols[0];
                 return rows.map((row: Record<string, any>, i: number) => {
@@ -325,7 +326,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               label="筛选列"
               value={(nodeData.filterColumns as string[]) || []}
               onChange={(v) => handleFieldChange('filterColumns', v)}
-              options={runOutput?.columns ? runOutput.columns.map((c: string) => ({ label: c, value: c })) : []}
+              options={runOutput?.allColumns
+                ? (runOutput.allColumns as string[]).map((c: string) => ({ label: c, value: c }))
+                : runOutput?.columns
+                  ? runOutput.columns.map((c: string) => ({ label: c, value: c }))
+                  : []}
             />
           </>
         )}
@@ -511,7 +516,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const isDiffPort = nodeType === 'diff' && p.key === 'isSame' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
             // For Table node: 'tables' port is an array of {title, columns, rows}
             const isTablesPort = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
-            const previewText = hasDisplay && !isDiffPort && !isTablesPort
+            // For Excel node: table-data port with columns+rows structure
+            const isExcelPort = !isTablesPort && p.type === 'table-data' && displayValue?.columns;
+            const previewText = hasDisplay && !isDiffPort && !isTablesPort && !isExcelPort
               ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
               : null;
 
@@ -545,13 +552,17 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     </Button>
                   )}
                 </div>
-                {/* Content area: Tables for table node, DiffSummary for diff node, pre for others */}
+                {/* Content area: Tables for table node, Univer for Excel, DiffSummary for diff node, pre for others */}
                 {hasDisplay && isTablesPort ? (
                   <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 3, overflow: 'hidden' }}>
                     {(displayValue as TableData[]).map((t: TableData, i: number) => (
                       <MiniTable key={i} table={t} maxRows={20} compact />
                     ))}
                   </div>
+                ) : hasDisplay && isExcelPort ? (
+                  <Suspense fallback={<pre style={{ margin: 0, padding: '4px 6px', fontSize: 9 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
+                    <UniverRenderer data={displayValue} nodeId={selectedNode?.id} compact height={250} />
+                  </Suspense>
                 ) : hasDisplay && isDiffPort ? (
                   <DiffSummary
                     contentA={String(runOutput.contentA ?? '')}

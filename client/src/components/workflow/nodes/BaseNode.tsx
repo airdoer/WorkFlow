@@ -8,7 +8,7 @@ import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
 
 // Lazy load renderers to reduce initial bundle
-const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
+const ExcelRenderer = lazy(() => import('./Excel/UniverRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 
@@ -22,6 +22,10 @@ export interface NodeField {
   rows?: number;
   step?: number;
   options?: { label: string; value: string }[];
+  /** Dynamic options factory: called with current nodeData at render time.
+   *  Takes priority over static `options` when provided.
+   */
+  optionsFn?: (nodeData: Record<string, any>) => { label: string; value: string }[];
   required?: boolean;
   /** If set, this field is driven by an input port with this key.
    *  When that port has an active connection, the field is locked (read-only).
@@ -421,6 +425,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         {fields.map((f) => {
           const locked = !!(f.linkedPortKey && connectedInputPorts[f.linkedPortKey]);
           const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
+          // Resolve options: dynamic fn takes priority over static array
+          const resolvedOptions = f.optionsFn ? f.optionsFn(data as Record<string, any>) : (f.options ?? []);
 
           const lockedStyle: React.CSSProperties = {
             width: '100%', fontSize: 11, padding: '3px 6px',
@@ -482,7 +488,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             );
           }
 
-          if (f.type === 'select' && f.options) {
+          if (f.type === 'select' && (resolvedOptions.length >= 0 || f.options !== undefined || f.optionsFn !== undefined)) {
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
                 {fieldLabel}
@@ -495,8 +501,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     disabled={locked}
                     value={val || undefined}
                     onChange={(v) => !locked && handleFieldChange(f.key, v)}
-                    options={f.options}
-                    placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                    options={resolvedOptions}
+                    placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                     style={{ width: '100%', fontSize: 11 }}
                     allowClear
                     getPopupContainer={(node) => node.parentElement || document.body}
@@ -507,7 +513,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             );
           }
 
-          if (f.type === 'multiselect' && f.options) {
+          if (f.type === 'multiselect' && (resolvedOptions.length >= 0 || f.options !== undefined || f.optionsFn !== undefined)) {
             const selectedVals: string[] = Array.isArray(val) ? val : [];
             return (
               <div key={f.key} style={{ marginBottom: 6 }}>
@@ -522,8 +528,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     disabled={locked}
                     value={selectedVals}
                     onChange={(v) => !locked && handleFieldChange(f.key, v)}
-                    options={f.options}
-                    placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                    options={resolvedOptions}
+                    placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                     style={{ width: '100%', fontSize: 11 }}
                     maxTagCount={2}
                     maxTagTextLength={8}
@@ -611,7 +617,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                            className="nowheel nopan">
                         {p.type === 'table-data' && displayValue?.columns ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
-                            <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
+                            <ExcelRenderer data={displayValue} nodeId={id} compact height={110} />
                           </Suspense>
                         ) : p.type === 'json-data' ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>

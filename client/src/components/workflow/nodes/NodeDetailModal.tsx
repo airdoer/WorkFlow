@@ -32,7 +32,7 @@ const STATUS_CONFIG: Record<RunStatus, { color: string; bg: string; label: strin
 };
 
 // Lazy renderers
-const ExcelRenderer = lazy(() => import('./Excel/ExcelRenderer'));
+const ExcelRenderer = lazy(() => import('./Excel/UniverRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 const DiffRenderer = lazy(() => import('./Diff/DiffRenderer'));
@@ -316,6 +316,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
             {fields.map((f) => {
               const locked = isFieldLocked(f);
               const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
+              // Resolve options: dynamic fn takes priority over static array
+              const resolvedOptions = f.optionsFn ? f.optionsFn(data as Record<string, any>) : (f.options ?? []);
 
               // Shared label with locked indicator
               const fieldLabel = (
@@ -382,7 +384,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 );
               }
 
-              if (f.type === 'select' && f.options) {
+              if (f.type === 'select' && (f.options !== undefined || f.optionsFn !== undefined)) {
                 return (
                   <div key={f.key}>
                     {fieldLabel}
@@ -390,8 +392,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       disabled={locked}
                       value={val || undefined}
                       onChange={(v) => !locked && handleFieldChange(f.key, v)}
-                      options={f.options}
-                      placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                      options={resolvedOptions}
+                      placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                       style={{ width: '100%', fontSize: 13 }}
                       allowClear
                       getPopupContainer={(node) => node.parentElement || document.body}
@@ -400,7 +402,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 );
               }
 
-              if (f.type === 'multiselect' && f.options) {
+              if (f.type === 'multiselect' && (f.options !== undefined || f.optionsFn !== undefined)) {
                 const selected: string[] = Array.isArray(val) ? val : [];
                 return (
                   <div key={f.key}>
@@ -410,8 +412,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       disabled={locked}
                       value={selected}
                       onChange={(v) => !locked && handleFieldChange(f.key, v)}
-                      options={f.options}
-                      placeholder={f.options.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
+                      options={resolvedOptions}
+                      placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                       style={{ width: '100%', fontSize: 13 }}
                       allowClear
                       getPopupContainer={(node) => node.parentElement || document.body}
@@ -561,7 +563,28 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                           </div>
                         ) : isExcel ? (
                           <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
-                            <ExcelRenderer data={displayValue} columnFilter={(data.columnFilter as string[]) || []} rowFilter={(data.rowFilter as string[]) || []} />
+                            <ExcelRenderer
+                              data={displayValue}
+                              nodeId={nodeId}
+                              height={400}
+                              onSelectionChange={(info) => {
+                                setNodes((nds) =>
+                                  nds.map((n) =>
+                                    n.id === nodeId
+                                      ? {
+                                          ...n,
+                                          data: {
+                                            ...n.data,
+                                            _selectedRows: info.selectedRows,
+                                            _selectedCols: info.selectedCols,
+                                            _selectedValues: info.selectedValues,
+                                          },
+                                        }
+                                      : n,
+                                  ),
+                                );
+                              }}
+                            />
                           </Suspense>
                         ) : isDiff ? (
                           <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#999' }}>加载 Diff 编辑器...</div>}>
