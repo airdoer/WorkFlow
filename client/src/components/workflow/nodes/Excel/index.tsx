@@ -1,7 +1,7 @@
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useMemo, useCallback, useRef } from 'react';
 import { NodeProps, useReactFlow } from 'reactflow';
 import BaseNode, { type NodeField } from '../BaseNode';
-import UniverRenderer, { type ExcelTableData, type SelectionInfo } from './UniverRenderer';
+import UniverRenderer, { type ExcelTableData } from './UniverRenderer';
 
 /* ─── ExcelNode ─────────────────────────────────────────────────────────── */
 function ExcelNode({ data, id, selected }: NodeProps) {
@@ -9,7 +9,7 @@ function ExcelNode({ data, id, selected }: NodeProps) {
   const runOutput = nodeData._runOutput as any;
   const { setNodes } = useReactFlow();
 
-  // helpers：从 _runOutput 实时计算 options，避免 useMemo 缓存旧值
+  // helpers
   const makeRowOptions = (d: Record<string, any>) => {
     const ro = d._runOutput as any;
     const rows = (ro?.allRows ?? ro?.rows) as Record<string, any>[] | undefined;
@@ -61,42 +61,32 @@ function ExcelNode({ data, id, selected }: NodeProps) {
     },
   ];
 
-  // 构建渲染数据
+  // Build render data — use stable keys so selection-only updates don't
+  // cause excelData to change (which would trigger Univer re-render)
+  const cols = runOutput?.columns as string[] | undefined;
+  const rows = runOutput?.rows as Record<string, any>[] | undefined;
+  const sheetNames = runOutput?.sheetNames as string[] | undefined;
+
   const excelData: ExcelTableData | null = useMemo(() => {
-    if (!runOutput) return null;
-    const cols = runOutput.columns as string[] | undefined;
-    const rows = runOutput.rows as Record<string, any>[] | undefined;
     if (!cols || !rows) return null;
-    return { columns: cols, rows, sheetNames: runOutput.sheetNames };
-  }, [runOutput]);
+    return { columns: cols, rows, sheetNames };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cols?.join(','),
+    rows?.length,
+    sheetNames?.join(','),
+  ]);
 
-  // 选中事件回调：同步到 node data
-  const handleSelectionChange = useCallback((info: SelectionInfo) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                _selectedRows: info.selectedRows,
-                _selectedCols: info.selectedCols,
-                _selectedValues: info.selectedValues,
-              },
-            }
-          : n,
-      ),
-    );
-  }, [id, setNodes]);
+  // NOTE: No onSelectionChange in compact node card — this prevents
+  // infinite re-render loops when setNodes triggers ReactFlow re-render.
+  // Selection changes are only captured in the NodeDetailModal (fullscreen).
 
-  // 自定义内容区（Univer 表格显示）
   const tableContent = excelData ? (
     <UniverRenderer
       data={excelData}
       nodeId={id}
       compact
       height={200}
-      onSelectionChange={handleSelectionChange}
     />
   ) : null;
 

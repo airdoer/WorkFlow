@@ -567,23 +567,6 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                               data={displayValue}
                               nodeId={nodeId}
                               height={400}
-                              onSelectionChange={(info) => {
-                                setNodes((nds) =>
-                                  nds.map((n) =>
-                                    n.id === nodeId
-                                      ? {
-                                          ...n,
-                                          data: {
-                                            ...n.data,
-                                            _selectedRows: info.selectedRows,
-                                            _selectedCols: info.selectedCols,
-                                            _selectedValues: info.selectedValues,
-                                          },
-                                        }
-                                      : n,
-                                  ),
-                                );
-                              }}
                             />
                           </Suspense>
                         ) : isDiff ? (

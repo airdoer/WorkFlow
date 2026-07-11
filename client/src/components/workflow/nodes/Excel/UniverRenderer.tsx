@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core';
 import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/locales/zh-CN';
@@ -7,7 +7,6 @@ import '@univerjs/preset-sheets-core/lib/index.css';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
-/** Data format from backend Excel node output */
 export interface ExcelTableData {
   columns: string[];
   rows: Record<string, any>[];
@@ -15,37 +14,31 @@ export interface ExcelTableData {
 }
 
 export interface UniverRendererProps {
-  /** Structured table data (columns + rows) */
   data: ExcelTableData;
-  /** ReactFlow node id — used to sync selection back to node data */
   nodeId?: string;
-  /** Compact mode: smaller height, no toolbar (for node card in canvas) */
   compact?: boolean;
-  /** Container height (default: compact=200, full=400) */
   height?: number;
-  /** Callback when selection changes (selectedRows, selectedCols, selectedValues) */
   onSelectionChange?: (info: SelectionInfo) => void;
 }
 
 export interface SelectionInfo {
-  selectedRows: number[];   // 1-based row indices
-  selectedCols: string[];   // column names
-  selectedValues: any;      // scalar (single cell) or 2D array (range)
+  selectedRows: number[];
+  selectedCols: string[];
+  selectedValues: any;
 }
 
-/* ─── Data conversion: backend output → Univer IWorkbookData ─────────────── */
+/* ─── Data conversion ─────────────────────────────────────────────────────── */
 
 function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
   const { columns = [], rows = [] } = data;
   const sheetKey = sheetName || 'Sheet1';
 
-  // Build cellData: row 0 = header, row 1..N = data rows
-  const cellData: Record<number, Record<number, { v: string | number | null }>> = {};
+  const cellData: Record<number, Record<number, any>> = {};
 
-  // Header row (row 0)
+  // Header row (row 0) — bold
   cellData[0] = {};
   columns.forEach((col, ci) => {
-    cellData[0][ci] = { v: col };
+    cellData[0][ci] = { v: col, s: { bl: 1 } };
   });
 
   // Data rows (row 1..N)
@@ -59,9 +52,18 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
     });
   });
 
-  // Column count
   const colCount = columns.length;
-  const rowCount = rows.length + 1; // +1 for header
+  const rowCount = rows.length + 1;
+
+  // Auto column widths
+  const colData: Record<number, any> = {};
+  columns.forEach((col, ci) => {
+    let maxLen = col.length;
+    rows.forEach((row) => {
+      maxLen = Math.max(maxLen, String(row[col] ?? '').length);
+    });
+    colData[ci] = { w: Math.min(Math.max(maxLen * 9, 60), 300) };
+  });
 
   return {
     id: 'workbook-id',
@@ -72,23 +74,14 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
         cellData,
         rowCount,
         colCount,
-        // Default column widths
         defaultColumnWidth: 100,
         defaultRowHeight: 27,
-        // Header row style (bold)
-        rowData: {
-          0: {
-            hd: 0,
-          },
-        },
+        colData,
+        freeze: { startRow: 1, endRow: 1 },
       },
     },
   };
 }
-
-// We need this variable outside the component because Univer defaultRowHeight
-// depends on the compact prop but the data conversion is pure.
-// We'll handle styles inside the component after creation.
 
 /* ─── Selection extraction ────────────────────────────────────────────────── */
 
@@ -108,15 +101,13 @@ function extractSelectionFromUniver(
     const ranges = selection.getActiveRangeList?.() || [];
     if (!ranges || ranges.length === 0) return null;
 
-    // Get the first range
-    const range = ranges[0] || ranges;
+    const range = Array.isArray(ranges) ? ranges[0] : ranges;
     const startRow = range?.getRow?.() ?? range?.startRow ?? 0;
     const endRow = range?.getLastRow?.() ?? range?.endRow ?? 0;
     const startCol = range?.getColumn?.() ?? range?.startCol ?? 0;
     const endCol = range?.getLastColumn?.() ?? range?.endCol ?? 0;
 
-    // Skip header row (row 0) — data starts from row 1
-    const dataStartRow = Math.max(startRow - 1, 0); // skip header row
+    const dataStartRow = Math.max(startRow - 1, 0);
     const dataEndRow = Math.min(endRow - 1, rows.length - 1);
     const colStart = Math.max(startCol, 0);
     const colEnd = Math.min(endCol, columns.length - 1);
@@ -127,7 +118,7 @@ function extractSelectionFromUniver(
 
     const selectedRows: number[] = [];
     for (let r = dataStartRow; r <= dataEndRow; r++) {
-      selectedRows.push(r + 1); // 1-based
+      selectedRows.push(r + 1);
     }
 
     const selectedCols = columns.slice(colStart, colEnd + 1);
@@ -141,7 +132,6 @@ function extractSelectionFromUniver(
       selectedValues.push(rowVals);
     }
 
-    // Single cell → scalar; single value → unwrap
     let finalValues: any = selectedValues;
     if (selectedValues.length === 1 && selectedValues[0].length === 1) {
       finalValues = selectedValues[0][0];
@@ -149,13 +139,40 @@ function extractSelectionFromUniver(
 
     return { selectedRows, selectedCols, selectedValues: finalValues };
   } catch (e) {
-    // Selection API might not be available in all versions
     console.warn('[UniverRenderer] extractSelection failed:', e);
     return null;
   }
 }
 
+/* ─── Compact mode CSS ────────────────────────────────────────────────────── */
+
+// Inject a global <style> tag once to hide Univer chrome in compact containers
+let _compactStyleInjected = false;
+function injectCompactStyle() {
+  if (_compactStyleInjected) return;
+  _compactStyleInjected = true;
+  const style = document.createElement('style');
+  style.id = 'univer-compact-override';
+  style.textContent = `
+    .univer-compact header {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    .univer-compact footer {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 /* ─── The Component ──────────────────────────────────────────────────────── */
+
+let _univerContainerCounter = 0;
 
 const UniverRenderer: React.FC<UniverRendererProps> = ({
   data,
@@ -169,39 +186,45 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
   const univerInstanceRef = useRef<any>(null);
   const columnsRef = useRef<string[]>(data.columns);
   const rowsRef = useRef<Record<string, any>[]>(data.rows);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const isInitializedRef = useRef(false);
+  const lastDataKeyRef = useRef<string>('');
+  const selDebounceRef = useRef<any>(null);
+
+  const containerIdRef = useRef<string>(
+    `univer-c-${nodeId || (++_univerContainerCounter)}`
+  );
 
   const containerHeight = height ?? (compact ? 200 : 400);
 
-  // Keep refs in sync with props
+  // Keep refs in sync
   useEffect(() => {
     columnsRef.current = data.columns;
     rowsRef.current = data.rows;
   }, [data.columns, data.rows]);
 
-  // Convert data to Univer format
-  const workbookData = useMemo(() => {
-    if (!data.columns.length && !data.rows.length) return null;
-    return toUniverWorkbookData(data, data.sheetNames?.[0]);
-  }, [data.columns, data.rows, data.sheetNames]);
-
-  // Initialize Univer
   useEffect(() => {
-    if (!containerRef.current || !workbookData) return;
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
-    // Clean up previous instance
-    if (univerInstanceRef.current) {
-      try {
-        univerInstanceRef.current.dispose();
-      } catch (e) {
-        // ignore
-      }
-      univerInstanceRef.current = null;
-      univerAPIRef.current = null;
-    }
+  // Stable key for data comparison
+  const dataKey = `${data.columns.join(',')}|${data.rows.length}|${data.sheetNames?.join(',')}`;
+  const workbookData = data.columns.length > 0
+    ? toUniverWorkbookData(data, data.sheetNames?.[0])
+    : null;
 
-    // Ensure container has a unique id
-    const containerId = `univer-container-${nodeId || Math.random().toString(36).slice(2)}`;
-    containerRef.current.id = containerId;
+  // Inject compact CSS once
+  useEffect(() => {
+    if (compact) injectCompactStyle();
+  }, [compact]);
+
+  // ─── Init Univer ONCE on mount ────────────────────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || isInitializedRef.current) return;
+
+    isInitializedRef.current = true;
+    container.id = containerIdRef.current;
 
     const { univer, univerAPI } = createUniver({
       locale: LocaleType.ZH_CN,
@@ -210,7 +233,7 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
       },
       presets: [
         UniverSheetsCorePreset({
-          container: containerId,
+          container: containerIdRef.current,
         }),
       ],
     });
@@ -218,71 +241,80 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
     univerInstanceRef.current = univer;
     univerAPIRef.current = univerAPI;
 
-    // Create workbook with data
-    univerAPI.createWorkbook(workbookData);
+    // Create empty workbook first — real data will be loaded in next effect
+    univerAPI.createWorkbook({});
 
-    // Listen for selection changes via command execution
-    if (onSelectionChange) {
-      try {
-        const disposable = univerAPI.onCommandExecuted((command: any) => {
-          // Selection change commands
-          if (
-            command?.id === 'sheet.command.set-selection' ||
-            command?.id === 'sheet.operation.set-selection' ||
-            command?.id?.includes?.('selection')
-          ) {
+    // Selection listener with debounce
+    try {
+      const disposable = univerAPI.onCommandExecuted((command: any) => {
+        if (
+          command?.id === 'sheet.command.set-selection' ||
+          command?.id === 'sheet.operation.set-selection' ||
+          command?.id?.includes?.('selection')
+        ) {
+          if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
+          selDebounceRef.current = setTimeout(() => {
             const sel = extractSelectionFromUniver(univerAPI, columnsRef.current, rowsRef.current);
-            if (sel) {
-              onSelectionChange(sel);
+            if (sel && onSelectionChangeRef.current) {
+              onSelectionChangeRef.current(sel);
             }
-          }
-        });
-
-        return () => {
-          disposable?.dispose?.();
-          try { univer.dispose(); } catch (e) { /* ignore */ }
-          univerInstanceRef.current = null;
-          univerAPIRef.current = null;
-        };
-      } catch (e) {
-        // onCommandExecuted might not be available
-        console.warn('[UniverRenderer] onCommandExecuted not available:', e);
-      }
+          }, 100);
+        }
+      });
+      (univerInstanceRef.current as any)._selDisposable = disposable;
+    } catch (e) {
+      console.warn('[UniverRenderer] onCommandExecuted not available:', e);
     }
 
     return () => {
+      if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
+      try {
+        const d = (univerInstanceRef.current as any)?._selDisposable;
+        d?.dispose?.();
+      } catch (e) { /* ignore */ }
       try { univer.dispose(); } catch (e) { /* ignore */ }
       univerInstanceRef.current = null;
       univerAPIRef.current = null;
+      isInitializedRef.current = false;
     };
-  }, [workbookData, nodeId, onSelectionChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount-only
+
+  // ─── Update workbook when data actually changes ───────────────────────
+  useEffect(() => {
+    const api = univerAPIRef.current;
+    if (!api || !workbookData) return;
+
+    if (dataKey === lastDataKeyRef.current) return;
+    lastDataKeyRef.current = dataKey;
+
+    try {
+      const workbook = api.getActiveWorkbook();
+      if (workbook) {
+        const unitId = workbook.getUnitId?.();
+        if (unitId) {
+          try { api.disposeWorkbook(unitId); } catch (e) { /* ignore */ }
+        }
+      }
+      api.createWorkbook(workbookData);
+    } catch (e) {
+      console.warn('[UniverRenderer] Failed to update workbook:', e);
+    }
+  }, [dataKey, workbookData]);
 
   if (!data.columns.length && !data.rows.length) {
     return <div style={{ color: '#999', fontSize: 12, padding: 8 }}>暂无 Excel 数据</div>;
   }
 
   return (
-    <div className="nowheel nopan" style={{ height: containerHeight, position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      {/* Selection info badge */}
-      {compact && onSelectionChange && (
-        <div style={{
-          position: 'absolute',
-          bottom: 4,
-          right: 4,
-          fontSize: 10,
-          color: '#1890ff',
-          background: 'rgba(230,244,255,0.9)',
-          padding: '1px 6px',
-          borderRadius: 3,
-          pointerEvents: 'none',
-          zIndex: 10,
-        }}>
-          🖱 点击/框选单元格
-        </div>
-      )}
+    <div className={`nowheel nopan ${compact ? 'univer-compact' : ''}`} style={{ height: containerHeight, position: 'relative' }}>
+      <div
+        ref={containerRef}
+        id={containerIdRef.current}
+        style={{ width: '100%', height: '100%' }}
+      />
     </div>
   );
 };
 
-export default UniverRenderer;
+export default React.memo(UniverRenderer);
