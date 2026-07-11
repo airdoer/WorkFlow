@@ -13,6 +13,7 @@ from Implement.workflowImpl.kdipExecutor import KdipExecutor
 from Implement.workflowImpl.kimNotifyExecutor import KimNotifyExecutor
 from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
 from Implement.workflowImpl.tableExecutor import TableExecutor
+from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor
 
 ExecutorManager.register(ExcelExecutor())
 ExecutorManager.register(JsonExecutor())
@@ -28,3 +29,4 @@ ExecutorManager.register(KdipExecutor())
 ExecutorManager.register(KimNotifyExecutor())
 ExecutorManager.register(BoolGateExecutor())
 ExecutorManager.register(TableExecutor())
+ExecutorManager.register(ExcelSearchExecutor())

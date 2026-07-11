@@ -44,10 +44,10 @@ class TableExecutor(BaseNodeExecutor):
                 # 非 JSON → 按行拆分做单列表
                 lines = [l for l in raw_str.splitlines() if l.strip()]
                 tables = [{"title": None, "columns": ["内容"], "rows": [[l] for l in lines]}]
-                return {"tables": tables, "tableStr": self._to_text(tables)}
+                return {"success": True, "tables": tables, "tableStr": self._to_text(tables)}
 
         tables = self._parse_data(data)
-        return {"tables": tables, "tableStr": self._to_text(tables)}
+        return {"success": True, "tables": tables, "tableStr": self._to_text(tables)}
 
     # ------------------------------------------------------------------
     def _parse_data(self, data) -> list:

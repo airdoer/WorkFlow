@@ -28,6 +28,8 @@ from Implement.workflowImpl.c7ServerExecutor import C7ServerExecutor, _load_c7_s
 from Implement.workflowImpl.kdipExecutor import KdipExecutor
 from Implement.workflowImpl.kimNotifyExecutor import KimNotifyExecutor
 from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
+from Implement.workflowImpl.tableExecutor import TableExecutor
+from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor, load_excelsearch_options
 
 # region init
 
@@ -47,6 +49,8 @@ ExecutorManager.register(C7ServerExecutor())
 ExecutorManager.register(KdipExecutor())
 ExecutorManager.register(KimNotifyExecutor())
 ExecutorManager.register(BoolGateExecutor())
+ExecutorManager.register(TableExecutor())
+ExecutorManager.register(ExcelSearchExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 
@@ -402,6 +406,17 @@ def workflow_c7server_list():
         return jsonify({'options': options})
     except Exception as e:
         logger.exception("[workflow_c7server_list] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/excelsearch/list', methods=['GET'])
+def workflow_excelsearch_list():
+    """Get Excel file list for ExcelSearch node dropdown"""
+    try:
+        options = load_excelsearch_options()
+        return jsonify({'options': options})
+    except Exception as e:
+        logger.exception("[workflow_excelsearch_list] Error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 # endregion

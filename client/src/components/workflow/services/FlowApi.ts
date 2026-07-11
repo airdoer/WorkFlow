@@ -124,6 +124,13 @@ export const FlowApi = {
     return data.options || [];
   },
 
+  // ExcelSearch file list for dropdown
+  async getExcelSearchOptions(): Promise<{ label: string; value: string; localPath: string; p4Path: string; description: string }[]> {
+    const res = await fetch(`${API_BASE}/api/workflow/excelsearch/list`);
+    const data = await handleResponse<{ options: { label: string; value: string; localPath: string; p4Path: string; description: string }[] }>(res);
+    return data.options || [];
+  },
+
   // Single-node run (REST, for node-level ▶ button)
   async runNode(type: string, config: any, input: any) {
     const res = await fetch(`${API_BASE}/api/workflow/node/run`, {

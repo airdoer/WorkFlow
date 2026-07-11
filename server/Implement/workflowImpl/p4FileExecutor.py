@@ -17,17 +17,24 @@ class P4FileExecutor(BaseNodeExecutor):
 
         try:
             local_path = self._p4_sync(p4_path)
+            file_type = self._detect_file_type(p4_path, '')
 
-            # Read file content
-            with open(local_path, 'r', encoding='utf-8', errors='replace') as f:
-                content = f.read()
+            # For binary files (xlsx/xls), use latin-1 to preserve raw bytes
+            # latin-1 is a lossless encoding for any byte sequence
+            is_binary = file_type == 'excel' and p4_path.lower().rsplit('.', 1)[-1] in ('xlsx', 'xls')
 
-            # Try to parse as JSON for structured output
-            try:
-                json_data = json.loads(content)
-                file_type = "json"
-            except (json.JSONDecodeError, ValueError):
-                file_type = self._detect_file_type(p4_path, content)
+            if is_binary:
+                with open(local_path, 'rb') as f:
+                    content = f.read().decode('latin-1')
+            else:
+                with open(local_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                # Try to parse as JSON for structured output
+                try:
+                    json.loads(content)
+                    file_type = "json"
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
             return {
                 "filePath": p4_path,

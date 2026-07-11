@@ -42,6 +42,8 @@ interface BaseNodeProps {
   label: string;
   nodeType: string;
   fields: NodeField[];
+  /** Optional React node rendered after the fields area (e.g. table preview) */
+  extraContentAfterFields?: React.ReactNode;
 }
 
 const STATUS_CONFIG = {
@@ -143,6 +145,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   label,
   nodeType,
   fields,
+  extraContentAfterFields,
 }) => {
   const { setNodes, getNodes } = useReactFlow();
   const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
@@ -578,6 +581,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             </div>
           );
         })}
+
+        {/* Extra content (e.g. table preview for Excel node) */}
+        {extraContentAfterFields && (
+          <div style={{ marginTop: 4 }}>{extraContentAfterFields}</div>
+        )}
 
         {/* Run output — per output port */}
         {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (

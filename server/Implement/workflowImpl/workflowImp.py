@@ -430,6 +430,12 @@ class WorkflowRuntime:
                     source_handle = edge.get('sourceHandle')
                     if target_handle and source_handle and source_handle in src_output:
                         input_data[target_handle] = src_output[source_handle]
+                        # Propagate file metadata alongside file content so downstream
+                        # renderers (Excel, Lua, etc.) can use localPath / fileType.
+                        if source_handle == 'fileContent':
+                            for meta_key in ('localPath', 'fileType', 'filePath'):
+                                if meta_key in src_output:
+                                    input_data.setdefault(meta_key, src_output[meta_key])
                     elif target_handle:
                         input_data.update(src_output)
                     else:

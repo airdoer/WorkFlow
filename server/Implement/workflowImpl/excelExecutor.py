@@ -10,94 +10,187 @@ class ExcelExecutor(BaseNodeExecutor):
 
     def execute(self, config: dict, input_data: dict) -> dict:
         """
-        Excel renderer: receives content from upstream node.
-        - input_data['localPath']: local file path (from P4File node for binary files)
-        - input_data['fileContent']: raw content (for CSV or text-based)
-        - input_data['fileType']: file type hint from upstream
-        - config['sheet']: optional sheet name
-        - config['rowFilter']: optional list of row indices (1-based)
-        - config['columnFilter']: optional list of column names
+        Excel 渲染节点：接收文件内容或 Table 节点的 tableData 输入。
+
+        输入优先级：
+          1. tableData 端口（来自 Table 节点的 tables[0]，直接渲染，跳过文件解析）
+          2. fileContent / localPath 端口（来自 P4File / ExcelSearch）
+
+        配置项：
+          - sheetName  : 工作表名（可选；input_data['sheetName'] 优先于 config['sheetName']）
+          - filterColumns : 列名列表，只保留这些列（空则全部保留）
+          - filterRows    : 行号列表（1-based），只保留这些行（空则全部保留）
+
+        输出：
+          columns, rows, sheetNames, tableData,
+          selectedRows=[], selectedCols=[], selectedValues=null
         """
-        local_path = input_data.get("localPath", "")
-        file_content = input_data.get("fileContent", "")
-        file_type = input_data.get("fileType", "")
 
-        sheet_name = config.get("sheet", "")
-        row_filter = config.get("rowFilter")  # list of row numbers (1-based strings)
-        column_filter = config.get("columnFilter")  # list of column names
+        # ── 1. tableData 输入（来自 Table 节点 tables 端口） ──────────────────
+        table_data_input = input_data.get('tableData')
+        if table_data_input:
+            # table_data_input 可能是 tables 列表的第一个元素，或 Table 节点直接输出的 tables 列表
+            if isinstance(table_data_input, list) and len(table_data_input) > 0:
+                first = table_data_input[0]
+            elif isinstance(table_data_input, dict):
+                first = table_data_input
+            else:
+                first = None
 
-        # Validate content format — reject JSON input for Excel
-        if file_type == "json" or (not local_path and file_content and not file_content.startswith("PK")):
-            try:
-                json.loads(file_content[:500] if file_content else "{}")
-                return {"error": "Input content is JSON format, not Excel. Use the JSON node instead."}
-            except (json.JSONDecodeError, ValueError):
-                pass
+            if first and isinstance(first, dict) and 'columns' in first and 'rows' in first:
+                columns = [str(c) for c in first.get('columns', [])]
+                raw_rows = first.get('rows', [])
+                rows = self._apply_filters_raw(raw_rows, columns, config)
+                columns = self._apply_column_filter(columns, config)
+                rows = [{columns[i]: row[i] for i in range(len(columns)) if i < len(row)} for row in rows]
+                table_data = {'title': first.get('title'), 'columns': columns, 'rows': rows}
+                return {
+                    'columns': columns, 'rows': rows,
+                    'sheetNames': [], 'tableData': table_data,
+                    'selectedRows': [], 'selectedCols': [], 'selectedValues': None,
+                }
+
+        # ── 2. 文件内容输入 ──────────────────────────────────────────────────
+        local_path = input_data.get('localPath', '')
+        file_content = input_data.get('fileContent', '')
+
+        # sheetName: 连线输入优先于 config
+        sheet_name = input_data.get('sheetName') or config.get('sheetName', '') or config.get('sheet', '')
+
+        # filterColumns / filterRows — 支持列表或换行符分隔字符串
+        filter_columns = self._parse_list(config.get('filterColumns', ''))
+        filter_rows    = self._parse_list(config.get('filterRows',    ''))
+        # 兼容旧字段名
+        if not filter_columns:
+            filter_columns = self._parse_list(config.get('columnFilter', ''))
+        if not filter_rows:
+            filter_rows = [str(r) for r in (config.get('rowFilter') or [])]
 
         if not local_path and not file_content:
-            return {"error": "No input content. Connect an upstream node or provide content."}
+            return {'error': 'No input. Connect P4File, ExcelSearch, or Table node.'}
 
         try:
-            # Use local path if available (from P4File node for xlsx files)
+            # 优先用 localPath 打开 xlsx
             if local_path and os.path.exists(local_path):
                 wb = openpyxl.load_workbook(local_path, data_only=True)
             elif file_content:
-                # Try to load from content bytes (for xlsx binary)
                 try:
                     wb = openpyxl.load_workbook(
-                        io.BytesIO(file_content.encode('latin-1') if isinstance(file_content, str) else file_content),
+                        io.BytesIO(
+                            file_content.encode('latin-1')
+                            if isinstance(file_content, str)
+                            else file_content
+                        ),
                         data_only=True,
                     )
                 except Exception:
-                    # Try CSV parsing
-                    return self._parse_csv(file_content, row_filter, column_filter)
+                    return self._parse_csv(file_content, filter_rows, filter_columns)
             else:
-                return {"error": "Cannot open file. Ensure an upstream P4 File node is connected with an Excel file."}
+                return {'error': 'Cannot open file. Ensure an upstream P4 File or ExcelSearch node is connected.'}
 
-            # Select sheet
-            if sheet_name:
-                if sheet_name not in wb.sheetnames:
-                    return {"error": f"Sheet '{sheet_name}' not found. Available: {', '.join(wb.sheetnames)}"}
-                ws = wb[sheet_name]
+            # 选取 sheet
+            if sheet_name and str(sheet_name) in wb.sheetnames:
+                ws = wb[str(sheet_name)]
+            elif sheet_name:
+                return {'error': f"Sheet '{sheet_name}' not found. Available: {', '.join(wb.sheetnames)}"}
             else:
                 ws = wb.active
 
-            # Extract all data — replace None column headers with empty string
+            # 提取原始数据（处理 None 列头）
             raw_columns = [cell.value for cell in ws[1]]
-            columns = [str(c) if c is not None else f"Col{i+1}" for i, c in enumerate(raw_columns)]
-            rows = []
+            columns = [str(c) if c is not None else f'Col{i+1}' for i, c in enumerate(raw_columns)]
+            all_rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
-                rows.append(dict(zip(columns, row)))
+                all_rows.append(list(row))
 
-            # Apply row filter
-            if row_filter and len(row_filter) > 0:
-                row_indices = [int(r) - 1 for r in row_filter if r.isdigit() and int(r) <= len(rows)]
-                rows = [rows[i] for i in row_indices if 0 <= i < len(rows)]
+            # 应用筛选
+            filtered_rows = self._apply_row_filter(all_rows, filter_rows)
+            filtered_columns, filtered_rows = self._apply_column_filter_indexed(columns, filtered_rows, filter_columns)
 
-            # Apply column filter — use set for safe membership test
-            if column_filter and len(column_filter) > 0:
-                column_set = set(column_filter)
-                columns = [c for c in columns if c in column_set]
-                rows = [{k: v for k, v in row.items() if k in column_set} for row in rows]
+            rows_dict = [{filtered_columns[i]: (row[i] if i < len(row) else None) for i in range(len(filtered_columns))} for row in filtered_rows]
 
-            return {"columns": columns, "rows": rows, "sheetNames": wb.sheetnames}
+            table_data = {'title': None, 'columns': filtered_columns, 'rows': rows_dict}
+            return {
+                'columns': filtered_columns,
+                'rows': rows_dict,
+                'sheetNames': list(wb.sheetnames),
+                'tableData': table_data,
+                'selectedRows': [],
+                'selectedCols': [],
+                'selectedValues': None,
+            }
         except Exception as e:
-            return {"error": str(e)}
+            return {'error': str(e)}
 
-    def _parse_csv(self, content: str, row_filter, column_filter) -> dict:
-        """Parse CSV content as a fallback."""
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _parse_list(self, value) -> list:
+        """将列表或换行符/逗号分隔字符串转为列表。"""
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if str(v).strip()]
+        if isinstance(value, str) and value.strip():
+            # 支持换行符或逗号分隔
+            sep = '\n' if '\n' in value else ','
+            return [v.strip() for v in value.split(sep) if v.strip()]
+        return []
+
+    def _apply_row_filter(self, rows: list, filter_rows: list) -> list:
+        if not filter_rows:
+            return rows
+        indices = set()
+        for r in filter_rows:
+            try:
+                idx = int(r) - 1  # 1-based → 0-based
+                if 0 <= idx < len(rows):
+                    indices.add(idx)
+            except ValueError:
+                pass
+        return [rows[i] for i in sorted(indices)]
+
+    def _apply_column_filter_indexed(self, columns: list, rows: list, filter_columns: list):
+        """根据列名过滤列（保留列顺序）。"""
+        if not filter_columns:
+            return columns, rows
+        col_set = set(filter_columns)
+        kept_indices = [i for i, c in enumerate(columns) if c in col_set]
+        new_columns = [columns[i] for i in kept_indices]
+        new_rows = [[row[i] if i < len(row) else None for i in kept_indices] for row in rows]
+        return new_columns, new_rows
+
+    def _apply_column_filter(self, columns: list, config: dict) -> list:
+        filter_columns = self._parse_list(config.get('filterColumns', ''))
+        if not filter_columns:
+            return columns
+        col_set = set(filter_columns)
+        return [c for c in columns if c in col_set]
+
+    def _apply_filters_raw(self, rows: list, columns: list, config: dict) -> list:
+        """对 raw rows（列表格式）应用行/列过滤。"""
+        filter_rows = self._parse_list(config.get('filterRows', ''))
+        rows = self._apply_row_filter(rows, filter_rows)
+        return rows
+
+    def _parse_csv(self, content: str, filter_rows: list, filter_columns: list) -> dict:
+        """CSV fallback 解析。"""
         import csv
         reader = csv.DictReader(io.StringIO(content))
-        columns = reader.fieldnames or []
+        columns = list(reader.fieldnames or [])
         rows = list(reader)
 
-        if row_filter and len(row_filter) > 0:
-            row_indices = [int(r) - 1 for r in row_filter if r.isdigit() and int(r) <= len(rows)]
-            rows = [rows[i] for i in row_indices if 0 <= i < len(rows)]
+        filtered_rows = self._apply_row_filter(rows, filter_rows)
 
-        if column_filter and len(column_filter) > 0:
-            column_set = set(column_filter)
-            columns = [c for c in columns if c in column_set]
-            rows = [{k: v for k, v in row.items() if k in column_set} for row in rows]
+        if filter_columns:
+            col_set = set(filter_columns)
+            columns = [c for c in columns if c in col_set]
+            filtered_rows = [{k: v for k, v in row.items() if k in col_set} for row in filtered_rows]
 
-        return {"columns": columns, "rows": rows}
+        table_data = {'title': None, 'columns': columns, 'rows': filtered_rows}
+        return {
+            'columns': columns,
+            'rows': filtered_rows,
+            'sheetNames': [],
+            'tableData': table_data,
+            'selectedRows': [],
+            'selectedCols': [],
+            'selectedValues': None,
+        }

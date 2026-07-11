@@ -1,0 +1,9 @@
+{
+  "_comment": "Excel 文件注册表。local_path 优先，为空时通过 p4_path 同步。",
+  "example_balance": {
+    "name": "数值平衡示例表",
+    "local_path": "",
+    "p4_path": "//C7/Development/Mainline/Design/balance.xlsx",
+    "description": "游戏数值平衡配置示例"
+  }
+}

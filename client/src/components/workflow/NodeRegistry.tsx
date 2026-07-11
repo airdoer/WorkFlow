@@ -14,6 +14,7 @@ import KdipNode from './nodes/Jenkins';
 import KimNotifyNode from './nodes/KimNotify';
 import BoolGateNode from './nodes/BoolGate';
 import TableNode from './nodes/Table';
+import ExcelSearchNode from './nodes/ExcelSearch';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -29,6 +30,7 @@ import KdipIcon from './nodes/Jenkins/icon';
 import KimNotifyIcon from './nodes/KimNotify/icon';
 import BoolGateIcon from './nodes/BoolGate/icon';
 import TableIcon from './nodes/Table/icon';
+import ExcelSearchIcon from './nodes/ExcelSearch/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -45,6 +47,7 @@ export const nodeTypes: NodeTypes = {
   kimnotify: KimNotifyNode,
   boolgate: BoolGateNode,
   table: TableNode,
+  excelsearch: ExcelSearchNode,
 };
 
 export interface NodeRegistryEntry {
@@ -76,6 +79,8 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'boolgate', label: 'Bool 门控', icon: <BoolGateIcon />, category: '工具', description: '当输入为 True 时放行执行后续节点，为 False 时报错中断' },
   // Renderers
   { type: 'table', label: 'Table 表格', icon: <TableIcon />, category: '渲染器', description: '接收上游数据，将数组/字典渲染为表格；数组→单表，字典→多表' },
+  // Data sources
+  { type: 'excelsearch', label: 'Excel 搜索', icon: <ExcelSearchIcon />, category: '数据源', description: '从预注册列表中选择 Excel 文件，输出文件内容供下游 Excel 节点使用' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

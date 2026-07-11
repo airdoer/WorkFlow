@@ -65,8 +65,13 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'output' },
   ],
   excel: [
-    { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'input' },
-    { key: 'tableData', label: '表格数据', type: 'table-data', direction: 'output' },
+    { key: 'fileContent', label: '文件内容',  type: 'file-content', direction: 'input' },
+    { key: 'tableData',   label: '表格数据',  type: 'table-data',   direction: 'input',  maxConnections: 1 },
+    { key: 'sheetName',   label: 'Sheet名',   type: 'string',       direction: 'input',  maxConnections: 1 },
+    { key: 'tableData',   label: '表格数据',  type: 'table-data',   direction: 'output' },
+    { key: 'selectedRows',   label: '选中行', type: 'any',          direction: 'output' },
+    { key: 'selectedCols',   label: '选中列', type: 'any',          direction: 'output' },
+    { key: 'selectedValues', label: '选中值', type: 'any',          direction: 'output' },
   ],
   json: [
     { key: 'fileContent', label: 'JSON String', type: 'string', direction: 'input' },
@@ -126,9 +131,17 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   ],
   // Table node — renders list/dict data as tables
   table: [
-    { key: 'tableInput', label: '数据输入', type: 'any', direction: 'input', maxConnections: 1 },
-    { key: 'tables',    label: '表格数据', type: 'table-data', direction: 'output' },
-    { key: 'tableStr',  label: '文本输出', type: 'string', direction: 'output' },
+    { key: 'tableInput', label: '数据输入', type: 'any',        direction: 'input',  maxConnections: 1 },
+    { key: 'success',    label: '成功与否', type: 'boolean',    direction: 'output' },
+    { key: 'tables',     label: '表格数据', type: 'table-data', direction: 'output' },
+    { key: 'tableStr',   label: '文本输出', type: 'string',     direction: 'output' },
+  ],
+  // ExcelSearch node — file selector, outputs localPath + fileContent
+  excelsearch: [
+    { key: 'fileContent', label: '文件内容', type: 'file-content', direction: 'output' },
+    { key: 'localPath',   label: '本地路径', type: 'string',       direction: 'output' },
+    { key: 'fileName',    label: '文件名',   type: 'string',       direction: 'output' },
+    { key: 'sheetNames',  label: 'Sheet列表', type: 'any',         direction: 'output' },
   ],
 };
 
