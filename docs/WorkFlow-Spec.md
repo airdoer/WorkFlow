@@ -174,7 +174,7 @@ server/
 │       ├── boolExecutor.py                  // Bool 节点执行（输出布尔值）
 │       ├── numberExecutor.py               // Number 节点执行（输出数值）
 │       ├── c7ServerExecutor.py             // C7Server 节点执行（读取 c7Server.json + c7ServerTags.json，带缓存）
-│       ├── jenkinsExecutor.py              // Jenkins 节点执行（调用 KdipClient.extend_cmd）
+│       ├── kdipExecutor.py              // Jenkins 节点执行（调用 KdipClient.extend_cmd）
 │       ├── kimNotifyExecutor.py            // KimNotify 节点执行（调用 C7KimRobot.send_msg）
 │       └── boolGateExecutor.py             // BoolGate 节点执行（True 放行，False 抛异常）
 │

@@ -3,8 +3,14 @@ from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 from Implement.kdipImpl.kdipImp import KdipClient, KdipError
 from Implement.kdipImpl.kdip_config import KDIP_CMD_WHITELIST
 
+# 指令默认 cmdParam 模板：当用户未填写附加参数时自动填充
+# {server_id} 会被替换为实际的 server_id 字符串
+_CMD_DEFAULT_PARAMS = {
+    "kdip_game_get_service_switch_state": {"server_id": "{server_id}"},
+}
 
-class JenkinsExecutor(BaseNodeExecutor):
+
+class KdipExecutor(BaseNodeExecutor):
     type = "kdip"
 
     def __init__(self):
@@ -23,7 +29,7 @@ class JenkinsExecutor(BaseNodeExecutor):
           - serverName: 服务器名（namespace 或 tag key）
           - username:   用户名（可通过连线从 String 节点获取，也可手写）
           - cmdKey:     任务名（KDIP 指令 key），从下拉框选择
-          - cmdParam:   附加参数（可选，JSON 字符串）
+          - cmdParam:   附加参数（可选，JSON 字符串，留空时自动填充默认参数）
 
         输出:
           - success: bool — 执行成功与否
@@ -60,6 +66,15 @@ class JenkinsExecutor(BaseNodeExecutor):
             server_info = client.get_server_info(server_name)
             zone_id = server_info.get('zone_id')
             server_id = server_info.get('server_id')
+
+            # 如果用户未提供 cmdParam，自动填充默认参数
+            if not cmd_param and cmd_key in _CMD_DEFAULT_PARAMS:
+                template = _CMD_DEFAULT_PARAMS[cmd_key]
+                # 替换模板中的占位符
+                cmd_param = {
+                    k: (v.replace('{server_id}', str(server_id)) if isinstance(v, str) else v)
+                    for k, v in template.items()
+                }
 
             result = client.extend_cmd(
                 zone_id=zone_id,
