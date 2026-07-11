@@ -441,7 +441,8 @@ const ValueNode: React.FC<ValueNodeProps> = ({
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />
                     错误
                   </div>
-                  <div style={{ padding: '4px 6px', maxHeight: 60, overflowY: 'auto', borderTop: '1px solid #ffccc7', fontSize: 9 }}>
+                  <div style={{ padding: '4px 6px', maxHeight: 60, overflowY: 'auto', borderTop: '1px solid #ffccc7', fontSize: 9 }}
+                       className="nowheel nopan">
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
                       {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(runOutput, null, 2)}
                     </pre>
@@ -453,7 +454,8 @@ const ValueNode: React.FC<ValueNodeProps> = ({
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: portColor, display: 'inline-block' }} />
                     {outputPortLabel} ✅
                   </div>
-                  <div style={{ padding: '4px 6px', maxHeight: 80, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
+                  <div style={{ padding: '4px 6px', maxHeight: 80, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}
+                       className="nowheel nopan">
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                       {typeof runOutput[outputPortKey] !== 'undefined'
                         ? String(runOutput[outputPortKey])

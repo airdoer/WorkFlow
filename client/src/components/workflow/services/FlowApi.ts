@@ -91,6 +91,15 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
+  // Check if a name is already taken (server-side authoritative check)
+  async checkName(name: string, excludeId?: string): Promise<boolean> {
+    const params = new URLSearchParams({ name });
+    if (excludeId) params.set('exclude', excludeId);
+    const res = await fetch(`${API_BASE}/api/workflow/check_name?${params}`);
+    const data = await handleResponse<{ exists: boolean }>(res);
+    return data.exists;
+  },
+
   // Trash operations
   async listTrash(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/api/workflow/trash/list`);

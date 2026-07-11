@@ -432,4 +432,28 @@ def workflow_executors():
         logger.exception("[workflow_executors] Unexpected error: %s", e)
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/workflow/check_name', methods=['GET'])
+def workflow_check_name():
+    """Check if a workflow name is already taken.
+    Query params:
+      name     - the name to check (required)
+      exclude  - workflow id to exclude from the check (optional, for renames)
+    Returns: { exists: bool }
+    """
+    name = (request.args.get('name') or '').strip()
+    exclude_id = (request.args.get('exclude') or '').strip()
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    try:
+        all_wf = WorkflowManager.list_all()
+        exists = any(
+            r['name'] == name and r['id'] != exclude_id
+            for r in all_wf
+        )
+        return jsonify({'exists': exists})
+    except Exception as e:
+        logger.exception("[workflow_check_name] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
 # endregion

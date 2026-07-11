@@ -125,18 +125,50 @@ const Toolbar: React.FC<ToolbarProps> = ({
     setEditingName(true);
     setTimeout(() => nameInputRef.current?.select(), 50);
   };
-  const commitName = () => {
-    const trimmed = nameDraft.trim() || '未命名工作流';
-    setName(trimmed);
-    setEditingName(false);
-  };
-  const cancelEditName = () => { setEditingName(false); };
 
   // ── meta info ───────────────────────────────────────────────
+  // Must be declared before commitName (used in its useCallback deps)
   const [author, setAuthor] = useState(initialAuthor || '');
   const [description, setDescription] = useState(initialDesc || '');
   useEffect(() => { setAuthor(initialAuthor || ''); }, [initialAuthor]);
   useEffect(() => { setDescription(initialDesc || ''); }, [initialDesc]);
+
+  // commitName: validate → update name → auto-save
+  const commitName = useCallback(async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === name) {
+      setEditingName(false);
+      return;
+    }
+    // Server-side authoritative name conflict check
+    try {
+      const exists = await FlowApi.checkName(trimmed, workflowId);
+      if (exists) {
+        message.error(`「${trimmed}」已存在，请使用其他名称`);
+        return; // keep editing
+      }
+    } catch (_) {
+      // If check fails, still allow save
+    }
+    setName(trimmed);
+    setEditingName(false);
+    // Trigger save with new name immediately
+    setSaving(true);
+    try {
+      const json = reactFlowInstance.toObject();
+      const result = await FlowApi.save(trimmed, json, workflowId, { author, description });
+      const now = new Date().toISOString();
+      setLastSavedAt(now);
+      onSave?.(result.id, trimmed);
+      message.success('已重命名并保存');
+    } catch (err: any) {
+      message.error(`保存失败: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [nameDraft, name, workflowId, author, description, reactFlowInstance, onSave]);
+
+  const cancelEditName = () => { setEditingName(false); };
 
   // ── save ────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -260,7 +292,42 @@ const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
-  // ── Trash ────────────────────────────────────────────────────
+  // ── new workflow naming modal ────────────────────────────────
+  const [newNameOpen, setNewNameOpen] = useState(false);
+  const [newNameDraft, setNewNameDraft] = useState('');
+  const [newNameLoading, setNewNameLoading] = useState(false);
+  const [newNameError, setNewNameError] = useState('');
+
+  const openNewWorkflow = () => {
+    setNewNameDraft('');
+    setNewNameError('');
+    setNewNameOpen(true);
+  };
+
+  const handleCreateNew = async () => {
+    const trimmed = newNameDraft.trim();
+    if (!trimmed) { setNewNameError('请输入工作流名称'); return; }
+    setNewNameLoading(true);
+    try {
+      // Server-side authoritative check to handle concurrent creation
+      const exists = await FlowApi.checkName(trimmed);
+      if (exists) {
+        setNewNameError(`「${trimmed}」已存在，请使用其他名称`);
+        setNewNameLoading(false);
+        return;
+      }
+      // Save empty workflow to server immediately
+      await FlowApi.save(trimmed, { nodes: [], edges: [] }, undefined, { author: '', description: '' });
+    } catch (err: any) {
+      setNewNameError(`创建失败: ${err.message}`);
+      setNewNameLoading(false);
+      return;
+    }
+    setNewNameLoading(false);
+    setNewNameOpen(false);
+    setLibraryOpen(false);
+    onSwitchWorkflow?.(`__new__:${trimmed}`);
+  };
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [trashData, setTrashData] = useState<any[]>([]);
@@ -418,16 +485,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ref={nameInputRef}
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            onPressEnter={commitName}
+            onPressEnter={() => commitName()}
+            onBlur={() => commitName()}
             onKeyDown={(e) => e.key === 'Escape' && cancelEditName()}
             size="small"
             style={{ fontSize: 14, fontWeight: 600, minWidth: 160, width: `${Math.max(nameDraft.length * 9, 160)}px` }}
-            suffix={
-              <Space size={2}>
-                <CheckOutlined style={{ color: '#52c41a', cursor: 'pointer', fontSize: 12 }} onClick={commitName} />
-                <CloseOutlined style={{ color: '#ff4d4f', cursor: 'pointer', fontSize: 12 }} onClick={cancelEditName} />
-              </Space>
-            }
           />
         ) : (
           <Tooltip title="点击编辑名称">
@@ -539,10 +601,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => {
-                  setLibraryOpen(false);
-                  onSwitchWorkflow?.('__new__');
-                }}
+                onClick={openNewWorkflow}
               >
                 新建工作流
               </Button>
@@ -647,6 +706,34 @@ const Toolbar: React.FC<ToolbarProps> = ({
           ]}
         />
       </Modal>
+      {/* ── 新建工作流命名 Modal ── */}
+      <Modal
+        title={<span style={{ fontWeight: 700 }}>新建工作流</span>}
+        open={newNameOpen}
+        onCancel={() => setNewNameOpen(false)}
+        onOk={handleCreateNew}
+        okText="创建"
+        cancelText="取消"
+        confirmLoading={newNameLoading}
+        width={400}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 6, fontSize: 13, color: '#595959' }}>工作流名称</div>
+        <Input
+          value={newNameDraft}
+          onChange={(e) => { setNewNameDraft(e.target.value); setNewNameError(''); }}
+          onPressEnter={handleCreateNew}
+          placeholder="请输入新工作流名称"
+          autoFocus
+          maxLength={80}
+          showCount
+          status={newNameError ? 'error' : undefined}
+        />
+        {newNameError && (
+          <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>{newNameError}</div>
+        )}
+      </Modal>
+
       {/* ── 复制工作流 Modal ── */}
       <Modal
         title={<span style={{ fontWeight: 700 }}>复制工作流</span>}

@@ -66,10 +66,11 @@ const WorkflowPage: React.FC = () => {
 
   const handleSwitchWorkflow = (id: string) => {
     const currentPath = window.location.pathname;
-    if (id === '__new__') {
-      // Navigate to new empty workflow
+    if (id === '__new__' || id.startsWith('__new__:')) {
+      // Navigate to new empty workflow; carry pre-supplied name if present
+      const presetName = id.startsWith('__new__:') ? id.slice('__new__:'.length) : undefined;
       history.push(currentPath);
-      setWorkflowData({ key: `new_${Date.now()}` });
+      setWorkflowData({ key: `new_${Date.now()}`, name: presetName });
     } else {
       history.push(`${currentPath}?id=${id}`);
       loadWorkflow(id);

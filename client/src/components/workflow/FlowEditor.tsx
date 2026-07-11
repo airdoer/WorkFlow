@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -101,6 +101,25 @@ function FlowEditorInner({
   // Track unsaved state
   const [isDirty, setIsDirty] = useState(false);
   const lastSavedJsonRef = useRef<string>('');
+
+  // Auto-save on mount when a new workflow already has a name (created via naming modal)
+  // This turns the pre-saved empty record into a proper record with the correct json
+  useEffect(() => {
+    if (!workflowId && workflowName && workflowName !== '未命名工作流') {
+      // Slight delay to let ReactFlow initialize
+      const t = setTimeout(async () => {
+        try {
+          const json = toObject();
+          const result = await FlowApi.save(workflowName, json, undefined, {
+            author: workflowAuthor || '',
+            description: workflowDescription || '',
+          });
+          onSave?.(result.id, workflowName);
+        } catch (_) {}
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track multi-selection for special styling
   const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
@@ -408,7 +427,8 @@ function FlowEditorInner({
 
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
-      const wfId = currentWorkflowId || workflowId;
+      // Auto-save before running to ensure backend has latest state
+      const wfId = await ensureSaved() || currentWorkflowId || workflowId;
       if (!wfId) {
         message.warning('请先保存工作流');
         return;
@@ -435,7 +455,7 @@ function FlowEditorInner({
 
       setRunCancelFn(() => cancelFn);
     },
-    [workflowId, setNodes, setEdges, handleNodeUpdate],
+    [workflowId, ensureSaved, setNodes, setEdges, handleNodeUpdate],
   );
 
   // Handle drag-over from Toolbox
@@ -623,7 +643,11 @@ function FlowEditorInner({
         onSwitchWorkflow={onSwitchWorkflow}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => setIsDirty(true)} />
+        <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => {
+          setIsDirty(true);
+          // Debounced auto-save after adding a node
+          setTimeout(() => ensureSaved(), 800);
+        }} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
           <ReactFlow
             nodes={nodes}

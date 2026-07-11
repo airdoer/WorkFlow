@@ -16,8 +16,8 @@ class JsonExecutor(BaseNodeExecutor):
         import logging
         logger = logging.getLogger(__name__)
 
-        # Get content from upstream — fileContent port, or raw input_data
-        file_content = input_data.get("fileContent", "")
+        # Get content from upstream — fileContent port, or jsonStr (from upstream JSON node), or raw input_data
+        file_content = input_data.get("fileContent", "") or input_data.get("jsonStr", "")
 
         # jsonPath can come from config (manual input) or input_data (wired from upstream String node)
         json_path = config.get("jsonPath", "") or input_data.get("jsonPath", "")
@@ -49,7 +49,7 @@ class JsonExecutor(BaseNodeExecutor):
                 if data is None:
                     return {"error": f"JSON path '{json_path}' returned no results"}
 
-            return {"jsonData": data}
+            return {"jsonData": data, "jsonStr": json.dumps(data, ensure_ascii=False)}
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON content: {str(e)}"}
         except Exception as e:

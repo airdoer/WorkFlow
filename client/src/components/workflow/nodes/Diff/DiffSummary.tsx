@@ -111,7 +111,7 @@ const DiffSummary: React.FC<DiffSummaryProps> = ({
           padding: '4px 6px', background: '#f6ffed', borderRadius: 4,
           border: '1px solid #d9f7be', maxHeight: height ?? 120, overflowY: 'auto',
           fontSize: 10, color: '#389e0d',
-        }}>
+        }} className="nowheel nopan">
           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
             {contentA || '(空)'}
           </pre>
@@ -125,7 +125,7 @@ const DiffSummary: React.FC<DiffSummaryProps> = ({
           <div style={{
             maxHeight: height ?? 200, overflowY: 'auto',
             fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace',
-          }}>
+          }} className="nowheel nopan">
             {visibleLines.map((line, i) => (
               <div
                 key={i}
