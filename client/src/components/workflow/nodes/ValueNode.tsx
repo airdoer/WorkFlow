@@ -22,7 +22,7 @@ import {
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
-import { NodeField } from './BaseNode';
+import { NodeField, FieldTextInput } from './BaseNode';
 
 export type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -236,12 +236,11 @@ const ValueNode: React.FC<ValueNodeProps> = ({
 
     if (inputType === 'number') {
       return (
-        <input
-          className="nodrag"
-          type="number"
-          value={hasIncomingEdge ? (upstreamValue ?? '') : ((data[valueKey] as number) ?? '')}
+        <FieldTextInput
+          value={hasIncomingEdge ? String(upstreamValue ?? '') : String((data[valueKey] as number) ?? '')}
           disabled={hasIncomingEdge}
-          onChange={(e) => handleValueChange(parseFloat(e.target.value) || 0)}
+          locked={hasIncomingEdge}
+          onChange={(v) => handleValueChange(parseFloat(v) || 0)}
           style={inputStyle}
           placeholder={hasIncomingEdge ? '由连线提供' : '输入数值'}
         />
@@ -249,12 +248,11 @@ const ValueNode: React.FC<ValueNodeProps> = ({
     }
 
     return (
-      <input
-        className="nodrag"
-        type="text"
-        value={hasIncomingEdge ? (upstreamValue ?? '') : ((data[valueKey] as string) ?? '')}
+      <FieldTextInput
+        value={hasIncomingEdge ? String(upstreamValue ?? '') : String((data[valueKey] as string) ?? '')}
         disabled={hasIncomingEdge}
-        onChange={(e) => handleValueChange(e.target.value)}
+        locked={hasIncomingEdge}
+        onChange={handleValueChange}
         style={inputStyle}
         placeholder={hasIncomingEdge ? '由连线提供' : '输入字符串'}
       />

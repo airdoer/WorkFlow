@@ -21,7 +21,7 @@ import { FlowApi } from '../../services/FlowApi';
 import { getNodePorts } from '../../PortTypes';
 import { useWorkflowContext } from '../../WorkflowContext';
 import NodeDetailModal from '../NodeDetailModal';
-import { NodeField } from '../BaseNode';
+import { NodeField, FieldTextInput } from '../BaseNode';
 
 type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -347,25 +347,31 @@ function JsonNode({ data, id, selected }: NodeProps) {
                 <span style={{ color: '#999', marginLeft: 4 }}>(可选，也可连线输入)</span>
               )}
             </label>
-            <input
-              className="nodrag"
-              type="text"
-              value={hasJsonPathEdge ? (upstreamJsonPath ?? '...等待上游运行') : (manualJsonPath ?? '')}
-              disabled={hasJsonPathEdge}
-              onChange={(e) => handleJsonPathChange(e.target.value)}
-              placeholder={hasJsonPathEdge ? '由连线提供' : '$.data.items（可选）'}
-              style={{
-                width: '100%',
-                fontSize: 11,
-                padding: '3px 6px',
-                border: '1px solid #d9d9d9',
-                borderRadius: 3,
-                boxSizing: 'border-box',
-                background: hasJsonPathEdge ? '#f5f5f5' : '#fff',
-                color: hasJsonPathEdge ? '#aaa' : '#333',
-                cursor: hasJsonPathEdge ? 'not-allowed' : 'text',
-              }}
-            />
+            {hasJsonPathEdge ? (
+              <input
+                className="nodrag"
+                type="text"
+                value={upstreamJsonPath ?? '...等待上游运行'}
+                readOnly
+                placeholder="由连线提供"
+                style={{
+                  width: '100%', fontSize: 11, padding: '3px 6px',
+                  border: '1px solid #d9d9d9', borderRadius: 3, boxSizing: 'border-box',
+                  background: '#f5f5f5', color: '#aaa', cursor: 'not-allowed',
+                }}
+              />
+            ) : (
+              <FieldTextInput
+                value={manualJsonPath ?? ''}
+                placeholder="$.data.items（可选）"
+                onChange={handleJsonPathChange}
+                style={{
+                  width: '100%', fontSize: 11, padding: '3px 6px',
+                  border: '1px solid #d9d9d9', borderRadius: 3, boxSizing: 'border-box',
+                  background: '#fff', color: '#333', cursor: 'text',
+                }}
+              />
+            )}
           </div>
 
           {/* Run output */}

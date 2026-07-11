@@ -1,4 +1,4 @@
-import os
+import re
 import json
 from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 
@@ -7,28 +7,24 @@ class JsonExecutor(BaseNodeExecutor):
     type = "json"
 
     def execute(self, config: dict, input_data: dict) -> dict:
-        """
-        JSON renderer: receives content from upstream node.
-        - input_data['fileContent']: raw file content (string) — from P4File or any node
-        - input_data: full upstream output dict (used as fallback)
-        - config['jsonPath']: optional JSON path expression to filter data
-        """
         import logging
         logger = logging.getLogger(__name__)
 
-        # Get content from upstream — fileContent port, or jsonStr (from upstream JSON node), or raw input_data
+        # Get content from upstream — fileContent port, jsonStr port, or fallback to whole input
         file_content = input_data.get("fileContent", "") or input_data.get("jsonStr", "")
 
-        # jsonPath can come from config (manual input) or input_data (wired from upstream String node)
+        # jsonPath can come from config (manual) or wired input_data
         json_path = config.get("jsonPath", "") or input_data.get("jsonPath", "")
 
-        logger.warning(f"[JsonExecutor] input_data keys={list(input_data.keys())}, json_path={repr(json_path)}, file_content type={type(file_content)}, file_content[:80]={repr(str(file_content)[:80])}")
+        logger.warning(
+            "[JsonExecutor] input_data keys=%s, json_path=%r, "
+            "file_content type=%s, file_content[:80]=%r",
+            list(input_data.keys()), json_path, type(file_content), str(file_content)[:80],
+        )
 
-        # Strip the known control keys so they don't get treated as data in fallback
-        _control_keys = {"fileContent", "jsonPath"}
+        _control_keys = {"fileContent", "jsonPath", "jsonStr"}
 
         if not file_content and isinstance(input_data, dict):
-            # If upstream output has no fileContent key, try remaining data fields as the source
             data_fields = {k: v for k, v in input_data.items() if k not in _control_keys}
             if data_fields:
                 file_content = json.dumps(data_fields, ensure_ascii=False)
@@ -37,24 +33,20 @@ class JsonExecutor(BaseNodeExecutor):
             return {"error": "No input content. Connect an upstream node or provide content."}
 
         try:
-            # If upstream already gave us a parsed dict/list, use it directly
             if isinstance(file_content, (dict, list)):
                 data = file_content
             else:
-                # Try to parse as JSON; if it's a plain string that isn't JSON,
-                # try a second json.loads in case it's a double-encoded JSON string
                 try:
                     data = json.loads(file_content)
-                    # If the result is still a string (double-encoded JSON), decode again
+                    # Double-encoded JSON string → decode again
                     if isinstance(data, str):
                         try:
                             data = json.loads(data)
                         except Exception:
-                            pass  # keep as string if second decode fails
+                            pass
                 except json.JSONDecodeError as e:
                     return {"error": f"Invalid JSON content: {str(e)}"}
 
-            # If jsonPath is specified, filter the data
             if json_path:
                 data = self._query_json_path(data, json_path)
                 if data is None:
@@ -62,9 +54,6 @@ class JsonExecutor(BaseNodeExecutor):
 
             return {
                 "jsonData": data,
-                # If data is already a string (e.g. jsonPath extracted a string field),
-                # keep it as-is so downstream JSON node can json.loads it directly.
-                # If data is a dict/list, serialize to string for string-typed ports.
                 "jsonStr": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False),
             }
         except json.JSONDecodeError as e:
@@ -73,16 +62,44 @@ class JsonExecutor(BaseNodeExecutor):
             return {"error": str(e)}
 
     def _query_json_path(self, data, path: str):
-        """Simple JSON path query: supports dot notation like $.data.items"""
-        parts = path.lstrip("$").lstrip(".").split(".")
+        """JSON path query supporting dot notation and array indexing.
+
+        Examples:
+            serverHotfixInfo          -> dict key
+            serverHotfixInfo[0]       -> first element
+            serverHotfixInfo[-1]      -> last element
+            data.list[2].name         -> mixed
+            items[0][1]               -> nested indexes
+        """
+        path = path.strip().lstrip("$").lstrip(".")
+
+        # Split on dots that are NOT inside brackets
+        tokens = [seg for seg in re.split(r"\.(?![^\[]*\])", path) if seg]
+
         current = data
-        for part in parts:
-            if isinstance(current, dict):
-                current = current.get(part)
-            elif isinstance(current, list) and part.isdigit():
-                current = current[int(part)]
-            else:
-                return None
+        for token in tokens:
             if current is None:
                 return None
+            # Split token into key part and bracket-index part(s)
+            m = re.fullmatch(r"([^\[]*)((?:\[-?\d+\])*)", token)
+            if not m:
+                return None
+            key_part, index_part = m.group(1), m.group(2)
+
+            if key_part:
+                if isinstance(current, dict):
+                    current = current.get(key_part)
+                else:
+                    return None
+
+            if index_part:
+                for idx_str in re.findall(r"\[(-?\d+)\]", index_part):
+                    if isinstance(current, list):
+                        try:
+                            current = current[int(idx_str)]
+                        except IndexError:
+                            return None
+                    else:
+                        return None
+
         return current

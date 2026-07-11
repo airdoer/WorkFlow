@@ -12,7 +12,7 @@ const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 
 export type RunStatus = 'idle' | 'running' | 'success' | 'error';
-
+export { FieldTextInput, FieldTextarea };
 export interface NodeField {
   key: string;
   label: string;
@@ -64,7 +64,7 @@ const PORT_COLORS: Record<string, string> = {
   'json-path': '#722ed1',
 };
 
-/* ── Local-state text inputs to prevent cursor-jump on every keystroke ── */
+/* ── Uncontrolled text inputs: DOM is source of truth → cursor never jumps ── */
 interface FieldInputProps {
   value: string;
   disabled?: boolean;
@@ -77,47 +77,59 @@ interface FieldInputProps {
 }
 
 const FieldTextInput: React.FC<FieldInputProps> = ({ value, disabled, placeholder, required, style, lockedStyle, locked, onChange }) => {
-  const [local, setLocal] = useState(value ?? '');
-  // Sync when external value changes (e.g. node loaded / wire connected)
+  const inputRef = useRef<HTMLInputElement>(null);
   const prevExternal = useRef(value);
+
+  // Sync external value changes directly to DOM (bypass React controlled input)
   useEffect(() => {
-    if (value !== prevExternal.current) {
+    if (value !== prevExternal.current && inputRef.current) {
       prevExternal.current = value;
-      setLocal(value ?? '');
+      inputRef.current.value = value ?? '';
     }
   }, [value]);
+
   return (
     <input
+      ref={inputRef}
       className="nodrag"
       type="text"
-      value={local}
+      defaultValue={value ?? ''}
       disabled={disabled}
       placeholder={placeholder}
-      onChange={(e) => { setLocal(e.target.value); }}
-      onBlur={() => { prevExternal.current = local; onChange(local); }}
+      onBlur={() => {
+        const v = inputRef.current?.value ?? '';
+        prevExternal.current = v;
+        onChange(v);
+      }}
       style={locked ? lockedStyle : style}
     />
   );
 };
 
 const FieldTextarea: React.FC<FieldInputProps & { rows?: number }> = ({ value, disabled, placeholder, required, style, lockedStyle, locked, onChange, rows }) => {
-  const [local, setLocal] = useState(value ?? '');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevExternal = useRef(value);
+
   useEffect(() => {
-    if (value !== prevExternal.current) {
+    if (value !== prevExternal.current && textareaRef.current) {
       prevExternal.current = value;
-      setLocal(value ?? '');
+      textareaRef.current.value = value ?? '';
     }
   }, [value]);
+
   return (
     <textarea
+      ref={textareaRef}
       className="nodrag"
-      value={local}
+      defaultValue={value ?? ''}
       disabled={disabled}
       placeholder={placeholder}
       rows={rows || 3}
-      onChange={(e) => { setLocal(e.target.value); }}
-      onBlur={() => { prevExternal.current = local; onChange(local); }}
+      onBlur={() => {
+        const v = textareaRef.current?.value ?? '';
+        prevExternal.current = v;
+        onChange(v);
+      }}
       style={locked ? { ...(lockedStyle || {}), resize: 'vertical' } : { ...(style || {}), resize: 'vertical' }}
     />
   );

@@ -3,6 +3,7 @@ import { Modal, Button, Tag, message } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
+import { FieldTextInput, FieldTextarea } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -342,10 +343,11 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 return (
                   <div key={f.key}>
                     {fieldLabel}
-                    <textarea
-                      value={val}
+                    <FieldTextarea
+                      value={String(val ?? '')}
                       disabled={locked}
-                      onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                      locked={locked}
+                      onChange={(v) => !locked && handleFieldChange(f.key, v)}
                       placeholder={locked ? '由连线提供' : f.placeholder}
                       rows={f.rows || 4}
                       style={locked ? { ...lockedInputStyle, resize: 'vertical' } : {
@@ -362,13 +364,12 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 return (
                   <div key={f.key}>
                     {fieldLabel}
-                    <input
-                      type="number"
-                      value={val}
+                    <FieldTextInput
+                      value={String(val ?? '')}
                       disabled={locked}
-                      onChange={(e) => !locked && handleFieldChange(f.key, parseFloat(e.target.value) || 0)}
+                      locked={locked}
+                      onChange={(v) => !locked && handleFieldChange(f.key, parseFloat(v) || 0)}
                       placeholder={locked ? '由连线提供' : f.placeholder}
-                      step={f.step}
                       style={locked ? lockedInputStyle : {
                         width: '100%', fontSize: 13, padding: '8px 12px',
                         border: `1px solid ${f.required && !val ? '#ffccc7' : '#d9d9d9'}`,
@@ -442,11 +443,11 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
               return (
                 <div key={f.key}>
                   {fieldLabel}
-                  <input
-                    type="text"
-                    value={val}
+                  <FieldTextInput
+                    value={String(val ?? '')}
                     disabled={locked}
-                    onChange={(e) => !locked && handleFieldChange(f.key, e.target.value)}
+                    locked={locked}
+                    onChange={(v) => !locked && handleFieldChange(f.key, v)}
                     placeholder={locked ? '由连线提供' : f.placeholder}
                     style={locked ? lockedInputStyle : {
                       width: '100%', fontSize: 13, padding: '8px 12px',
