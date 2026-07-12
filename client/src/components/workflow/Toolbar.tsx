@@ -523,7 +523,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ref={nameInputRef}
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            onPressEnter={() => commitName()}
+            onPressEnter={() => nameInputRef.current?.blur()}
             onBlur={() => commitName()}
             onKeyDown={(e) => e.key === 'Escape' && cancelEditName()}
             size="small"
