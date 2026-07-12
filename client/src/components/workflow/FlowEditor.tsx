@@ -586,6 +586,9 @@ function FlowEditorInner({
 
       // ── Ctrl+C: copy selected node(s) to localStorage clipboard ───────
       if (ctrl && e.key === 'c') {
+        // If user has text selected in a modal/panel, let browser handle copy
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
         if (selectedNodes.length > 0) {
           try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(buildPayload(selectedNodes))); } catch (_) {}
           e.preventDefault();
@@ -595,6 +598,9 @@ function FlowEditorInner({
 
       // ── Ctrl+X: cut selected node(s) ─────────────────────────────────
       if (ctrl && e.key === 'x') {
+        // If user has text selected, let browser handle cut
+        const sel = window.getSelection();
+        if (sel && sel.toString().length > 0) return;
         if (selectedNodes.length > 0) {
           try { localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(buildPayload(selectedNodes))); } catch (_) {}
           const ids = new Set(selectedNodes.map((n) => n.id));
