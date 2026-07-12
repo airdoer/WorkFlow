@@ -77,6 +77,13 @@ const WorkflowPage: React.FC = () => {
     }
   };
 
+  const handleDeleteWorkflow = () => {
+    const currentPath = window.location.pathname;
+    // Navigate to default URL with library_open=true
+    history.push(`${currentPath}?library_open=true`);
+    setWorkflowData({ key: `new_${Date.now()}` });
+  };
+
   const handleFullscreenToggle = () => {
     const id = searchParams.get('id') || workflowData.id;
     const isFullscreen = window.location.pathname === '/workflow/fullscreen';
@@ -109,9 +116,11 @@ const WorkflowPage: React.FC = () => {
         workflowCreatedAt={workflowData.createdAt}
         workflowUpdatedAt={workflowData.updatedAt}
         isFullscreen={isFullscreen}
+        initialLibraryOpen={searchParams.get('library_open') === 'true'}
         onFullscreenToggle={handleFullscreenToggle}
         onSave={handleSave}
         onSwitchWorkflow={handleSwitchWorkflow}
+        onDeleteWorkflow={handleDeleteWorkflow}
       />
     </div>
   );

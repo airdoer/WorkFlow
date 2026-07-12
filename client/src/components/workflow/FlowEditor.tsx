@@ -43,6 +43,8 @@ interface FlowEditorProps {
   onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
   onSwitchWorkflow?: (id: string) => void;
+  onDeleteWorkflow?: () => void;
+  initialLibraryOpen?: boolean;
 }
 
 function FlowEditorInner({
@@ -57,6 +59,8 @@ function FlowEditorInner({
   onFullscreenToggle,
   onSave,
   onSwitchWorkflow,
+  onDeleteWorkflow,
+  initialLibraryOpen,
 }: FlowEditorProps) {
   const initialNodes = initialData?.nodes || [];
 
@@ -695,6 +699,8 @@ function FlowEditorInner({
         onRun={handleRun}
         runCancelFn={runCancelFn}
         onSwitchWorkflow={onSwitchWorkflow}
+        onDeleteWorkflow={onDeleteWorkflow}
+        initialLibraryOpen={initialLibraryOpen}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => {

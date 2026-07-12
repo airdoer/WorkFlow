@@ -114,6 +114,10 @@ export interface ToolbarProps {
   runCancelFn?: (() => void) | null;
   /** Called when user picks a workflow from the library to switch to */
   onSwitchWorkflow?: (id: string) => void;
+  /** Called when user deletes the current workflow */
+  onDeleteWorkflow?: () => void;
+  /** If true, auto-open the workflow library modal on mount (driven by URL param) */
+  initialLibraryOpen?: boolean;
 }
 
 /* ─────────────────────────── component ─────────────────────────── */
@@ -136,6 +140,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onRun,
   runCancelFn,
   onSwitchWorkflow,
+  onDeleteWorkflow,
+  initialLibraryOpen,
 }) => {
   const reactFlowInstance = useReactFlow();
   const isRunning = !!runCancelFn;
@@ -352,7 +358,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   // ── workflow library modal ───────────────────────────────────
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(!!initialLibraryOpen);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryData, setLibraryData] = useState<WorkflowRecord[]>([]);
   const [librarySearch, setLibrarySearch] = useState('');
@@ -370,6 +376,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   const openLibrary = () => { setLibraryOpen(true); fetchLibrary(); };
+
+  // Auto-open library from URL param on mount
+  useEffect(() => {
+    if (initialLibraryOpen) { fetchLibrary(); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync library_open URL param
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (libraryOpen) {
+      url.searchParams.set('library_open', 'true');
+    } else {
+      url.searchParams.delete('library_open');
+    }
+    const next = url.pathname + url.search;
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [libraryOpen]);
 
   const handleDeleteWorkflow = async (id: string) => {
     try {
@@ -665,6 +690,26 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           保存
         </Button>
+        {workflowId && (
+          <Popconfirm
+            title="确定删除当前工作流？"
+            description="删除后将移入垃圾箱，并打开工作流库"
+            onConfirm={async () => {
+              try {
+                await FlowApi.delete(workflowId);
+                message.success('已移入垃圾箱');
+                onDeleteWorkflow?.();
+              } catch (e: any) {
+                message.error(`删除失败: ${e.message}`);
+              }
+            }}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+          </Popconfirm>
+        )}
       </Space>
 
       <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
