@@ -61,23 +61,9 @@ body,
   left: unset;
 }
 
-/* ========== Move antd message/notification to the top-right ========== */
+/* ========== antd message 居中但下移，避免遮挡工具栏 ========== */
 .ant-message {
-  left: auto !important;
-  right: 24px !important;
-  top: 16px !important;
-  transform: none !important;
-  margin-inline: 0 !important;
-}
-/* Override each notice item's centered positioning */
-.ant-message-notice {
-  left: auto !important;
-  right: 0 !important;
-  transform: none !important;
-}
-.ant-notification {
-  right: 24px !important;
-  left: auto !important;
+  top: 56px !important;
 }
 
 /* ========== Always hide footer ========== */
