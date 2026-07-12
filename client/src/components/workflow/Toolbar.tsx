@@ -32,9 +32,36 @@ import {
   RollbackOutlined,
   CopyOutlined,
   ClockCircleOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { listCrons, stopCron } from './nodes/Cron/executor';
+
+/* ───────────────────── Global Variable API ───────────────────── */
+
+const API_BASE =
+  (typeof window !== 'undefined' && (window as any).FLASK_BACKEND_URL) || '';
+
+async function listVars() {
+  const res = await fetch(`${API_BASE}/api/workflow/vars/list`);
+  return res.json();
+}
+async function setVar(key: string, value: string) {
+  const res = await fetch(`${API_BASE}/api/workflow/vars/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value }),
+  });
+  return res.json();
+}
+async function deleteVar(key: string) {
+  const res = await fetch(`${API_BASE}/api/workflow/vars/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key }),
+  });
+  return res.json();
+}
 import type { WorkflowJSON } from './types';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
@@ -170,6 +197,55 @@ const Toolbar: React.FC<ToolbarProps> = ({
       message.error('停止失败');
     }
   }, [refreshCronList]);
+
+  // ── Global Variable management ─────────────────────────────
+  const [varModalOpen, setVarModalOpen] = useState(false);
+  const [varList, setVarList] = useState<any[]>([]);
+  const [varLoading, setVarLoading] = useState(false);
+  const [editingVarKey, setEditingVarKey] = useState<string | null>(null);
+  const [editingVarValue, setEditingVarValue] = useState('');
+
+  const refreshVarList = useCallback(async () => {
+    setVarLoading(true);
+    try {
+      const result = await listVars();
+      setVarList(result.vars || []);
+    } catch (e: any) {
+      message.error('获取变量列表失败');
+    } finally {
+      setVarLoading(false);
+    }
+  }, []);
+
+  const openVarModal = useCallback(() => {
+    setVarModalOpen(true);
+    refreshVarList();
+  }, [refreshVarList]);
+
+  const handleDeleteVar = useCallback(async (key: string) => {
+    try {
+      const result = await deleteVar(key);
+      if (result.success) {
+        message.success(`已删除 ${key}`);
+        refreshVarList();
+      } else {
+        message.error(result.error || '删除失败');
+      }
+    } catch { message.error('删除失败'); }
+  }, [refreshVarList]);
+
+  const handleSaveVar = useCallback(async (key: string, value: string) => {
+    try {
+      const result = await setVar(key, value);
+      if (result.success) {
+        message.success(`已更新 ${key}`);
+        setEditingVarKey(null);
+        refreshVarList();
+      } else {
+        message.error(result.error || '更新失败');
+      }
+    } catch { message.error('更新失败'); }
+  }, [refreshVarList]);
 
   // commitName: validate → update name → auto-save
   const commitName = useCallback(async () => {
@@ -606,8 +682,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
       {/* ── 推右区到最右 */}
       <div style={{ marginLeft: 'auto' }} />
 
-      {/* ── 右区：导入/导出 + 定时任务 + 全屏 ── */}
+      {/* ── 右区：导入/导出 + 变量管理 + 定时任务 + 全屏 ── */}
       <Space size={4}>
+        <Tooltip title="全局变量管理">
+          <Button icon={<DatabaseOutlined />} size="small" onClick={openVarModal}>变量管理</Button>
+        </Tooltip>
         <Tooltip title="定时任务管理">
           <Button icon={<ClockCircleOutlined />} size="small" onClick={openCronModal}>定时任务</Button>
         </Tooltip>
@@ -626,6 +705,60 @@ const Toolbar: React.FC<ToolbarProps> = ({
           {isFullscreen ? '退出全屏' : '全屏'}
         </Button>
       </Space>
+
+      {/* ── 全局变量管理 Modal ── */}
+      <Modal
+        title={<span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>📦 全局变量管理</span>}
+        open={varModalOpen}
+        onCancel={() => { setVarModalOpen(false); setEditingVarKey(null); }}
+        footer={<Button size="small" onClick={refreshVarList} loading={varLoading}>刷新</Button>}
+        width={680}
+        destroyOnHidden
+        styles={{ body: { padding: '12px 8px' } }}
+      >
+        <Table
+          dataSource={varList}
+          rowKey="key"
+          size="small"
+          pagination={false}
+          loading={varLoading}
+          scroll={{ x: 'max-content' }}
+          locale={{ emptyText: '暂无全局变量' }}
+          columns={[
+            { title: 'Key', dataIndex: 'key', width: 150, ellipsis: true },
+            {
+              title: '当前值', dataIndex: 'value', width: 240,
+              render: (v: string, r: any) =>
+                editingVarKey === r.key ? (
+                  <Input.Search
+                    size="small"
+                    value={editingVarValue}
+                    onChange={e => setEditingVarValue(e.target.value)}
+                    onSearch={() => handleSaveVar(r.key, editingVarValue)}
+                    enterButton="保存"
+                  />
+                ) : (
+                  <span
+                    style={{ cursor: 'pointer', color: '#1890ff' }}
+                    title="点击编辑"
+                    onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }}
+                  >
+                    {v ?? '(空)'}
+                  </span>
+                ),
+            },
+            { title: '更新时间', dataIndex: 'updated_at', width: 150, render: (v: string) => v ? relativeTime(v) : '-' },
+            {
+              title: '操作', width: 70,
+              render: (_: any, r: any) => (
+                <Popconfirm title={`确定删除变量 "${r.key}" ？`} onConfirm={() => handleDeleteVar(r.key)} okText="删除" cancelText="取消">
+                  <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+                </Popconfirm>
+              ),
+            },
+          ]}
+        />
+      </Modal>
 
       {/* ── 定时任务管理 Modal ── */}
       <Modal

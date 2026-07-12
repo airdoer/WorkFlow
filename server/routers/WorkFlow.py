@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import uuid
 import asyncio
+import json
 import logging
 
 # 3rd ext
@@ -33,6 +34,9 @@ from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor, load
 from Implement.workflowImpl.cronExecutor import CronExecutor, CronRegistry
 from Implement.workflowImpl.setGlobalValueExecutor import SetGlobalValueExecutor
 from Implement.workflowImpl.getGlobalValueExecutor import GetGlobalValueExecutor
+
+# Shared Redis key constants for global variable management
+from Implement.workflowImpl.setGlobalValueExecutor import WF_GVAR_PREFIX, WF_GVAR_REGISTRY
 
 # region init
 
@@ -134,6 +138,78 @@ def cron_stop(cron_id):
         return jsonify({'success': True, 'cronId': cron_id, 'message': f'Cron {cron_id} 已停止'})
     except Exception as e:
         logger.exception("[cron_stop] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+# endregion
+
+
+# region Global Variable Management API
+
+@app.route('/api/workflow/vars/list', methods=['GET'])
+def vars_list():
+    """List all workflow global variables with current value and updated_at."""
+    try:
+        from dbImp.redisImp import my_redis
+        registry = my_redis.hgetall(WF_GVAR_REGISTRY)
+        result = []
+        for key_b, meta_b in registry.items():
+            key = key_b if isinstance(key_b, str) else key_b.decode('utf-8')
+            meta_str = meta_b if isinstance(meta_b, str) else meta_b.decode('utf-8')
+            try:
+                meta = json.loads(meta_str)
+            except Exception:
+                meta = {}
+            redis_key = f"{WF_GVAR_PREFIX}{key}"
+            val = my_redis.get(redis_key)
+            result.append({
+                'key': key,
+                'value': val if isinstance(val, str) else (val.decode('utf-8') if val else None),
+                'updated_at': meta.get('updated_at', ''),
+            })
+        return jsonify({'vars': result})
+    except Exception as e:
+        logger.exception("[vars_list] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/vars/set', methods=['POST'])
+def vars_set():
+    """Manually set a global variable."""
+    data = request.get_json(silent=True) or {}
+    key = str(data.get('key', '')).strip()
+    value = str(data.get('value', '')) if data.get('value') is not None else ''
+    if not key:
+        return jsonify({'error': 'Key 不能为空'}), 400
+    try:
+        from dbImp.redisImp import my_redis
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        pipe = my_redis.pipeline()
+        pipe.set(f"{WF_GVAR_PREFIX}{key}", value)
+        pipe.hset(WF_GVAR_REGISTRY, key, json.dumps({"updated_at": now}))
+        pipe.execute()
+        return jsonify({'success': True, 'key': key})
+    except Exception as e:
+        logger.exception("[vars_set] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/vars/delete', methods=['POST'])
+def vars_delete():
+    """Delete a global variable."""
+    data = request.get_json(silent=True) or {}
+    key = str(data.get('key', '')).strip()
+    if not key:
+        return jsonify({'error': 'Key 不能为空'}), 400
+    try:
+        from dbImp.redisImp import my_redis
+        pipe = my_redis.pipeline()
+        pipe.delete(f"{WF_GVAR_PREFIX}{key}")
+        pipe.hdel(WF_GVAR_REGISTRY, key)
+        pipe.execute()
+        return jsonify({'success': True, 'key': key})
+    except Exception as e:
+        logger.exception("[vars_delete] Error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 # endregion
