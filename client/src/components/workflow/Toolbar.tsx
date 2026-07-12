@@ -431,16 +431,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
         return;
       }
       // Save empty workflow to server immediately
-      await FlowApi.save(trimmed, { nodes: [], edges: [] }, undefined, { author: '', description: '' });
+      const result = await FlowApi.save(trimmed, { nodes: [], edges: [] }, undefined, { author: '', description: '' });
+      setNewNameLoading(false);
+      setNewNameOpen(false);
+      setLibraryOpen(false);
+      // Navigate to the newly created workflow by its server-assigned id
+      if (result?.id) {
+        onSwitchWorkflow?.(result.id);
+      } else {
+        onSwitchWorkflow?.(`__new__:${trimmed}`);
+      }
     } catch (err: any) {
       setNewNameError(`创建失败: ${err.message}`);
       setNewNameLoading(false);
-      return;
     }
-    setNewNameLoading(false);
-    setNewNameOpen(false);
-    setLibraryOpen(false);
-    onSwitchWorkflow?.(`__new__:${trimmed}`);
   };
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
