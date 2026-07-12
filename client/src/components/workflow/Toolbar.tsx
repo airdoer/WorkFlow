@@ -734,8 +734,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
                     size="small"
                     value={editingVarValue}
                     onChange={e => setEditingVarValue(e.target.value)}
-                    onSearch={() => handleSaveVar(r.key, editingVarValue)}
+                    onSearch={(val) => { if (val !== undefined) handleSaveVar(r.key, editingVarValue); }}
                     enterButton="保存"
+                    suffix={<CloseOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => setEditingVarKey(null)} />}
                   />
                 ) : (
                   <span
