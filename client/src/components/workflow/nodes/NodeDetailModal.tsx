@@ -338,9 +338,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
           </Button>
         </div>
 
-        {/* Parameters — full-width stacked fields */}
-        <div style={{ padding: '14px 16px', background: '#fafafa' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#333', marginBottom: 10 }}>参数</div>
+        {/* Parameters — full-width stacked fields, collapsible but fixed at top */}
+        <DetailSection title="参数" defaultOpen extra={<span style={{ fontSize: 11, color: '#666' }}>{fields.length} 项</span>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {fields.map((f) => {
               const locked = isFieldLocked(f);
@@ -471,7 +470,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
               );
             })}
           </div>
-        </div>
+        </DetailSection>
       </div>
 
       {/* ===== Scrollable zone: Port info, Input content, Output content ===== */}
