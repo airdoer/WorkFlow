@@ -113,6 +113,31 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   );
 
   // Upstream data
+  // Detect binary content (e.g. Excel latin-1 encoded bytes)
+  const isBinaryContent = (str: string): boolean => {
+    if (str.length < 20) return false;
+    let nonPrintable = 0;
+    const sample = str.slice(0, 500);
+    for (let i = 0; i < sample.length; i++) {
+      const code = sample.charCodeAt(i);
+      if (code < 32 && code !== 9 && code !== 10 && code !== 13) nonPrintable++;
+      else if (code > 126 && code < 160) nonPrintable++;
+    }
+    return nonPrintable / sample.length > 0.1;
+  };
+
+  const formatPreviewValue = (value: any): string | null => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string') {
+      return isBinaryContent(value) ? '📦 二进制文件，不支持文本预览' : value;
+    }
+    if (typeof value === 'object' && value?.fileContent && typeof value.fileContent === 'string' && isBinaryContent(value.fileContent)) {
+      const { fileContent, ...rest } = value;
+      return JSON.stringify({ ...rest, fileContent: '📦 二进制文件，不支持文本预览' }, null, 2);
+    }
+    return JSON.stringify(value, null, 2);
+  };
+
   const upstreamInfo = useMemo(() => {
     const edges = getEdges();
     const incoming = edges.filter((e) => e.target === nodeId && e.data?.matchStatus === 'matched');
@@ -135,9 +160,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
         tgtPortLabel: tgtPort?.label || e.targetHandle || '',
         tgtPortType: tgtPort?.type || '',
         hasData: previewValue !== undefined,
-        preview: previewValue !== undefined
-          ? (typeof previewValue === 'string' ? previewValue : JSON.stringify(previewValue, null, 2))
-          : null,
+        preview: formatPreviewValue(previewValue),
       };
     });
   }, [getEdges, allNodes, nodeId, inputPorts]);
@@ -236,8 +259,13 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
 
   const outputText = useMemo(() => {
     if (!runOutput) return '';
-    if (typeof runOutput === 'string') return runOutput;
+    if (typeof runOutput === 'string') return isBinaryContent(runOutput) ? '📦 二进制文件，不支持文本预览' : runOutput;
     if (runOutput.error) return runOutput.error;
+    // For Excel output with binary fileContent, strip it for display
+    if (typeof runOutput === 'object' && runOutput?.fileContent && typeof runOutput.fileContent === 'string' && isBinaryContent(runOutput.fileContent)) {
+      const { fileContent, ...rest } = runOutput;
+      return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
+    }
     return JSON.stringify(runOutput, null, 2);
   }, [runOutput]);
 
@@ -540,6 +568,10 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 // Table node: 'tables' is an array of {title, columns, rows}
                 const isTables = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
                 const isExcel = !isTables && p.type === 'table-data' && displayValue?.columns;
+                // For Excel node: merge allSheets from runOutput into the data prop
+                const excelData = isExcel && nodeType === 'excel' && runOutput?.allSheets
+                  ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  : displayValue;
                 const isJson = !isDiff && !isTables && p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;
                 const isFileContent = !isTables && typeof displayValue === 'string';
@@ -562,9 +594,9 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                             ))}
                           </div>
                         ) : isExcel ? (
-                          <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
+                          <Suspense fallback={<pre style={{ margin: 0, padding: 10 }}>{JSON.stringify(excelData, null, 2).slice(0, 200)}...</pre>}>
                             <ExcelRenderer
-                              data={displayValue}
+                              data={excelData}
                               nodeId={nodeId}
                               height={400}
                             />
@@ -589,11 +621,18 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                           </Suspense>
                         ) : isFileContent ? (
                           <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
-                            {displayValue}
+                            {typeof displayValue === 'string' && isBinaryContent(displayValue) ? '📦 二进制文件，不支持文本预览' : displayValue}
                           </pre>
                         ) : isPre ? (
                           <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
-                            {JSON.stringify(displayValue, null, 2)}
+                            {(() => {
+                              const json = displayValue;
+                              if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
+                                const { fileContent, ...rest } = json;
+                                return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
+                              }
+                              return JSON.stringify(json, null, 2);
+                            })()}
                           </pre>
                         ) : null}
                       </div>
@@ -604,7 +643,11 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
             ) : (
               <div style={{ background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden', padding: 10 }}>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
-                  {typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(runOutput, null, 2)}
+                  {(() => {
+                    const val = typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(runOutput, null, 2);
+                    if (typeof val === 'string' && isBinaryContent(val)) return '📦 二进制文件，不支持文本预览';
+                    return val;
+                  })()}
                 </pre>
               </div>
             )}

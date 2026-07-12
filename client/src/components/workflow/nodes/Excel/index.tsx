@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useCallback, useRef } from 'react';
 import { NodeProps, useReactFlow } from 'reactflow';
 import BaseNode, { type NodeField } from '../BaseNode';
-import UniverRenderer, { type ExcelTableData } from './UniverRenderer';
+import UniverRenderer, { type ExcelTableData, type SheetData } from './UniverRenderer';
 
 /* ─── ExcelNode ─────────────────────────────────────────────────────────── */
 function ExcelNode({ data, id, selected }: NodeProps) {
@@ -66,15 +66,17 @@ function ExcelNode({ data, id, selected }: NodeProps) {
   const cols = runOutput?.columns as string[] | undefined;
   const rows = runOutput?.rows as Record<string, any>[] | undefined;
   const sheetNames = runOutput?.sheetNames as string[] | undefined;
+  const allSheets = runOutput?.allSheets as SheetData[] | undefined;
 
   const excelData: ExcelTableData | null = useMemo(() => {
     if (!cols || !rows) return null;
-    return { columns: cols, rows, sheetNames };
+    return { columns: cols, rows, sheetNames, allSheets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cols?.join(','),
     rows?.length,
     sheetNames?.join(','),
+    allSheets?.length,
   ]);
 
   // NOTE: No onSelectionChange in compact node card — this prevents

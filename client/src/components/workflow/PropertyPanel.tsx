@@ -63,6 +63,32 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   const outgoingEdges = selectedNode ? edges.filter((e) => e.source === selectedNode.id) : [];
 
   // Collect upstream data per input port — includes actual output preview
+  // Detect binary content (e.g. Excel latin-1 encoded bytes)
+  const isBinaryContent = (str: string): boolean => {
+    if (str.length < 20) return false;
+    let nonPrintable = 0;
+    const sample = str.slice(0, 500);
+    for (let i = 0; i < sample.length; i++) {
+      const code = sample.charCodeAt(i);
+      if (code < 32 && code !== 9 && code !== 10 && code !== 13) nonPrintable++;
+      else if (code > 126 && code < 160) nonPrintable++;
+    }
+    return nonPrintable / sample.length > 0.1; // >10% non-printable = binary
+  };
+
+  const formatPreviewValue = (value: any): string | null => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string') {
+      return isBinaryContent(value) ? '📦 二进制文件，不支持文本预览' : value;
+    }
+    // For objects that contain fileContent as a binary string, hide it
+    if (typeof value === 'object' && value?.fileContent && typeof value.fileContent === 'string' && isBinaryContent(value.fileContent)) {
+      const { fileContent, ...rest } = value;
+      return JSON.stringify({ ...rest, fileContent: '📦 二进制文件，不支持文本预览' }, null, 2);
+    }
+    return JSON.stringify(value, null, 2);
+  };
+
   const upstreamData = incomingEdges
     .filter((e) => e.data?.matchStatus === 'matched')
     .map((e) => {
@@ -89,9 +115,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         tgtPortLabel: tgtPort?.label || tgtHandle || '',
         tgtPortType: tgtPort?.type || '',
         hasData: previewValue !== undefined,
-        preview: previewValue !== undefined
-          ? (typeof previewValue === 'string' ? previewValue : JSON.stringify(previewValue, null, 2))
-          : null,
+        preview: formatPreviewValue(previewValue),
       };
     });
 
@@ -158,9 +182,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
 
   // Format output for display
   const formatOutput = (output: any): string => {
-    if (typeof output === 'string') return output;
-    if (output?.fileContent && typeof output.fileContent === 'string') return output.fileContent;
+    if (typeof output === 'string') return isBinaryContent(output) ? '📦 二进制文件，不支持文本预览' : output;
+    if (output?.fileContent && typeof output.fileContent === 'string') return isBinaryContent(output.fileContent) ? '📦 二进制文件，不支持文本预览' : output.fileContent;
     if (output?.error) return output.error;
+    // For Excel output objects, strip binary fileContent if present
+    if (typeof output === 'object' && output?.fileContent && isBinaryContent(output.fileContent)) {
+      const { fileContent, ...rest } = output;
+      return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
+    }
     return JSON.stringify(output, null, 2);
   };
 
@@ -518,8 +547,21 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const isTablesPort = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
             // For Excel node: table-data port with columns+rows structure
             const isExcelPort = !isTablesPort && p.type === 'table-data' && displayValue?.columns;
+            // For Excel node: merge allSheets from runOutput into the data prop
+            const excelDataPort = isExcelPort && nodeType === 'excel' && runOutput?.allSheets
+              ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+              : displayValue;
             const previewText = hasDisplay && !isDiffPort && !isTablesPort && !isExcelPort
-              ? (typeof displayValue === 'string' ? displayValue : JSON.stringify(displayValue, null, 2))
+              ? (typeof displayValue === 'string' 
+                  ? (isBinaryContent(displayValue) ? '📦 二进制文件，不支持文本预览' : displayValue) 
+                  : (() => {
+                      const json = displayValue;
+                      if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
+                        const { fileContent, ...rest } = json;
+                        return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
+                      }
+                      return JSON.stringify(json, null, 2);
+                    })())
               : null;
 
             return (
@@ -560,8 +602,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     ))}
                   </div>
                 ) : hasDisplay && isExcelPort ? (
-                  <Suspense fallback={<pre style={{ margin: 0, padding: '4px 6px', fontSize: 9 }}>{JSON.stringify(displayValue, null, 2).slice(0, 200)}...</pre>}>
-                    <UniverRenderer data={displayValue} nodeId={selectedNode?.id} compact height={250} />
+                  <Suspense fallback={<pre style={{ margin: 0, padding: '4px 6px', fontSize: 9 }}>{JSON.stringify(excelDataPort, null, 2).slice(0, 200)}...</pre>}>
+                    <UniverRenderer data={excelDataPort} nodeId={selectedNode?.id} compact height={250} />
                   </Suspense>
                 ) : hasDisplay && isDiffPort ? (
                   <DiffSummary

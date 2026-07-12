@@ -7,16 +7,24 @@ import '@univerjs/preset-sheets-core/lib/index.css';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
+export interface SheetData {
+  name: string;
+  columns: string[];
+  rows: Record<string, any>[];
+}
+
 export interface ExcelTableData {
   columns: string[];
   rows: Record<string, any>[];
   sheetNames?: string[];
+  /** Multi-sheet data: when available, each sheet has its own columns/rows */
+  allSheets?: SheetData[];
 }
 
 export interface UniverRendererProps {
   data: ExcelTableData;
   nodeId?: string;
-  /** Full mode: show Univer spreadsheet with toolbar. Compact mode: show simple HTML table */
+  /** Full mode: show Univer spreadsheet with toolbar. Compact mode: show simple HTML table with tabs */
   compact?: boolean;
   height?: number;
   onSelectionChange?: (info: SelectionInfo) => void;
@@ -30,10 +38,8 @@ export interface SelectionInfo {
 
 /* ─── Data conversion ─────────────────────────────────────────────────────── */
 
-function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
-  const { columns = [], rows = [] } = data;
-  const sheetKey = sheetName || 'Sheet1';
-
+function sheetToUniverSheet(sheet: SheetData): any {
+  const { columns = [], rows = [] } = sheet;
   const cellData: Record<number, Record<number, any>> = {};
 
   // Header row (row 0) — bold
@@ -66,21 +72,47 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
     colData[ci] = { w: Math.min(Math.max(maxLen * 9, 60), 300) };
   });
 
+  // Sanitize sheet name for use as Univer sheet ID (alphanumeric + underscore)
+  const sheetId = sheet.name.replace(/[^a-zA-Z0-9_]/g, '_');
+
+  return {
+    id: sheetId,
+    name: sheet.name,
+    cellData,
+    rowCount,
+    colCount,
+    defaultColumnWidth: 100,
+    defaultRowHeight: 27,
+    colData,
+    freeze: { startRow: 1, endRow: 1 },
+  };
+}
+
+function toUniverWorkbookData(data: ExcelTableData): any {
+  const allSheets = data.allSheets;
+
+  if (allSheets && allSheets.length > 0) {
+    // Multi-sheet mode: create workbook with all sheets
+    const sheets: Record<string, any> = {};
+    allSheets.forEach((s) => {
+      const univerSheet = sheetToUniverSheet(s);
+      sheets[univerSheet.id] = univerSheet;
+    });
+
+    return {
+      id: `wb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sheets,
+    };
+  }
+
+  // Single-sheet mode (backward compat)
+  const sheetKey = data.sheetNames?.[0] || 'Sheet1';
+  const singleSheet: SheetData = { name: sheetKey, columns: data.columns, rows: data.rows };
+  const univerSheet = sheetToUniverSheet(singleSheet);
+
   return {
     id: `wb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    sheets: {
-      [sheetKey]: {
-        id: sheetKey,
-        name: sheetKey,
-        cellData,
-        rowCount,
-        colCount,
-        defaultColumnWidth: 100,
-        defaultRowHeight: 27,
-        colData,
-        freeze: { startRow: 1, endRow: 1 },
-      },
-    },
+    sheets: { [univerSheet.id]: univerSheet },
   };
 }
 
@@ -89,14 +121,23 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
 function extractSelectionFromUniver(
   univerAPI: any,
   workbookId: string,
-  columns: string[],
-  rows: Record<string, any>[],
+  allSheets: SheetData[],
 ): SelectionInfo | null {
   try {
     const workbook = univerAPI.getWorkbook(workbookId);
     if (!workbook) return null;
     const sheet = workbook.getActiveSheet();
     if (!sheet) return null;
+
+    // Find the matching SheetData by sheet name
+    const sheetName = sheet.getName?.() || sheet.getSheetId?.() || '';
+    const sheetData = allSheets.find(s =>
+      s.name === sheetName || s.name.replace(/[^a-zA-Z0-9_]/g, '_') === sheetName
+    ) || allSheets[0];
+    if (!sheetData) return null;
+
+    const { columns, rows } = sheetData;
+
     const selection = sheet.getSelection();
     if (!selection) return null;
 
@@ -146,61 +187,103 @@ function extractSelectionFromUniver(
   }
 }
 
-/* ─── Simple HTML Table (compact preview) ─────────────────────────────────── */
+/* ─── Simple HTML Table (compact preview) with sheet tabs ─────────────────── */
 
 const CompactTable: React.FC<{ data: ExcelTableData; height: number }> = React.memo(({ data, height }) => {
-  const { columns = [], rows = [] } = data;
-  const maxRows = Math.min(rows.length, Math.floor((height - 30) / 22));
+  const allSheets = data.allSheets;
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Determine which sheet data to display
+  const displaySheet: SheetData | null = allSheets && allSheets.length > 0
+    ? allSheets[activeTab]
+    : { name: data.sheetNames?.[0] || 'Sheet1', columns: data.columns, rows: data.rows };
+
+  if (!displaySheet || !displaySheet.columns.length) {
+    return <div style={{ color: '#999', fontSize: 12, padding: 8 }}>暂无 Excel 数据</div>;
+  }
+
+  const { columns = [], rows = [] } = displaySheet;
+  const tabHeight = allSheets && allSheets.length > 1 ? 26 : 0;
+  const tableHeight = height - tabHeight;
+  const maxRows = Math.min(rows.length, Math.floor((tableHeight - 30) / 22));
 
   return (
-    <div style={{ fontSize: 11, lineHeight: '20px', overflow: 'auto', height, maxHeight: height }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            {columns.map((col, i) => (
-              <th key={i} style={{
-                background: '#fafafa',
-                borderBottom: '1px solid #e8e8e8',
-                padding: '2px 6px',
-                fontWeight: 600,
-                fontSize: 10,
-                whiteSpace: 'nowrap',
-                textAlign: 'left',
-                position: 'sticky',
-                top: 0,
-                zIndex: 1,
-              }}>
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.slice(0, maxRows).map((row, ri) => (
-            <tr key={ri}>
-              {columns.map((col, ci) => (
-                <td key={ci} style={{
-                  borderBottom: '1px solid #f0f0f0',
-                  padding: '1px 6px',
+    <div style={{ fontSize: 11, lineHeight: '20px', height, maxHeight: height, display: 'flex', flexDirection: 'column' }}>
+      {/* Sheet tabs */}
+      {allSheets && allSheets.length > 1 && (
+        <div style={{
+          display: 'flex', gap: 0, borderBottom: '1px solid #e8e8e8',
+          flexShrink: 0, overflowX: 'auto', background: '#fafafa',
+        }}>
+          {allSheets.map((s, i) => (
+            <button
+              key={s.name}
+              onClick={() => setActiveTab(i)}
+              style={{
+                border: 'none', background: i === activeTab ? '#fff' : 'transparent',
+                padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+                borderBottom: i === activeTab ? '2px solid #1890ff' : '2px solid transparent',
+                color: i === activeTab ? '#1890ff' : '#666',
+                fontWeight: i === activeTab ? 600 : 400,
+                whiteSpace: 'nowrap', minWidth: 0,
+              }}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>
+              {columns.map((col, i) => (
+                <th key={i} style={{
+                  background: '#fafafa',
+                  borderBottom: '1px solid #e8e8e8',
+                  padding: '2px 6px',
+                  fontWeight: 600,
+                  fontSize: 10,
                   whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: 150,
+                  textAlign: 'left',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 1,
                 }}>
-                  {row[col] !== undefined && row[col] !== null ? String(row[col]) : ''}
-                </td>
+                  {col}
+                </th>
               ))}
             </tr>
-          ))}
-          {rows.length > maxRows && (
-            <tr>
-              <td colSpan={columns.length} style={{ padding: '2px 6px', color: '#999', fontSize: 10, textAlign: 'center' }}>
-                ... 还有 {rows.length - maxRows} 行
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.slice(0, maxRows).map((row, ri) => (
+              <tr key={ri}>
+                {columns.map((col, ci) => (
+                  <td key={ci} style={{
+                    borderBottom: '1px solid #f0f0f0',
+                    padding: '1px 6px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 150,
+                  }}>
+                    {row[col] !== undefined && row[col] !== null ? String(row[col]) : ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {rows.length > maxRows && (
+              <tr>
+                <td colSpan={columns.length} style={{ padding: '2px 6px', color: '#999', fontSize: 10, textAlign: 'center' }}>
+                  ... 还有 {rows.length - maxRows} 行
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 });
@@ -220,8 +303,9 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
   const workbookIdRef = useRef<string | null>(null);
   const univerAPIRef = useRef<any>(null);
   const univerRef = useRef<any>(null);
-  const columnsRef = useRef<string[]>(data.columns);
-  const rowsRef = useRef<Record<string, any>[]>(data.rows);
+  const allSheetsRef = useRef<SheetData[]>(
+    data.allSheets || [{ name: data.sheetNames?.[0] || 'Sheet1', columns: data.columns, rows: data.rows }]
+  );
   const onSelectionChangeRef = useRef(onSelectionChange);
   const selDebounceRef = useRef<any>(null);
   const isDisposedRef = useRef(false);
@@ -234,15 +318,16 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
 
   // Keep refs in sync
   useEffect(() => {
-    columnsRef.current = data.columns;
-    rowsRef.current = data.rows;
-  }, [data.columns, data.rows]);
+    allSheetsRef.current = data.allSheets || [
+      { name: data.sheetNames?.[0] || 'Sheet1', columns: data.columns, rows: data.rows },
+    ];
+  }, [data.allSheets, data.columns, data.rows, data.sheetNames]);
 
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
-  // ─── Full Univer mode (non-compact): init with delay to ensure container has size ──
+  // ─── Full Univer mode (non-compact): init with delay ──
   useEffect(() => {
     if (compact) return;
 
@@ -252,11 +337,10 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
     isDisposedRef.current = false;
     container.id = containerIdRef.current;
 
-    // Delay init to ensure container has actual dimensions (fixes "column width < 0")
+    // Delay init to ensure container has actual dimensions
     const initTimer = setTimeout(() => {
       if (isDisposedRef.current) return;
 
-      // Check container dimensions
       const rect = container.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) {
         console.warn('[UniverRenderer] Container has zero dimensions, skipping init');
@@ -279,11 +363,8 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
       univerRef.current = univer;
       univerAPIRef.current = univerAPI;
 
-      // Create workbook with real data
-      const wbData = data.columns.length > 0
-        ? toUniverWorkbookData(data, data.sheetNames?.[0])
-        : null;
-
+      // Create workbook with multi-sheet data
+      const wbData = toUniverWorkbookData(data);
       if (wbData) {
         try {
           const wb = univerAPI.createWorkbook(wbData);
@@ -308,7 +389,7 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
                 if (isDisposedRef.current || !workbookIdRef.current) return;
                 const sel = extractSelectionFromUniver(
                   univerAPI, workbookIdRef.current,
-                  columnsRef.current, rowsRef.current,
+                  allSheetsRef.current,
                 );
                 if (sel && onSelectionChangeRef.current) {
                   onSelectionChangeRef.current(sel);
@@ -321,15 +402,13 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
           console.warn('[UniverRenderer] onCommandExecuted setup failed:', e);
         }
       }
-    }, 200); // 200ms delay for Modal animation + container sizing
+    }, 200);
 
     return () => {
       isDisposedRef.current = true;
       clearTimeout(initTimer);
       if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
 
-      // Use requestAnimationFrame to defer disposal outside of React render cycle
-      // This fixes "Attempted to synchronously unmount a root" error
       const univerToDispose = univerRef.current;
       const containerId = containerIdRef.current;
       requestAnimationFrame(() => {
@@ -340,7 +419,6 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
         try {
           if (univerToDispose) univerToDispose.dispose();
         } catch (e) { /* ignore */ }
-        // Clean up container DOM
         const el = document.getElementById(containerId);
         if (el) el.innerHTML = '';
       });
@@ -350,13 +428,16 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
       workbookIdRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compact]); // Re-run only when compact changes
+  }, [compact]);
 
-  if (!data.columns.length && !data.rows.length) {
+  const hasAnyData = data.allSheets?.some(s => s.columns.length > 0 || s.rows.length > 0)
+    || (data.columns.length > 0 || data.rows.length > 0);
+
+  if (!hasAnyData) {
     return <div style={{ color: '#999', fontSize: 12, padding: 8 }}>暂无 Excel 数据</div>;
   }
 
-  // Compact mode: render simple HTML table (no Univer)
+  // Compact mode: render HTML table with sheet tabs
   if (compact) {
     return <CompactTable data={data} height={containerHeight} />;
   }

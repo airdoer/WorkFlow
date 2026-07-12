@@ -10,6 +10,19 @@ import NodeDetailModal from './NodeDetailModal';
 // Lazy load renderers to reduce initial bundle
 const ExcelRenderer = lazy(() => import('./Excel/UniverRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
+
+// Detect binary content (e.g. Excel latin-1 encoded bytes)
+function isBinaryContent(str: string): boolean {
+  if (str.length < 20) return false;
+  let nonPrintable = 0;
+  const sample = str.slice(0, 500);
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) nonPrintable++;
+    else if (code > 126 && code < 160) nonPrintable++;
+  }
+  return nonPrintable / sample.length > 0.1;
+}
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 
 export type RunStatus = 'idle' | 'running' | 'success' | 'error';
@@ -605,6 +618,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
+                // For Excel node: merge allSheets from runOutput into the data prop
+                const excelDataNode = p.type === 'table-data' && displayValue?.columns && runOutput?.allSheets
+                  ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  : displayValue;
+
                 return (
                   <div key={p.key} style={{ marginBottom: 4, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -616,8 +634,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                       <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}
                            className="nowheel nopan">
                         {p.type === 'table-data' && displayValue?.columns ? (
-                          <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
-                            <ExcelRenderer data={displayValue} nodeId={id} compact height={110} />
+                          <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(excelDataNode, null, 2).slice(0, 80)}...</pre>}>
+                            <ExcelRenderer data={excelDataNode} nodeId={id} compact height={110} />
                           </Suspense>
                         ) : p.type === 'json-data' ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
@@ -629,11 +647,18 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                           </Suspense>
                         ) : typeof displayValue === 'string' ? (
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                            {displayValue}
+                            {isBinaryContent(displayValue) ? '📦 二进制文件' : displayValue}
                           </pre>
                         ) : (
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                            {JSON.stringify(displayValue, null, 2)}
+                            {(() => {
+                              const json = displayValue;
+                              if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
+                                const { fileContent, ...rest } = json;
+                                return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
+                              }
+                              return JSON.stringify(json, null, 2);
+                            })()}
                           </pre>
                         )}
                       </div>
@@ -648,7 +673,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d' }}>✅ 结果</div>
                 <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                    {typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(runOutput, null, 2)}
+                    {(() => {
+                      const val = typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(runOutput, null, 2);
+                      if (typeof val === 'string' && isBinaryContent(val)) return '📦 二进制文件';
+                      return val;
+                    })()}
                   </pre>
                 </div>
               </div>

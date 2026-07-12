@@ -22,7 +22,7 @@ class ExcelExecutor(BaseNodeExecutor):
           - filterRows    : 行号列表（1-based），只保留这些行（空则全部保留）
 
         输出：
-          columns, rows, sheetNames, tableData,
+          columns, rows, sheetNames, tableData, allSheets,
           selectedRows=[], selectedCols=[], selectedValues=null
         """
 
@@ -53,7 +53,7 @@ class ExcelExecutor(BaseNodeExecutor):
                 return {
                     'columns': filtered_columns, 'rows': rows,
                     'allColumns': all_columns, 'allRows': all_rows_dict,
-                    'sheetNames': [], 'tableData': table_data,
+                    'sheetNames': [], 'allSheets': [], 'tableData': table_data,
                     'selectedRows': [], 'selectedCols': [], 'selectedValues': None,
                 }
 
@@ -95,7 +95,7 @@ class ExcelExecutor(BaseNodeExecutor):
             else:
                 return {'error': 'Cannot open file. Ensure an upstream P4 File or ExcelSearch node is connected.'}
 
-            # 选取 sheet
+            # ── 选取 sheet ────────────────────────────────────────────────
             if sheet_name and str(sheet_name) in wb.sheetnames:
                 ws = wb[str(sheet_name)]
             elif sheet_name:
@@ -119,17 +119,39 @@ class ExcelExecutor(BaseNodeExecutor):
             table_data = {'title': None, 'columns': filtered_columns, 'rows': rows_dict}
             # allColumns / allRows 保留原始完整数据，供前端筛选 options 使用
             all_rows_dict = [{columns[i]: (row[i] if i < len(row) else None) for i in range(len(columns))} for row in all_rows]
-            return {
+
+            # ── 构造 allSheets：每个 sheet 都提取数据 ─────────────────────
+            all_sheets = []
+            for sn in wb.sheetnames:
+                sws = wb[sn]
+                s_raw_cols = [cell.value for cell in sws[1]]
+                s_cols = [str(c) if c is not None else f'Col{i+1}' for i, c in enumerate(s_raw_cols)]
+                s_all_rows = []
+                for row in sws.iter_rows(min_row=2, values_only=True):
+                    s_all_rows.append(list(row))
+                # 对每个 sheet 也应用 filterRows/filterColumns
+                s_filtered_rows = self._apply_row_filter(s_all_rows, filter_rows, s_cols)
+                s_filtered_cols, s_filtered_rows = self._apply_column_filter_indexed(s_cols, s_filtered_rows, filter_columns)
+                s_rows_dict = [{s_filtered_cols[i]: (row[i] if i < len(row) else None) for i in range(len(s_filtered_cols))} for row in s_filtered_rows]
+                all_sheets.append({
+                    'name': sn,
+                    'columns': s_filtered_cols,
+                    'rows': s_rows_dict,
+                })
+
+            result = {
                 'columns': filtered_columns,
                 'rows': rows_dict,
                 'allColumns': columns,
                 'allRows': all_rows_dict,
                 'sheetNames': list(wb.sheetnames),
+                'allSheets': all_sheets,
                 'tableData': table_data,
                 'selectedRows': [],
                 'selectedCols': [],
                 'selectedValues': None,
             }
+            return result
         except Exception as e:
             return {'error': str(e)}
 
@@ -214,6 +236,7 @@ class ExcelExecutor(BaseNodeExecutor):
             'columns': columns,
             'rows': filtered_rows,
             'sheetNames': [],
+            'allSheets': [],
             'tableData': table_data,
             'selectedRows': [],
             'selectedCols': [],

@@ -244,7 +244,7 @@ http://172.28.200.60:8000/workflow/fullscreen?id=testNode
 http://172.28.200.60:16666
 
 # 查服务端日志
-业务优先用
+业务优先用排查flask的启动失败
 less /data/chenzhixu/WorkFlow/server/log/work_flow_server.log
 容器启动失败用
 docker logs -f work_flow_server_container
