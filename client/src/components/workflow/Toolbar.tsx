@@ -86,6 +86,18 @@ function relativeTime(isoStr?: string): string {
 
 /* ─────────────────────────── types ─────────────────────────── */
 
+/** Copy text to clipboard (works in HTTP contexts unlike navigator.clipboard) */
+function copyToClipboard(text: string) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
+
 interface WorkflowRecord {
   id: string;
   name: string;
@@ -690,6 +702,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           保存
         </Button>
+        
+      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
+
         {workflowId && (
           <Popconfirm
             title="确定删除当前工作流？"
@@ -711,8 +726,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </Popconfirm>
         )}
       </Space>
-
-      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
 
       {/* ── 中区：工作流库（绝对定位，基于整个 toolbar 居中）── */}
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
@@ -775,7 +788,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           columns={[
             {
               title: 'Key', dataIndex: 'key', width: 180, ellipsis: true,
-              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} /></Space>,
+              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { copyToClipboard(v); message.success('已复制'); }} /></Space>,
             },
             {
               title: '当前值', dataIndex: 'value', width: 300,
@@ -798,7 +811,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <Space size={4}>
                     <span style={{ cursor: 'default' }}>{v ?? '(空)'}</span>
                     <EditOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }} />
-                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} />}
+                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { copyToClipboard(v); message.success('已复制'); }} />}
                   </Space>
                 ),
             },
