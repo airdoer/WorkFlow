@@ -15,6 +15,7 @@ import KimNotifyNode from './nodes/KimNotify';
 import BoolGateNode from './nodes/BoolGate';
 import TableNode from './nodes/Table';
 import ExcelSearchNode from './nodes/ExcelSearch';
+import CronNode from './nodes/Cron';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -31,6 +32,7 @@ import KimNotifyIcon from './nodes/KimNotify/icon';
 import BoolGateIcon from './nodes/BoolGate/icon';
 import TableIcon from './nodes/Table/icon';
 import ExcelSearchIcon from './nodes/ExcelSearch/icon';
+import CronIcon from './nodes/Cron/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -48,6 +50,7 @@ export const nodeTypes: NodeTypes = {
   boolgate: BoolGateNode,
   table: TableNode,
   excelsearch: ExcelSearchNode,
+  cron: CronNode,
 };
 
 export interface NodeRegistryEntry {
@@ -81,6 +84,8 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'table', label: 'Table 表格', icon: <TableIcon />, category: '渲染器', description: '接收上游数据，将数组/字典渲染为表格；数组→单表，字典→多表' },
   // Data sources
   { type: 'excelsearch', label: 'Excel 搜索', icon: <ExcelSearchIcon />, category: '数据源', description: '从预注册列表中选择 Excel 文件，输出文件内容供下游 Excel 节点使用' },
+  // Trigger
+  { type: 'cron', label: 'Cron 定时', icon: <CronIcon />, category: '触发器', description: '按 Cron 表达式定时触发下游节点执行，最低频率 1 分钟' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

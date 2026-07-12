@@ -30,6 +30,7 @@ from Implement.workflowImpl.kimNotifyExecutor import KimNotifyExecutor
 from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
 from Implement.workflowImpl.tableExecutor import TableExecutor
 from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor, load_excelsearch_options
+from Implement.workflowImpl.cronExecutor import CronExecutor, CronRegistry
 
 # region init
 
@@ -51,8 +52,85 @@ ExecutorManager.register(KimNotifyExecutor())
 ExecutorManager.register(BoolGateExecutor())
 ExecutorManager.register(TableExecutor())
 ExecutorManager.register(ExcelSearchExecutor())
+ExecutorManager.register(CronExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
+
+# endregion
+
+
+# region Cron Management APIs
+
+@app.route('/api/workflow/cron/start', methods=['POST'])
+def cron_start():
+    """Start a new cron schedule.
+    Body: { cronExpr, workflowId, nodeId }
+    Returns: { success, cronId, message } or { error }
+    """
+    try:
+        data = request.json
+        cron_expr = data.get('cronExpr', '').strip()
+        workflow_id = data.get('workflowId', '')
+        node_id = data.get('nodeId', '')
+
+        if not cron_expr:
+            return jsonify({'error': 'Cron 表达式不能为空'}), 400
+
+        output = ExecutorManager.run_node('cron', {
+            'cronExpr': cron_expr,
+            'workflowId': workflow_id,
+            'nodeId': node_id,
+        }, {})
+
+        if output.get('error'):
+            return jsonify({'error': output['error']}), 400
+
+        # Set callback to trigger downstream execution via Socket.IO
+        cron_id = output.get('cronId')
+        if cron_id:
+            def _cron_callback():
+                """When cron fires, emit a Socket.IO event to trigger downstream nodes."""
+                logger.info("[CronCallback] cron_id=%s firing, emitting workflow:cron_fire", cron_id)
+                socketio.emit('workflow:cron_fire', {
+                    'cronId': cron_id,
+                    'workflowId': workflow_id,
+                    'nodeId': node_id,
+                    'timestamp': datetime.now().isoformat(),
+                }, room=workflow_id)
+
+            with CronRegistry.instance()._lock:
+                entry = CronRegistry.instance()._crons.get(cron_id)
+                if entry:
+                    entry['callback'] = _cron_callback
+
+        return jsonify(output)
+    except Exception as e:
+        logger.exception("[cron_start] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/cron/list', methods=['GET'])
+def cron_list():
+    """List all registered cron jobs (running and recently stopped)."""
+    try:
+        CronRegistry.instance().cleanup_stopped()
+        return jsonify({'crons': CronRegistry.instance().list_all()})
+    except Exception as e:
+        logger.exception("[cron_list] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/cron/<cron_id>/stop', methods=['POST'])
+def cron_stop(cron_id):
+    """Stop a running cron job."""
+    try:
+        ok = CronRegistry.instance().stop(cron_id)
+        if not ok:
+            return jsonify({'error': f'Cron {cron_id} 不存在或已停止'}), 404
+        return jsonify({'success': True, 'cronId': cron_id, 'message': f'Cron {cron_id} 已停止'})
+    except Exception as e:
+        logger.exception("[cron_stop] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
 
 # endregion
 

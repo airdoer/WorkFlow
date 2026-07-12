@@ -31,8 +31,10 @@ import {
   RestOutlined,
   RollbackOutlined,
   CopyOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
+import { listCrons, stopCron } from './nodes/Cron/executor';
 import type { WorkflowJSON } from './types';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
@@ -132,6 +134,42 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const [description, setDescription] = useState(initialDesc || '');
   useEffect(() => { setAuthor(initialAuthor || ''); }, [initialAuthor]);
   useEffect(() => { setDescription(initialDesc || ''); }, [initialDesc]);
+
+  // ── Cron management ──────────────────────────────────────────
+  const [cronModalOpen, setCronModalOpen] = useState(false);
+  const [cronList, setCronList] = useState<any[]>([]);
+  const [cronLoading, setCronLoading] = useState(false);
+
+  const refreshCronList = useCallback(async () => {
+    setCronLoading(true);
+    try {
+      const result = await listCrons();
+      setCronList(result.crons || []);
+    } catch (e: any) {
+      message.error('获取定时任务列表失败');
+    } finally {
+      setCronLoading(false);
+    }
+  }, []);
+
+  const openCronModal = useCallback(() => {
+    setCronModalOpen(true);
+    refreshCronList();
+  }, [refreshCronList]);
+
+  const handleStopCron = useCallback(async (cronId: string) => {
+    try {
+      const result = await stopCron(cronId);
+      if (result.success) {
+        message.success('已停止');
+        refreshCronList();
+      } else {
+        message.error(result.error || '停止失败');
+      }
+    } catch (e: any) {
+      message.error('停止失败');
+    }
+  }, [refreshCronList]);
 
   // commitName: validate → update name → auto-save
   const commitName = useCallback(async () => {
@@ -568,8 +606,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
       {/* ── 推右区到最右 */}
       <div style={{ marginLeft: 'auto' }} />
 
-      {/* ── 右区：导入/导出 + 全屏 ── */}
+      {/* ── 右区：导入/导出 + 定时任务 + 全屏 ── */}
       <Space size={4}>
+        <Tooltip title="定时任务管理">
+          <Button icon={<ClockCircleOutlined />} size="small" onClick={openCronModal}>定时任务</Button>
+        </Tooltip>
         <Tooltip title="导入 JSON">
           <Button icon={<ImportOutlined />} size="small" onClick={handleImport} />
         </Tooltip>
@@ -585,6 +626,44 @@ const Toolbar: React.FC<ToolbarProps> = ({
           {isFullscreen ? '退出全屏' : '全屏'}
         </Button>
       </Space>
+
+      {/* ── 定时任务管理 Modal ── */}
+      <Modal
+        title={<span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>⏰ 定时任务管理</span>}
+        open={cronModalOpen}
+        onCancel={() => setCronModalOpen(false)}
+        footer={<Button size="small" onClick={refreshCronList} loading={cronLoading}>刷新</Button>}
+        width={640}
+        destroyOnHidden
+      >
+        <Table
+          dataSource={cronList}
+          rowKey="cron_id"
+          size="small"
+          pagination={false}
+          loading={cronLoading}
+          locale={{ emptyText: '暂无运行中的定时任务' }}
+          columns={[
+            { title: 'ID', dataIndex: 'cron_id', width: 130, ellipsis: true },
+            { title: 'Cron 表达式', dataIndex: 'cron_expr', width: 130 },
+            { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => (
+              <span style={{ color: v === 'running' ? '#52c41a' : '#999', fontWeight: 600 }}>
+                {v === 'running' ? '🟢 运行中' : v === 'stopping' ? '⏹ 停止中' : '⚪ 已停止'}
+              </span>
+            )},
+            { title: '已执行', dataIndex: 'run_count', width: 70, align: 'center' as const },
+            { title: '上次执行', dataIndex: 'last_run', width: 150, render: (v: string) => v ? relativeTime(v) : '-' },
+            { title: '启动时间', dataIndex: 'started_at', width: 150, render: (v: string) => relativeTime(v) },
+            { title: '操作', width: 80, render: (_: any, r: any) => (
+              r.status === 'running' ? (
+                <Popconfirm title="确定停止该定时任务？" onConfirm={() => handleStopCron(r.cron_id)} okText="停止" cancelText="取消">
+                  <Button size="small" danger icon={<StopOutlined />}>停止</Button>
+                </Popconfirm>
+              ) : <span style={{ color: '#999', fontSize: 11 }}>已停止</span>
+            )},
+          ]}
+        />
+      </Modal>
 
       {/* ── 工作流库 Modal ── */}
       <Modal

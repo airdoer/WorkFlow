@@ -143,6 +143,11 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'fileName',    label: '文件名',   type: 'string',       direction: 'output' },
     { key: 'sheetNames',  label: 'Sheet列表', type: 'any',         direction: 'output' },
   ],
+  // Cron node — periodic trigger
+  cron: [
+    { key: 'valueIn', label: '输入值', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'trigger', label: '触发信号', type: 'any', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {
