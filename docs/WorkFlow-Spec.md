@@ -43,7 +43,7 @@ scp ... diffExecutor.py ... && sudo docker restart work_flow_server_container
 
 ## 一、项目概述
 
-基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点，**String / Bool / Number** 三类基础值节点，以及 **C7Server / Jenkins / KimNotify / BoolGate / Diff** 五类功能节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理、服务器操作和通知等操作的流程化编排。
+基于 **React Flow** 开源前端流程搭建引擎，构建一个可视化工作流平台。支持 P4File、Excel、Lua、JSON、Prompt 五类节点，**String / Bool / Number** 三类基础值节点，**C7Server / Jenkins / KimNotify / BoolGate / Diff / Table / ExcelSearch** 七类功能节点，**Cron** 定时触发节点，**SetGlobalValue / GetGlobalValue** 全局存储节点，通过**端口类型系统**实现数据源与渲染器的解耦连接，实现文件获取、解析、AI 处理、服务器操作、通知、定时触发和全局数据存取等操作的流程化编排。
 
 ### 技术选型
 
@@ -147,9 +147,33 @@ client/
                 │   ├── executor.ts
                 │   └── icon.tsx
                 │
-                └── BoolGate/
-                    ├── index.tsx             // 布尔门控节点（True 放行，False 报错）
-                    ├── executor.ts
+                ├── BoolGate/
+                │   ├── index.tsx             // 布尔门控节点（True 放行，False 报错）
+                │   ├── executor.ts
+                │   └── icon.tsx
+                │
+                ├── Table/
+                │   ├── index.tsx             // 表格渲染节点（接收上游数据渲染为表格）
+                │   └── icon.tsx
+                │
+                ├── ExcelSearch/
+                │   ├── index.tsx             // Excel 搜索节点（从预注册列表选文件）
+                │   ├── executor.ts
+                │   └── icon.tsx
+                │
+                ├── Cron/
+                │   ├── index.tsx             // Cron 定时触发节点
+                │   ├── executor.ts           // 启动/列表/停止 API
+                │   └── icon.tsx
+                │
+                ├── SetGlobalValue/
+                │   ├── index.tsx             // 向 Redis 写入全局键值
+                │   ├── schema.ts
+                │   └── icon.tsx
+                │
+                └── GetGlobalValue/
+                    ├── index.tsx             // 从 Redis 读取全局键值
+                    ├── schema.ts
                     └── icon.tsx
 ```
 
@@ -176,7 +200,12 @@ server/
 │       ├── c7ServerExecutor.py             // C7Server 节点执行（读取 c7Server.json + c7ServerTags.json，带缓存）
 │       ├── kdipExecutor.py              // Jenkins 节点执行（调用 KdipClient.extend_cmd）
 │       ├── kimNotifyExecutor.py            // KimNotify 节点执行（调用 C7KimRobot.send_msg）
-│       └── boolGateExecutor.py             // BoolGate 节点执行（True 放行，False 抛异常）
+│       ├── boolGateExecutor.py             // BoolGate 节点执行（True 放行，False 抛异常）
+│       ├── tableExecutor.py               // Table 节点执行（list/dict → 结构化表格）
+│       ├── excelSearchExecutor.py          // ExcelSearch 节点执行（加载文件列表选项）
+│       ├── cronExecutor.py                 // Cron 节点执行（crontab 解析 + 定时调度 + Registry）
+│       ├── setGlobalValueExecutor.py       // SetGlobalValue 节点执行（Redis SET）
+│       └── getGlobalValueExecutor.py       // GetGlobalValue 节点执行（Redis GET）
 │
 ├── utility/
 │   └── p4Utils.py                          // P4 工具库（download_file / update_file / list_dir 等）
@@ -2258,3 +2287,240 @@ excel: [
   - 实现 `filterColumns` / `filterRows` 过滤逻辑
   - 初始返回 `selectedRows=[]` / `selectedCols=[]` / `selectedValues=null`
 - [ ] 更新 PortTypes.ts 中 `excel` 节点端口定义
+
+---
+
+## 十七、新增节点开发指南
+
+> 本章节为快速新增节点提供完整的 Checklist 和文件清单，避免遗漏。
+
+### 17.1 新增节点 Checklist（共 6 步）
+
+| # | 步骤 | 文件 | 说明 |
+|---|------|------|------|
+| 1 | **后端 Executor** | `server/Implement/workflowImpl/<name>Executor.py` | 继承 `BaseNodeExecutor`，实现 `type` 和 `execute()` |
+| 2 | **后端注册** | `server/routers/WorkFlow.py` | import + `ExecutorManager.register()` |
+| 3 | **前端节点目录** | `client/src/components/workflow/nodes/<Name>/` | 创建 `index.tsx` + `icon.tsx` + `schema.ts` |
+| 4 | **端口类型注册** | `client/src/components/workflow/PortTypes.ts` | 在 `NODE_PORT_DEFINITIONS` 添加端口定义 |
+| 5 | **节点注册** | `client/src/components/workflow/NodeRegistry.tsx` | import 组件+图标 + `nodeTypes` + `nodeRegistryList` |
+| 6 | **部署** | SCP 全部文件 → restart 容器 | source 文件 restart，新依赖需 rebuild |
+
+### 17.2 后端 Executor 模板
+
+```python
+# server/Implement/workflowImpl/<name>Executor.py
+import logging
+from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
+
+logger = logging.getLogger(__name__)
+
+
+class <Name>Executor(BaseNodeExecutor):
+    type = "<name>"  # 必须与前端 nodeType 一致
+
+    def execute(self, config: dict, input_data: dict) -> dict:
+        """
+        config:   节点自身的字段值（如 key, value 等）
+        input_data: 上游连线传入的数据（key 对应 targetHandle）
+
+        Returns: { success: bool, ... } 或 { error: str }
+        """
+        # 从 config 或 input_data 获取参数
+        param = input_data.get("portKey") or config.get("fieldKey", "")
+
+        if not param:
+            return {"error": "参数不能为空"}
+
+        try:
+            # 业务逻辑
+            result = do_something(param)
+            return {"success": True, "output": result}
+        except Exception as e:
+            logger.exception("[<Name>] Error: %s", e)
+            return {"success": False, "error": str(e)}
+```
+
+### 17.3 后端注册（WorkFlow.py）
+
+在 `server/routers/WorkFlow.py` 中添加两处：
+
+```python
+# 1. 导入（顶部 import 区）
+from Implement.workflowImpl.<name>Executor import <Name>Executor
+
+# 2. 注册（ExecutorManager.register 区）
+ExecutorManager.register(<Name>Executor())
+```
+
+### 17.4 前端节点组件模板
+
+#### icon.tsx（必须返回 React 组件，不能是字符串）
+
+```tsx
+import React from 'react';
+import { SomeOutlined } from '@ant-design/icons';
+
+const <Name>Icon: React.FC = () => <SomeOutlined style={{ fontSize: 24, color: '#1890ff' }} />;
+
+export default <Name>Icon;
+```
+
+> ⚠️ **重要**：`icon.tsx` 必须导出 React 函数组件，不能导出 emoji 字符串。
+> 否则在 `<Icon />` 渲染时 React 会将 emoji 当作 HTML 标签导致报错。
+
+#### schema.ts
+
+```ts
+export const schema = {};
+```
+
+#### index.tsx（简单节点，基于 BaseNode）
+
+```tsx
+import React, { memo } from 'react';
+import { NodeProps } from 'reactflow';
+import BaseNode, { NodeField } from '../BaseNode';
+
+const <NAME>_FIELDS: NodeField[] = [
+  {
+    key: 'fieldKey',
+    label: '字段标签',
+    type: 'text',          // 'text' | 'textarea' | 'number' | 'select' | 'multiselect'
+    required: true,
+    placeholder: '提示文本',
+    linkedPortKey: 'portKey',  // 关联的输入端口 key，连线时字段自动锁定
+  },
+];
+
+function <Name>Node({ data, id, selected }: NodeProps) {
+  return (
+    <BaseNode
+      data={data as Record<string, unknown>}
+      id={id}
+      selected={!!selected}
+      icon="🏷️"
+      label="<Name>"
+      nodeType="<name>"
+      fields={<NAME>_FIELDS}
+    />
+  );
+}
+
+export default memo(<Name>Node);
+```
+
+#### NodeField 关键属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `key` | string | 对应 `nodeData[key]` 中的字段名，也是 config 传给后端的 key |
+| `label` | string | 节点卡片上显示的字段名 |
+| `type` | string | 控制渲染方式：text/textarea/number/select/multiselect |
+| `required` | boolean | 为 true 时，字段为空且 linkedPortKey 无连线 → 节点无法运行 |
+| `linkedPortKey` | string | 关联输入端口 key，连线时字段自动变为只读（"🔗 由连线提供"） |
+| `options` | array | select/multiselect 的静态选项 |
+| `optionsFn` | function | 动态选项工厂 `(nodeData) => options[]`，优先于 options |
+| `renderCustomField` | function | 自定义渲染 `(value, onChange, locked) => ReactNode` |
+
+### 17.5 端口类型注册（PortTypes.ts）
+
+在 `NODE_PORT_DEFINITIONS` 中添加：
+
+```typescript
+// <Name> node — description
+<name>: [
+  // 输入端口
+  { key: 'portKey', label: '端口标签', type: 'string', direction: 'input', maxConnections: 1 },
+  // 输出端口
+  { key: 'outputKey', label: '输出标签', type: 'string', direction: 'output' },
+],
+```
+
+**端口类型兼容性矩阵**（`PORT_TYPE_COMPATIBILITY`）：
+
+| type | 兼容目标 |
+|------|---------|
+| `string` | string, any, text, file-content, file-path |
+| `any` | 几乎所有类型 |
+| `boolean` | boolean, any |
+| `table-data` | table-data, any |
+| `file-content` | file-content, string, text, any |
+| `number` | number, any |
+
+如果需要新的端口类型，需同时在 `PORT_TYPE_COMPATIBILITY` 中添加双向兼容规则。
+
+### 17.6 节点注册（NodeRegistry.tsx）
+
+需要添加 3 处：
+
+```tsx
+// 1. 导入节点组件
+import <Name>Node from './nodes/<Name>';
+
+// 2. 导入图标
+import <Name>Icon from './nodes/<Name>/icon';
+
+// 3. 注册到 nodeTypes（ReactFlow 用）
+export const nodeTypes: NodeTypes = {
+  ...
+  <name>: <Name>Node,
+};
+
+// 4. 注册到 nodeRegistryList（Toolbox 工具箱用）
+export const nodeRegistryList: NodeRegistryEntry[] = [
+  ...
+  {
+    type: '<name>',
+    label: '<显示名>',
+    icon: <<Name>Icon />,
+    category: '<分类>',
+    description: '<工具提示文本>',
+  },
+];
+```
+
+**已有分类**：`数据源`、`渲染器`、`AI`、`基础类型`、`工具`、`触发器`、`全局存储`
+
+### 17.7 部署 Checklist
+
+| 场景 | 操作 |
+|------|------|
+| 只改了前端 source 文件 | SCP → dev server 自动热更新，无需 restart |
+| 改了前端但未生效 | `sudo docker restart work_flow_client_dev` |
+| 改了后端 Python 文件 | SCP → `sudo docker restart work_flow_server_container` |
+| 新增后端 Python 文件 | SCP → restart server（不需要 rebuild，Python 是解释型） |
+| 新增了 pip 依赖 | 需 rebuild server 镜像：修改 Dockerfile → rebuild → restart |
+| 新增了 npm 依赖 | 需 rebuild client 镜像：修改 Dockerfile → rebuild → restart |
+| 新增了节点目录 | 先 `mkdir -p` 远端目录，再 SCP 文件 |
+
+### 17.8 特殊场景参考
+
+| 场景 | 参考节点 |
+|------|---------|
+| 简单输入+输出（基于 BaseNode） | Prompt, Table, Diff, SetGlobalValue |
+| 基础值节点（基于 ValueNode） | String, Bool, Number |
+| 需要自定义 UI 的节点 | C7Server（动态下拉）, Excel（Univer 集成）, Cron（定时任务） |
+| 需要后端外部数据的节点 | C7Server（服务器列表 API）, ExcelSearch（文件列表 API） |
+| 需要后端持久状态的节点 | Cron（CronRegistry + 后台线程） |
+| 需要 Redis 读写 | SetGlobalValue, GetGlobalValue |
+
+### 17.9 数据流转说明
+
+```
+前端节点 UI
+  │
+  ├── 字段值（config）: data[fieldKey] → 后端 config 参数
+  │     如 data.key="myKey" → config.key="myKey"
+  │
+  ├── 连线输入（input_data）: 上游 output → 本节点 input_data
+  │     如上游输出 { value: "hello" } 连到本节点 keyIn → input_data.keyIn="hello"
+  │
+  └── 执行结果（_runOutput）: 后端返回 → data._runOutput
+        如 { success: true, value: "result" } → 下游可读取
+
+连线匹配规则：
+  - sourceHandle（上游输出端口 key）→ targetHandle（本节点输入端口 key）
+  - 端口类型必须兼容（参考 PORT_TYPE_COMPATIBILITY）
+  - 输入端口 maxConnections: 1 → 只能接一条线
+  - 输入端口 maxConnections: undefined → 可接多条线
+```
