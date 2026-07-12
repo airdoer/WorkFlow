@@ -827,7 +827,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           columns={[
             {
               title: 'Key', dataIndex: 'key', width: 180, ellipsis: true,
-              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); copyToClipboard(v); message.success('已复制'); }} /></Space>,
+              render: (v: string) => v,
             },
             {
               title: '当前值', dataIndex: 'value', width: 300,
@@ -850,7 +850,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <Space size={4}>
                     <span style={{ cursor: 'default' }}>{v ?? '(空)'}</span>
                     <EditOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }} />
-                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={(e) => { e.stopPropagation(); copyToClipboard(v); message.success('已复制'); }} />}
                   </Space>
                 ),
             },
