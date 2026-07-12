@@ -116,6 +116,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         tgtPortType: tgtPort?.type || '',
         hasData: previewValue !== undefined,
         preview: formatPreviewValue(previewValue),
+        isBinary: typeof previewValue === 'string' ? isBinaryContent(previewValue) : (!!(typeof previewValue === 'object' && previewValue?.fileContent && typeof previewValue.fileContent === 'string' && isBinaryContent(previewValue.fileContent))),
       };
     });
 
@@ -438,7 +439,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   ) : (
                     <Tag style={{ fontSize: 9, margin: 0 }} color="orange">未接收</Tag>
                   )}
-                  {u.hasData && u.preview && (
+                  {u.hasData && u.preview && !u.isBinary && (
                     <Button
                       size="small"
                       icon={<ExpandOutlined />}
@@ -452,7 +453,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                 <div style={{ fontSize: 10, color: '#999', marginBottom: 4 }}>
                   来自 {u.sourceId} → {u.srcHandle || '全部输出'}
                 </div>
-                {u.hasData && u.preview && (
+                {u.hasData && u.preview && !u.isBinary && (
                   <pre
                     style={{
                       margin: 0,
@@ -470,6 +471,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   >
                     {u.preview}
                   </pre>
+                )}
+                {u.hasData && u.isBinary && (
+                  <div style={{ fontSize: 10, color: '#999', padding: '2px 6px', background: '#f9f9f9', borderRadius: 3 }}>
+                    📦 二进制文件内容（不可预览）
+                  </div>
                 )}
               </div>
             ))}
@@ -605,7 +611,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   </div>
                 ) : hasDisplay && isExcelPort ? (
                   <Suspense fallback={<pre style={{ margin: 0, padding: '4px 6px', fontSize: 9 }}>{JSON.stringify(excelDataPort, null, 2).slice(0, 200)}...</pre>}>
-                    <UniverRenderer data={excelDataPort} nodeId={selectedNode?.id} compact height={250} />
+                    <UniverRenderer data={excelDataPort} nodeId={selectedNode?.id} compact height={300} />
                   </Suspense>
                 ) : hasDisplay && isDiffPort ? (
                   <DiffSummary
@@ -784,7 +790,7 @@ function FieldSelect({ label, value, onChange, options, placeholder }: {
         style={{ width: '100%', fontSize: 11 }}
         allowClear
         getPopupContainer={(node) => node.parentElement || document.body}
-        dropdownStyle={{ fontSize: 11 }}
+        styles={{ popup: { root: { fontSize: 11 } } }}
       />
     </div>
   );
@@ -814,7 +820,7 @@ function FieldMultiSelect({ label, value, onChange, options }: {
         maxTagCount={3}
         maxTagTextLength={10}
         getPopupContainer={(node) => node.parentElement || document.body}
-        dropdownStyle={{ fontSize: 11 }}
+        styles={{ popup: { root: { fontSize: 11 } } }}
       />
     </div>
   );

@@ -85,15 +85,6 @@ function ExcelNode({ data, id, selected }: NodeProps) {
   // infinite re-render loops when setNodes triggers ReactFlow re-render.
   // Selection changes are only captured in the NodeDetailModal (fullscreen).
 
-  const tableContent = excelData ? (
-    <UniverRenderer
-      data={excelData}
-      nodeId={id}
-      compact
-      height={200}
-    />
-  ) : null;
-
   return (
     <BaseNode
       data={nodeData}
@@ -103,7 +94,6 @@ function ExcelNode({ data, id, selected }: NodeProps) {
       label="Excel"
       nodeType="excel"
       fields={EXCEL_FIELDS}
-      extraContentAfterFields={tableContent}
     />
   );
 }

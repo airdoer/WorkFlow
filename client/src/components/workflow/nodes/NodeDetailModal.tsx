@@ -161,6 +161,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
         tgtPortType: tgtPort?.type || '',
         hasData: previewValue !== undefined,
         preview: formatPreviewValue(previewValue),
+        isBinary: typeof previewValue === 'string' ? isBinaryContent(previewValue) : (!!(typeof previewValue === 'object' && previewValue?.fileContent && typeof previewValue.fileContent === 'string' && isBinaryContent(previewValue.fileContent))),
       };
     });
   }, [getEdges, allNodes, nodeId, inputPorts]);
@@ -524,13 +525,18 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       {u.hasData ? <Tag color="green" style={{ margin: 0 }}>已接收</Tag> : <Tag color="orange" style={{ margin: 0 }}>未接收</Tag>}
                     </div>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>来自 {u.sourceId} → {u.srcHandle || '全部输出'}</div>
-                    {u.hasData && u.preview && (
+                    {u.hasData && u.preview && !u.isBinary && (
                       <pre style={{
                         margin: 0, padding: '8px 10px', background: '#fff', border: '1px solid #e8e8e8',
                         borderRadius: 4, maxHeight: 200, overflowY: 'auto', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
                       }}>
                         {u.preview}
                       </pre>
+                    )}
+                    {u.hasData && u.isBinary && (
+                      <div style={{ fontSize: 11, color: '#999', padding: '4px 8px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
+                        📦 二进制文件内容（不可预览）
+                      </div>
                     )}
                   </div>
                 ))}

@@ -207,7 +207,6 @@ const CompactTable: React.FC<{ data: ExcelTableData; height: number }> = React.m
   const { columns = [], rows = [] } = displaySheet;
   const tabHeight = allSheets && allSheets.length > 1 ? 26 : 0;
   const tableHeight = height - tabHeight;
-  const maxRows = Math.min(rows.length, Math.floor((tableHeight - 30) / 22));
 
   return (
     <div style={{ fontSize: 11, lineHeight: '20px', height, maxHeight: height, display: 'flex', flexDirection: 'column' }}>
@@ -260,7 +259,7 @@ const CompactTable: React.FC<{ data: ExcelTableData; height: number }> = React.m
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, maxRows).map((row, ri) => (
+            {rows.map((row, ri) => (
               <tr key={ri}>
                 {columns.map((col, ci) => (
                   <td key={ci} style={{
@@ -276,13 +275,6 @@ const CompactTable: React.FC<{ data: ExcelTableData; height: number }> = React.m
                 ))}
               </tr>
             ))}
-            {rows.length > maxRows && (
-              <tr>
-                <td colSpan={columns.length} style={{ padding: '2px 6px', color: '#999', fontSize: 10, textAlign: 'center' }}>
-                  ... 还有 {rows.length - maxRows} 行
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>

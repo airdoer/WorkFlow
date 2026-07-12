@@ -616,7 +616,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         }
         width={820}
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { background: '#f0f4f8', padding: '16px 16px 8px' } }}
       >
         <Input.Search
@@ -656,7 +656,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         onCancel={() => setTrashOpen(false)}
         footer={<Button onClick={() => setTrashOpen(false)}>关闭</Button>}
         width={680}
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { background: '#fff7f0', padding: '16px 16px 8px' } }}
       >
         <Table
@@ -716,7 +716,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         cancelText="取消"
         confirmLoading={newNameLoading}
         width={400}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 6, fontSize: 13, color: '#595959' }}>工作流名称</div>
         <Input
@@ -744,7 +744,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         cancelText="取消"
         confirmLoading={dupLoading}
         width={420}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 8, color: '#595959', fontSize: 13 }}>
           来源：<strong>{dupTarget?.name}</strong>

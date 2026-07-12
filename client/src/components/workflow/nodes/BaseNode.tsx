@@ -519,7 +519,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     style={{ width: '100%', fontSize: 11 }}
                     allowClear
                     getPopupContainer={(node) => node.parentElement || document.body}
-                    dropdownStyle={{ fontSize: 11 }}
+                    styles={{ popup: { root: { fontSize: 11 } } }}
                   />
                 </div>
               </div>
@@ -548,7 +548,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     maxTagTextLength={8}
                     allowClear
                     getPopupContainer={(node) => node.parentElement || document.body}
-                    dropdownStyle={{ fontSize: 11 }}
+                    styles={{ popup: { root: { fontSize: 11 } } }}
                   />
                 </div>
               </div>
@@ -634,11 +634,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                       {hasDisplay ? ' ✅' : ''}
                     </div>
                     {hasDisplay && (
-                      <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}
+                      <div style={{ padding: '4px 6px', maxHeight: 250, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}
                            className="nowheel nopan">
                         {p.type === 'table-data' && displayValue?.columns ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(excelDataNode, null, 2).slice(0, 80)}...</pre>}>
-                            <ExcelRenderer data={excelDataNode} nodeId={id} compact height={110} />
+                            <ExcelRenderer data={excelDataNode} nodeId={id} compact height={220} />
                           </Suspense>
                         ) : p.type === 'json-data' ? (
                           <Suspense fallback={<pre style={{ margin: 0 }}>{JSON.stringify(displayValue, null, 2).slice(0, 80)}...</pre>}>
