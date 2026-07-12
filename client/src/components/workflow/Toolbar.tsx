@@ -273,6 +273,32 @@ const Toolbar: React.FC<ToolbarProps> = ({
     } catch { message.error('更新失败'); }
   }, [refreshVarList]);
 
+  // ── Add new variable ──────────────────────────────────────────
+  const [addVarOpen, setAddVarOpen] = useState(false);
+  const [addVarKey, setAddVarKey] = useState('');
+  const [addVarValue, setAddVarValue] = useState('');
+  const [addVarLoading, setAddVarLoading] = useState(false);
+
+  const openAddVar = () => { setAddVarKey(''); setAddVarValue(''); setAddVarOpen(true); };
+
+  const handleAddVar = async () => {
+    const key = addVarKey.trim();
+    if (!key) { message.warning('Key 不能为空'); return; }
+    if (varList.some(v => v.key === key)) { message.warning(`Key "${key}" 已存在`); return; }
+    setAddVarLoading(true);
+    try {
+      const result = await setVar(key, addVarValue);
+      if (result.success) {
+        message.success(`已添加 ${key}`);
+        setAddVarOpen(false);
+        refreshVarList();
+      } else {
+        message.error(result.error || '添加失败');
+      }
+    } catch { message.error('添加失败'); }
+    finally { setAddVarLoading(false); }
+  };
+
   // commitName: validate → update name → auto-save
   const commitName = useCallback(async () => {
     const trimmed = nameDraft.trim();
@@ -781,7 +807,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
         title={<span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>📦 全局变量管理</span>}
         open={varModalOpen}
         onCancel={() => { setVarModalOpen(false); setEditingVarKey(null); }}
-        footer={<Button size="small" onClick={refreshVarList} loading={varLoading}>刷新</Button>}
+        footer={
+          <Space>
+            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={openAddVar}>新增</Button>
+            <Button size="small" onClick={refreshVarList} loading={varLoading}>刷新</Button>
+          </Space>
+        }
         width={900}
         destroyOnHidden
         styles={{ body: { padding: '12px 8px' } }}
@@ -834,6 +865,43 @@ const Toolbar: React.FC<ToolbarProps> = ({
             },
           ]}
         />
+      </Modal>
+
+      {/* ── 新增全局变量 Modal ── */}
+      <Modal
+        title={<span style={{ color: '#1f2f3f', fontWeight: 700, fontSize: 15 }}>➕ 新增全局变量</span>}
+        open={addVarOpen}
+        onCancel={() => setAddVarOpen(false)}
+        onOk={handleAddVar}
+        okText="确认"
+        cancelText="取消"
+        confirmLoading={addVarLoading}
+        width={420}
+        destroyOnHidden
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <div>
+            <div style={{ marginBottom: 4, fontWeight: 600 }}>Key</div>
+            <Input
+              size="small"
+              value={addVarKey}
+              onChange={e => setAddVarKey(e.target.value)}
+              onPressEnter={handleAddVar}
+              placeholder="变量名"
+              autoFocus
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 4, fontWeight: 600 }}>Value</div>
+            <Input
+              size="small"
+              value={addVarValue}
+              onChange={e => setAddVarValue(e.target.value)}
+              onPressEnter={handleAddVar}
+              placeholder="变量值"
+            />
+          </div>
+        </div>
       </Modal>
 
       {/* ── 定时任务管理 Modal ── */}
