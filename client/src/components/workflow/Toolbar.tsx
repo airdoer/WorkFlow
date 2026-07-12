@@ -766,7 +766,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         open={cronModalOpen}
         onCancel={() => setCronModalOpen(false)}
         footer={<Button size="small" onClick={refreshCronList} loading={cronLoading}>刷新</Button>}
-        width={720}
+        width={900}
         destroyOnHidden
         styles={{ body: { padding: '12px 8px' } }}
       >
@@ -776,7 +776,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           size="small"
           pagination={false}
           loading={cronLoading}
-          scroll={{ x: 'max-content' }}
           locale={{ emptyText: '暂无运行中的定时任务' }}
           columns={[
             { title: 'ID', dataIndex: 'cron_id', width: 110, ellipsis: true },
