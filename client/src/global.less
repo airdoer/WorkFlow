@@ -61,15 +61,16 @@ body,
   left: unset;
 }
 
-/* ========== Move antd message/notification to the right ========== */
-.ant-message,
-.ant-notification {
-  right: 16px !important;
+/* ========== Move antd message/notification to the top-right ========== */
+.ant-message {
   left: auto !important;
-  justify-content: flex-end !important;
+  right: 24px !important;
+  top: 16px !important;
+  transform: none !important;
 }
-.ant-message-notice {
-  justify-content: flex-end !important;
+.ant-notification {
+  right: 24px !important;
+  left: auto !important;
 }
 
 /* ========== Always hide footer ========== */
