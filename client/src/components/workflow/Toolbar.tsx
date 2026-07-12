@@ -633,8 +633,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
         open={cronModalOpen}
         onCancel={() => setCronModalOpen(false)}
         footer={<Button size="small" onClick={refreshCronList} loading={cronLoading}>刷新</Button>}
-        width={640}
+        width={720}
         destroyOnHidden
+        styles={{ body: { padding: '12px 8px' } }}
       >
         <Table
           dataSource={cronList}
@@ -642,19 +643,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
           size="small"
           pagination={false}
           loading={cronLoading}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: '暂无运行中的定时任务' }}
           columns={[
-            { title: 'ID', dataIndex: 'cron_id', width: 130, ellipsis: true },
-            { title: 'Cron 表达式', dataIndex: 'cron_expr', width: 130 },
+            { title: 'ID', dataIndex: 'cron_id', width: 110, ellipsis: true },
+            { title: 'Cron 表达式', dataIndex: 'cron_expr', width: 120 },
             { title: '状态', dataIndex: 'status', width: 80, render: (v: string) => (
               <span style={{ color: v === 'running' ? '#52c41a' : '#999', fontWeight: 600 }}>
                 {v === 'running' ? '🟢 运行中' : v === 'stopping' ? '⏹ 停止中' : '⚪ 已停止'}
               </span>
             )},
-            { title: '已执行', dataIndex: 'run_count', width: 70, align: 'center' as const },
-            { title: '上次执行', dataIndex: 'last_run', width: 150, render: (v: string) => v ? relativeTime(v) : '-' },
-            { title: '启动时间', dataIndex: 'started_at', width: 150, render: (v: string) => relativeTime(v) },
-            { title: '操作', width: 80, render: (_: any, r: any) => (
+            { title: '已执行', dataIndex: 'run_count', width: 60, align: 'center' as const },
+            { title: '上次执行', dataIndex: 'last_run', width: 130, render: (v: string) => v ? relativeTime(v) : '-' },
+            { title: '启动时间', dataIndex: 'started_at', width: 130, render: (v: string) => relativeTime(v) },
+            { title: '操作', width: 70, render: (_: any, r: any) => (
               r.status === 'running' ? (
                 <Popconfirm title="确定停止该定时任务？" onConfirm={() => handleStopCron(r.cron_id)} okText="停止" cancelText="取消">
                   <Button size="small" danger icon={<StopOutlined />}>停止</Button>
