@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets';
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core';
 import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/locales/zh-CN';
@@ -16,6 +16,7 @@ export interface ExcelTableData {
 export interface UniverRendererProps {
   data: ExcelTableData;
   nodeId?: string;
+  /** Full mode: show Univer spreadsheet with toolbar. Compact mode: show simple HTML table */
   compact?: boolean;
   height?: number;
   onSelectionChange?: (info: SelectionInfo) => void;
@@ -66,7 +67,7 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
   });
 
   return {
-    id: 'workbook-id',
+    id: `wb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     sheets: {
       [sheetKey]: {
         id: sheetKey,
@@ -87,11 +88,12 @@ function toUniverWorkbookData(data: ExcelTableData, sheetName?: string): any {
 
 function extractSelectionFromUniver(
   univerAPI: any,
+  workbookId: string,
   columns: string[],
   rows: Record<string, any>[],
 ): SelectionInfo | null {
   try {
-    const workbook = univerAPI.getActiveWorkbook();
+    const workbook = univerAPI.getWorkbook(workbookId);
     if (!workbook) return null;
     const sheet = workbook.getActiveSheet();
     if (!sheet) return null;
@@ -144,31 +146,64 @@ function extractSelectionFromUniver(
   }
 }
 
-/* ─── Compact mode CSS ────────────────────────────────────────────────────── */
+/* ─── Simple HTML Table (compact preview) ─────────────────────────────────── */
 
-// Inject a global <style> tag once to hide Univer chrome in compact containers
-let _compactStyleInjected = false;
-function injectCompactStyle() {
-  if (_compactStyleInjected) return;
-  _compactStyleInjected = true;
-  const style = document.createElement('style');
-  style.id = 'univer-compact-override';
-  style.textContent = `
-    .univer-compact header {
-      display: none !important;
-      height: 0 !important;
-      min-height: 0 !important;
-      overflow: hidden !important;
-    }
-    .univer-compact footer {
-      display: none !important;
-      height: 0 !important;
-      min-height: 0 !important;
-      overflow: hidden !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
+const CompactTable: React.FC<{ data: ExcelTableData; height: number }> = React.memo(({ data, height }) => {
+  const { columns = [], rows = [] } = data;
+  const maxRows = Math.min(rows.length, Math.floor((height - 30) / 22));
+
+  return (
+    <div style={{ fontSize: 11, lineHeight: '20px', overflow: 'auto', height, maxHeight: height }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <thead>
+          <tr>
+            {columns.map((col, i) => (
+              <th key={i} style={{
+                background: '#fafafa',
+                borderBottom: '1px solid #e8e8e8',
+                padding: '2px 6px',
+                fontWeight: 600,
+                fontSize: 10,
+                whiteSpace: 'nowrap',
+                textAlign: 'left',
+                position: 'sticky',
+                top: 0,
+                zIndex: 1,
+              }}>
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, maxRows).map((row, ri) => (
+            <tr key={ri}>
+              {columns.map((col, ci) => (
+                <td key={ci} style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  padding: '1px 6px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 150,
+                }}>
+                  {row[col] !== undefined && row[col] !== null ? String(row[col]) : ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {rows.length > maxRows && (
+            <tr>
+              <td colSpan={columns.length} style={{ padding: '2px 6px', color: '#999', fontSize: 10, textAlign: 'center' }}>
+                ... 还有 {rows.length - maxRows} 行
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+});
 
 /* ─── The Component ──────────────────────────────────────────────────────── */
 
@@ -182,17 +217,17 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
   onSelectionChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const workbookIdRef = useRef<string | null>(null);
   const univerAPIRef = useRef<any>(null);
-  const univerInstanceRef = useRef<any>(null);
+  const univerRef = useRef<any>(null);
   const columnsRef = useRef<string[]>(data.columns);
   const rowsRef = useRef<Record<string, any>[]>(data.rows);
   const onSelectionChangeRef = useRef(onSelectionChange);
-  const isInitializedRef = useRef(false);
-  const lastDataKeyRef = useRef<string>('');
   const selDebounceRef = useRef<any>(null);
+  const isDisposedRef = useRef(false);
 
   const containerIdRef = useRef<string>(
-    `univer-c-${nodeId || (++_univerContainerCounter)}`
+    `univer-full-${nodeId || (++_univerContainerCounter)}`
   );
 
   const containerHeight = height ?? (compact ? 200 : 400);
@@ -207,107 +242,128 @@ const UniverRenderer: React.FC<UniverRendererProps> = ({
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
 
-  // Stable key for data comparison
-  const dataKey = `${data.columns.join(',')}|${data.rows.length}|${data.sheetNames?.join(',')}`;
-  const workbookData = data.columns.length > 0
-    ? toUniverWorkbookData(data, data.sheetNames?.[0])
-    : null;
-
-  // Inject compact CSS once
+  // ─── Full Univer mode (non-compact): init with delay to ensure container has size ──
   useEffect(() => {
-    if (compact) injectCompactStyle();
-  }, [compact]);
+    if (compact) return;
 
-  // ─── Init Univer ONCE on mount ────────────────────────────────────────
-  useEffect(() => {
     const container = containerRef.current;
-    if (!container || isInitializedRef.current) return;
+    if (!container) return;
 
-    isInitializedRef.current = true;
+    isDisposedRef.current = false;
     container.id = containerIdRef.current;
 
-    const { univer, univerAPI } = createUniver({
-      locale: LocaleType.ZH_CN,
-      locales: {
-        [LocaleType.ZH_CN]: mergeLocales(UniverPresetSheetsCoreZhCN),
-      },
-      presets: [
-        UniverSheetsCorePreset({
-          container: containerIdRef.current,
-        }),
-      ],
-    });
+    // Delay init to ensure container has actual dimensions (fixes "column width < 0")
+    const initTimer = setTimeout(() => {
+      if (isDisposedRef.current) return;
 
-    univerInstanceRef.current = univer;
-    univerAPIRef.current = univerAPI;
+      // Check container dimensions
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        console.warn('[UniverRenderer] Container has zero dimensions, skipping init');
+        return;
+      }
 
-    // Create empty workbook first — real data will be loaded in next effect
-    univerAPI.createWorkbook({});
-
-    // Selection listener with debounce
-    try {
-      const disposable = univerAPI.onCommandExecuted((command: any) => {
-        if (
-          command?.id === 'sheet.command.set-selection' ||
-          command?.id === 'sheet.operation.set-selection' ||
-          command?.id?.includes?.('selection')
-        ) {
-          if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
-          selDebounceRef.current = setTimeout(() => {
-            const sel = extractSelectionFromUniver(univerAPI, columnsRef.current, rowsRef.current);
-            if (sel && onSelectionChangeRef.current) {
-              onSelectionChangeRef.current(sel);
-            }
-          }, 100);
-        }
+      // Create a fresh Univer instance for this container
+      const { univer, univerAPI } = createUniver({
+        locale: LocaleType.ZH_CN,
+        locales: {
+          [LocaleType.ZH_CN]: mergeLocales(UniverPresetSheetsCoreZhCN),
+        },
+        presets: [
+          UniverSheetsCorePreset({
+            container: containerIdRef.current,
+          }),
+        ],
       });
-      (univerInstanceRef.current as any)._selDisposable = disposable;
-    } catch (e) {
-      console.warn('[UniverRenderer] onCommandExecuted not available:', e);
-    }
 
-    return () => {
-      if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
-      try {
-        const d = (univerInstanceRef.current as any)?._selDisposable;
-        d?.dispose?.();
-      } catch (e) { /* ignore */ }
-      try { univer.dispose(); } catch (e) { /* ignore */ }
-      univerInstanceRef.current = null;
-      univerAPIRef.current = null;
-      isInitializedRef.current = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Mount-only
+      univerRef.current = univer;
+      univerAPIRef.current = univerAPI;
 
-  // ─── Update workbook when data actually changes ───────────────────────
-  useEffect(() => {
-    const api = univerAPIRef.current;
-    if (!api || !workbookData) return;
+      // Create workbook with real data
+      const wbData = data.columns.length > 0
+        ? toUniverWorkbookData(data, data.sheetNames?.[0])
+        : null;
 
-    if (dataKey === lastDataKeyRef.current) return;
-    lastDataKeyRef.current = dataKey;
-
-    try {
-      const workbook = api.getActiveWorkbook();
-      if (workbook) {
-        const unitId = workbook.getUnitId?.();
-        if (unitId) {
-          try { api.disposeWorkbook(unitId); } catch (e) { /* ignore */ }
+      if (wbData) {
+        try {
+          const wb = univerAPI.createWorkbook(wbData);
+          workbookIdRef.current = wb?.getUnitId?.() ?? null;
+        } catch (e) {
+          console.warn('[UniverRenderer] createWorkbook failed:', e);
         }
       }
-      api.createWorkbook(workbookData);
-    } catch (e) {
-      console.warn('[UniverRenderer] Failed to update workbook:', e);
-    }
-  }, [dataKey, workbookData]);
+
+      // Listen for selection changes
+      if (onSelectionChange) {
+        try {
+          const disposable = univerAPI.onCommandExecuted((command: any) => {
+            if (isDisposedRef.current || !workbookIdRef.current) return;
+            if (
+              command?.id === 'sheet.command.set-selection' ||
+              command?.id === 'sheet.operation.set-selection' ||
+              command?.id?.includes?.('selection')
+            ) {
+              if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
+              selDebounceRef.current = setTimeout(() => {
+                if (isDisposedRef.current || !workbookIdRef.current) return;
+                const sel = extractSelectionFromUniver(
+                  univerAPI, workbookIdRef.current,
+                  columnsRef.current, rowsRef.current,
+                );
+                if (sel && onSelectionChangeRef.current) {
+                  onSelectionChangeRef.current(sel);
+                }
+              }, 150);
+            }
+          });
+          (univerRef.current as any)._selDisposable = disposable;
+        } catch (e) {
+          console.warn('[UniverRenderer] onCommandExecuted setup failed:', e);
+        }
+      }
+    }, 200); // 200ms delay for Modal animation + container sizing
+
+    return () => {
+      isDisposedRef.current = true;
+      clearTimeout(initTimer);
+      if (selDebounceRef.current) clearTimeout(selDebounceRef.current);
+
+      // Use requestAnimationFrame to defer disposal outside of React render cycle
+      // This fixes "Attempted to synchronously unmount a root" error
+      const univerToDispose = univerRef.current;
+      const containerId = containerIdRef.current;
+      requestAnimationFrame(() => {
+        try {
+          const d = (univerToDispose as any)?._selDisposable;
+          d?.dispose?.();
+        } catch (e) { /* ignore */ }
+        try {
+          if (univerToDispose) univerToDispose.dispose();
+        } catch (e) { /* ignore */ }
+        // Clean up container DOM
+        const el = document.getElementById(containerId);
+        if (el) el.innerHTML = '';
+      });
+
+      univerRef.current = null;
+      univerAPIRef.current = null;
+      workbookIdRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact]); // Re-run only when compact changes
 
   if (!data.columns.length && !data.rows.length) {
     return <div style={{ color: '#999', fontSize: 12, padding: 8 }}>暂无 Excel 数据</div>;
   }
 
+  // Compact mode: render simple HTML table (no Univer)
+  if (compact) {
+    return <CompactTable data={data} height={containerHeight} />;
+  }
+
+  // Full mode: render Univer container
   return (
-    <div className={`nowheel nopan ${compact ? 'univer-compact' : ''}`} style={{ height: containerHeight, position: 'relative' }}>
+    <div className="nowheel nopan" style={{ height: containerHeight, position: 'relative' }}>
       <div
         ref={containerRef}
         id={containerIdRef.current}
