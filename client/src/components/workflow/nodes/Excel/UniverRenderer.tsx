@@ -17,6 +17,8 @@ export interface ExcelTableData {
   columns: string[];
   rows: Record<string, any>[];
   sheetNames?: string[];
+  /** Name of the currently displayed/selected sheet */
+  activeSheetName?: string;
   /** Multi-sheet data: when available, each sheet has its own columns/rows */
   allSheets?: SheetData[];
 }
@@ -106,8 +108,8 @@ function toUniverWorkbookData(data: ExcelTableData): any {
   }
 
   // Single-sheet mode (backward compat)
-  const sheetKey = data.sheetNames?.[0] || 'Sheet1';
-  const singleSheet: SheetData = { name: sheetKey, columns: data.columns, rows: data.rows };
+  const sheetName = data.activeSheetName || data.sheetNames?.[0] || 'Sheet1';
+  const singleSheet: SheetData = { name: sheetName, columns: data.columns, rows: data.rows };
   const univerSheet = sheetToUniverSheet(singleSheet);
 
   return {

@@ -568,9 +568,11 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 // Table node: 'tables' is an array of {title, columns, rows}
                 const isTables = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
                 const isExcel = !isTables && p.type === 'table-data' && displayValue?.columns;
-                // For Excel node: merge allSheets from runOutput into the data prop
+                // For Excel node: only merge allSheets when no specific sheetName is selected
+                const hasSheetNameSelected = !!(data.sheetName as string);
                 const excelData = isExcel && nodeType === 'excel' && runOutput?.allSheets
-                  ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  ? { ...displayValue, activeSheetName: hasSheetNameSelected ? (data.sheetName as string) : undefined, allSheets: hasSheetNameSelected ? undefined : runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  : isExcel ? { ...displayValue, activeSheetName: (data.sheetName as string) || undefined }
                   : displayValue;
                 const isJson = !isDiff && !isTables && p.type === 'json-data';
                 const isLua = p.type === 'text' && typeof displayValue === 'object' && displayValue?.content;

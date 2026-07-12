@@ -547,9 +547,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
             const isTablesPort = p.key === 'tables' && Array.isArray(displayValue) && displayValue.length > 0 && displayValue[0]?.columns;
             // For Excel node: table-data port with columns+rows structure
             const isExcelPort = !isTablesPort && p.type === 'table-data' && displayValue?.columns;
-            // For Excel node: merge allSheets from runOutput into the data prop
+            // For Excel node: only merge allSheets when no specific sheetName is selected
+            const hasSheetNameSelected = !!(nodeData.sheetName as string);
             const excelDataPort = isExcelPort && nodeType === 'excel' && runOutput?.allSheets
-              ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+              ? { ...displayValue, activeSheetName: hasSheetNameSelected ? (nodeData.sheetName as string) : undefined, allSheets: hasSheetNameSelected ? undefined : runOutput.allSheets, sheetNames: runOutput.sheetNames }
+              : isExcelPort ? { ...displayValue, activeSheetName: (nodeData.sheetName as string) || undefined }
               : displayValue;
             const previewText = hasDisplay && !isDiffPort && !isTablesPort && !isExcelPort
               ? (typeof displayValue === 'string' 

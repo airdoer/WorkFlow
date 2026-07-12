@@ -61,22 +61,24 @@ function ExcelNode({ data, id, selected }: NodeProps) {
     },
   ];
 
-  // Build render data — use stable keys so selection-only updates don't
-  // cause excelData to change (which would trigger Univer re-render)
+  // Build render data — only pass allSheets when no specific sheetName is selected
   const cols = runOutput?.columns as string[] | undefined;
   const rows = runOutput?.rows as Record<string, any>[] | undefined;
   const sheetNames = runOutput?.sheetNames as string[] | undefined;
   const allSheets = runOutput?.allSheets as SheetData[] | undefined;
+  const hasSheetName = !!(nodeData.sheetName as string); // 是否选了指定 sheet
 
   const excelData: ExcelTableData | null = useMemo(() => {
     if (!cols || !rows) return null;
-    return { columns: cols, rows, sheetNames, allSheets };
+    // 选了 sheetName → 只渲染该 sheet（不传 allSheets）；未选 → 显示所有 sheet tabs
+    return { columns: cols, rows, sheetNames, activeSheetName: hasSheetName ? (nodeData.sheetName as string) : undefined, allSheets: hasSheetName ? undefined : allSheets };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cols?.join(','),
     rows?.length,
     sheetNames?.join(','),
     allSheets?.length,
+    hasSheetName,
   ]);
 
   // NOTE: No onSelectionChange in compact node card — this prevents

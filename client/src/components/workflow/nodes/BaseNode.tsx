@@ -619,8 +619,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
                 // For Excel node: merge allSheets from runOutput into the data prop
+                // For Excel node: only merge allSheets when no specific sheetName is selected
+                const hasSheetNameSelected = !!(data.sheetName as string);
                 const excelDataNode = p.type === 'table-data' && displayValue?.columns && runOutput?.allSheets
-                  ? { ...displayValue, allSheets: runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  ? { ...displayValue, activeSheetName: hasSheetNameSelected ? (data.sheetName as string) : undefined, allSheets: hasSheetNameSelected ? undefined : runOutput.allSheets, sheetNames: runOutput.sheetNames }
+                  : p.type === 'table-data' && displayValue?.columns ? { ...displayValue, activeSheetName: (data.sheetName as string) || undefined }
                   : displayValue;
 
                 return (
