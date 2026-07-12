@@ -1,10 +1,12 @@
 ---
 name: workflow-debug
-description: This skill should be used when the user asks to "debug WorkFlow", "test WorkFlow", "check WorkFlow server", "connect to WorkFlow remote", "查看容器日志", "重启容器", "测试接口", "SSH连接服务器", "调试WorkFlow", "检查服务状态", or needs to SSH into the WorkFlow development server at 172.28.200.60, inspect Docker containers, run backend/frontend tests, or verify API endpoints. Covers SSH connection, Docker container management, log inspection, and API testing for the WorkFlow project.
-version: 1.0.0
+description: This skill should be used when the user asks to "debug WorkFlow", "test WorkFlow", "check WorkFlow server", "connect to WorkFlow remote", "查看容器日志", "重启容器", "测试接口", "SSH连接服务器", "调试WorkFlow", "检查服务状态", or needs to SSH into the WorkFlow development server at 172.28.200.60, inspect Docker containers, run backend/frontend tests, or verify API endpoints. Covers SSH connection, Docker container management, log inspection, and API testing for the WorkFlow project. 修改代码后的部署请使用 workflow-deploy skill。
+version: 1.1.0
 ---
 
 # WorkFlow 调试与测试 Skill
+
+> **修改代码后需要部署？请先加载 `workflow-deploy` skill，确保本地代码同步到远端。**
 
 本 Skill 提供对 WorkFlow 项目远程开发服务器的调试和测试操作指南。
 

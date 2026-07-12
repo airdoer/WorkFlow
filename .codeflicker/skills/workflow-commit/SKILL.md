@@ -129,3 +129,4 @@ git push origin main
 4. **Windows 环境**：所有命令在 `cmd.exe` 中执行，注意路径使用反斜杠，长命令考虑写脚本文件
 5. **冲突处理**：如果 push 失败提示冲突，先 `git pull origin main --rebase`，解决冲突后再 push
 6. **message 中的中文**：Windows cmd 对中文 commit message 支持良好，无需额外编码设置
+7. **提交后部署**：代码 push 后远端服务器并不会自动更新，需要加载 `workflow-deploy` skill 将修改同步到远端并重启服务
