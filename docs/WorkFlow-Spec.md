@@ -2376,6 +2376,14 @@ export const schema = {};
 
 #### index.tsx（简单节点，基于 BaseNode）
 
+> ⚠️ **强制规则：绝大多数节点必须基于 `BaseNode` 或 `ValueNode`，禁止手写自定义节点组件！**
+>
+> 只有当节点需要**完全不同的 UI 结构**（如 Excel 的 Univer 渲染器、C7Server 的动态下拉）时，
+> 才允许自定义组件，且 Handle 位置、按钮布局必须与 BaseNode 保持一致。
+>
+> **Cron 节点教训**：最初手写了 206 行自定义组件，导致端口在边框外、
+> 按钮位置不一致，改用 BaseNode 后只需 12 行且样式统一。
+
 ```tsx
 import React, { memo } from 'react';
 import { NodeProps } from 'reactflow';
