@@ -55,21 +55,29 @@ class TableExecutor(BaseNodeExecutor):
         if isinstance(data, list):
             return [self._list_to_table(data, title=None)]
         elif isinstance(data, dict):
-            # 每个 key → 一个子表
-            tables = []
-            for key, val in data.items():
-                if isinstance(val, list):
-                    tables.append(self._list_to_table(val, title=str(key)))
-                elif isinstance(val, dict):
-                    tables.append(self._dict_to_table(val, title=str(key)))
-                else:
-                    # 标量值 → 单行单列
-                    tables.append({
-                        "title": str(key),
-                        "columns": ["值"],
-                        "rows": [[str(val)]],
-                    })
-            return tables
+            # 判断 dict 的 value 是否全部是基础类型
+            all_scalar = all(
+                not isinstance(v, (dict, list)) for v in data.values()
+            )
+            if all_scalar:
+                # 全部是基础类型 → 整体作为一个 K-V 表
+                return [self._dict_to_table(data, title=None)]
+            else:
+                # 有复杂类型的 value → 每个 key 单独成表
+                tables = []
+                for key, val in data.items():
+                    if isinstance(val, list):
+                        tables.append(self._list_to_table(val, title=str(key)))
+                    elif isinstance(val, dict):
+                        tables.append(self._dict_to_table(val, title=str(key)))
+                    else:
+                        # 标量值 → 单行单列
+                        tables.append({
+                            "title": str(key),
+                            "columns": ["值"],
+                            "rows": [[str(val)]],
+                        })
+                return tables
         else:
             # 标量
             return [{"title": None, "columns": ["值"], "rows": [[str(data)]]}]
