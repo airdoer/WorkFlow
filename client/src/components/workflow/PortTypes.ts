@@ -148,6 +148,18 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'valueIn', label: '输入值', type: 'string', direction: 'input', maxConnections: 1 },
     { key: 'trigger', label: '触发信号', type: 'any', direction: 'output' },
   ],
+  // SetGlobalValue — write key-value to Redis
+  setglobalvalue: [
+    { key: 'keyIn', label: 'Key', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'valueIn', label: 'Value', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'success', label: '成功与否', type: 'boolean', direction: 'output' },
+  ],
+  // GetGlobalValue — read value from Redis by key
+  getglobalvalue: [
+    { key: 'keyIn', label: 'Key', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'success', label: '成功与否', type: 'boolean', direction: 'output' },
+    { key: 'value', label: '值', type: 'string', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {

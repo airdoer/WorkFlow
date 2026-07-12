@@ -16,6 +16,8 @@ import BoolGateNode from './nodes/BoolGate';
 import TableNode from './nodes/Table';
 import ExcelSearchNode from './nodes/ExcelSearch';
 import CronNode from './nodes/Cron';
+import SetGlobalValueNode from './nodes/SetGlobalValue';
+import GetGlobalValueNode from './nodes/GetGlobalValue';
 
 import P4FileIcon from './nodes/P4File/icon';
 import ExcelIcon from './nodes/Excel/icon';
@@ -33,6 +35,8 @@ import BoolGateIcon from './nodes/BoolGate/icon';
 import TableIcon from './nodes/Table/icon';
 import ExcelSearchIcon from './nodes/ExcelSearch/icon';
 import CronIcon from './nodes/Cron/icon';
+import SetGlobalValueIcon from './nodes/SetGlobalValue/icon';
+import GetGlobalValueIcon from './nodes/GetGlobalValue/icon';
 
 export const nodeTypes: NodeTypes = {
   p4file: P4FileNode,
@@ -51,6 +55,8 @@ export const nodeTypes: NodeTypes = {
   table: TableNode,
   excelsearch: ExcelSearchNode,
   cron: CronNode,
+  setglobalvalue: SetGlobalValueNode,
+  getglobalvalue: GetGlobalValueNode,
 };
 
 export interface NodeRegistryEntry {
@@ -86,6 +92,9 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   { type: 'excelsearch', label: 'Excel 搜索', icon: <ExcelSearchIcon />, category: '数据源', description: '从预注册列表中选择 Excel 文件，输出文件内容供下游 Excel 节点使用' },
   // Trigger
   { type: 'cron', label: 'Cron 定时', icon: <CronIcon />, category: '触发器', description: '按 Cron 表达式定时触发下游节点执行，最低频率 1 分钟' },
+  // Global storage
+  { type: 'setglobalvalue', label: 'SetGlobal', icon: <SetGlobalValueIcon />, category: '全局存储', description: '向 Redis 写入全局键值对，输出执行成功与否' },
+  { type: 'getglobalvalue', label: 'GetGlobal', icon: <GetGlobalValueIcon />, category: '全局存储', description: '从 Redis 读取全局键的值，输出成功与否和值' },
 ];
 
 export function getNodeRegistry(type: string): NodeRegistryEntry | undefined {

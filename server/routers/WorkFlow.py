@@ -31,6 +31,8 @@ from Implement.workflowImpl.boolGateExecutor import BoolGateExecutor
 from Implement.workflowImpl.tableExecutor import TableExecutor
 from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor, load_excelsearch_options
 from Implement.workflowImpl.cronExecutor import CronExecutor, CronRegistry
+from Implement.workflowImpl.setGlobalValueExecutor import SetGlobalValueExecutor
+from Implement.workflowImpl.getGlobalValueExecutor import GetGlobalValueExecutor
 
 # region init
 
@@ -53,6 +55,8 @@ ExecutorManager.register(BoolGateExecutor())
 ExecutorManager.register(TableExecutor())
 ExecutorManager.register(ExcelSearchExecutor())
 ExecutorManager.register(CronExecutor())
+ExecutorManager.register(SetGlobalValueExecutor())
+ExecutorManager.register(GetGlobalValueExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 
