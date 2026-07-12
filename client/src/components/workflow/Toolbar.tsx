@@ -86,15 +86,23 @@ function relativeTime(isoStr?: string): string {
 
 /* ─────────────────────────── types ─────────────────────────── */
 
-/** Copy text to clipboard (works in HTTP contexts unlike navigator.clipboard) */
+/** Copy text to clipboard — tries modern API first, falls back to execCommand */
 function copyToClipboard(text: string) {
+  // Modern async API (preferred, but requires HTTPS)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    return;
+  }
+  fallbackCopy(text);
+}
+function fallbackCopy(text: string) {
   const ta = document.createElement('textarea');
   ta.value = text;
-  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;pointer-events:none';
   document.body.appendChild(ta);
   ta.focus();
   ta.setSelectionRange(0, ta.value.length);
-  document.execCommand('copy');
+  try { document.execCommand('copy'); } catch (_) { /* noop */ }
   document.body.removeChild(ta);
 }
 
@@ -788,7 +796,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           columns={[
             {
               title: 'Key', dataIndex: 'key', width: 180, ellipsis: true,
-              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { copyToClipboard(v); message.success('已复制'); }} /></Space>,
+              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); copyToClipboard(v); message.success('已复制'); }} /></Space>,
             },
             {
               title: '当前值', dataIndex: 'value', width: 300,
@@ -811,7 +819,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <Space size={4}>
                     <span style={{ cursor: 'default' }}>{v ?? '(空)'}</span>
                     <EditOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }} />
-                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { copyToClipboard(v); message.success('已复制'); }} />}
+                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={(e) => { e.stopPropagation(); copyToClipboard(v); message.success('已复制'); }} />}
                   </Space>
                 ),
             },
