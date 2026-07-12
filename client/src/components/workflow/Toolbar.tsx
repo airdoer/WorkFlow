@@ -728,27 +728,34 @@ const Toolbar: React.FC<ToolbarProps> = ({
           loading={varLoading}
           locale={{ emptyText: '暂无全局变量' }}
           columns={[
-            { title: 'Key', dataIndex: 'key', width: 150, ellipsis: true },
             {
-              title: '当前值', dataIndex: 'value', width: 240,
+              title: 'Key', dataIndex: 'key', width: 180, ellipsis: true,
+              render: (v: string) => <Space size={4}><span>{v}</span><CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} /></Space>,
+            },
+            {
+              title: '当前值', dataIndex: 'value', width: 300,
               render: (v: string, r: any) =>
                 editingVarKey === r.key ? (
-                  <Input.Search
+                  <Input
                     size="small"
                     value={editingVarValue}
                     onChange={e => setEditingVarValue(e.target.value)}
-                    onSearch={(val) => { if (val !== undefined) handleSaveVar(r.key, editingVarValue); }}
-                    enterButton="保存"
-                    suffix={<CloseOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => setEditingVarKey(null)} />}
+                    onPressEnter={() => handleSaveVar(r.key, editingVarValue)}
+                    onBlur={() => handleSaveVar(r.key, editingVarValue)}
+                    onKeyDown={e => { if (e.key === 'Escape') setEditingVarKey(null); }}
+                    autoFocus
                   />
                 ) : (
-                  <span
-                    style={{ cursor: 'pointer', color: '#1890ff' }}
-                    title="点击编辑"
-                    onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }}
-                  >
-                    {v ?? '(空)'}
-                  </span>
+                  <Space size={4}>
+                    <span
+                      style={{ cursor: 'pointer', color: '#1890ff' }}
+                      title="点击编辑"
+                      onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }}
+                    >
+                      {v ?? '(空)'}
+                    </span>
+                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} />}
+                  </Space>
                 ),
             },
             { title: '更新时间', dataIndex: 'updated_at', width: 150, render: (v: string) => v ? relativeTime(v) : '-' },
