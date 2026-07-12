@@ -712,7 +712,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         open={varModalOpen}
         onCancel={() => { setVarModalOpen(false); setEditingVarKey(null); }}
         footer={<Button size="small" onClick={refreshVarList} loading={varLoading}>刷新</Button>}
-        width={680}
+        width={900}
         destroyOnHidden
         styles={{ body: { padding: '12px 8px' } }}
       >
@@ -722,7 +722,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           size="small"
           pagination={false}
           loading={varLoading}
-          scroll={{ x: 'max-content' }}
           locale={{ emptyText: '暂无全局变量' }}
           columns={[
             { title: 'Key', dataIndex: 'key', width: 150, ellipsis: true },
@@ -829,7 +828,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Button onClick={() => { setLibraryOpen(false); setLibrarySearch(''); }}>关闭</Button>
           </div>
         }
-        width={820}
+        width={900}
         destroyOnHidden
         styles={{ body: { background: '#f0f4f8', padding: '16px 16px 8px' } }}
       >
