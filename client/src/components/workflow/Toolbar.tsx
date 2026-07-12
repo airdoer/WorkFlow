@@ -736,25 +736,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
               title: '当前值', dataIndex: 'value', width: 300,
               render: (v: string, r: any) =>
                 editingVarKey === r.key ? (
-                  <Input
-                    size="small"
-                    value={editingVarValue}
-                    onChange={e => setEditingVarValue(e.target.value)}
-                    onPressEnter={() => handleSaveVar(r.key, editingVarValue)}
-                    onBlur={() => handleSaveVar(r.key, editingVarValue)}
-                    onKeyDown={e => { if (e.key === 'Escape') setEditingVarKey(null); }}
-                    autoFocus
-                  />
+                  <Space size={4}>
+                    <Input
+                      size="small"
+                      value={editingVarValue}
+                      onChange={e => setEditingVarValue(e.target.value)}
+                      onPressEnter={() => handleSaveVar(r.key, editingVarValue)}
+                      onKeyDown={e => { if (e.key === 'Escape') setEditingVarKey(null); }}
+                      autoFocus
+                      style={{ flex: 1, minWidth: 120 }}
+                    />
+                    <CheckOutlined style={{ color: '#52c41a', cursor: 'pointer', fontSize: 14 }} onClick={() => handleSaveVar(r.key, editingVarValue)} />
+                    <CloseOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 14 }} onClick={() => setEditingVarKey(null)} />
+                  </Space>
                 ) : (
                   <Space size={4}>
-                    <span
-                      style={{ cursor: 'pointer', color: '#1890ff' }}
-                      title="点击编辑"
-                      onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }}
-                    >
-                      {v ?? '(空)'}
-                    </span>
-                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} />}
+                    <span style={{ cursor: 'default' }}>{v ?? '(空)'}</span>
+                    <EditOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { setEditingVarKey(r.key); setEditingVarValue(v ?? ''); }} />
+                    {v && <CopyOutlined style={{ color: '#999', cursor: 'pointer', fontSize: 11 }} onClick={() => { navigator.clipboard.writeText(v); message.success('已复制'); }} />}
                   </Space>
                 ),
             },
