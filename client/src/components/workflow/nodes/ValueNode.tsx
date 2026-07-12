@@ -193,7 +193,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
 
   // 为 NodeDetailModal 提供一个 fields 列表
   const fields: NodeField[] = [
-    { key: valueKey, label: label, type: inputType === 'boolean' ? 'text' : inputType, required: true },
+    { key: valueKey, label: label, type: inputType === 'boolean' ? 'text' : inputType, required: true, linkedPortKey: inputPortKey },
   ];
 
   const renderInput = () => {
