@@ -656,6 +656,7 @@ function FlowEditorInner({
           setIsDirty(true);
           e.preventDefault();
           message.success(`已粘贴 ${newNodes.length} 个节点（无运行状态）`);
+          setTimeout(() => doSave(), 100);
         } catch (_) {
           message.error('粘贴失败');
         }
@@ -667,7 +668,7 @@ function FlowEditorInner({
         handleDuplicateNode(selectedNodeId);
       }
     },
-    [nodes, edges, selectedNodeId, handleDuplicateNode, setNodes, setEdges, getNode, pushUndo],
+    [nodes, edges, selectedNodeId, handleDuplicateNode, setNodes, setEdges, getNode, pushUndo, doSave],
   );
 
   return (
