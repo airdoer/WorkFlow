@@ -90,10 +90,10 @@ function relativeTime(isoStr?: string): string {
 function copyToClipboard(text: string) {
   const ta = document.createElement('textarea');
   ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.left = '-9999px';
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
   document.body.appendChild(ta);
-  ta.select();
+  ta.focus();
+  ta.setSelectionRange(0, ta.value.length);
   document.execCommand('copy');
   document.body.removeChild(ta);
 }
