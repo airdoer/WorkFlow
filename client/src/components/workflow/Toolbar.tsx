@@ -614,7 +614,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       const measured_w = node.width || node.measured?.width || DEFAULT_W;
       // For executed nodes, use measured height which includes output preview
       const data = node.data as Record<string, any>;
-      const hasOutput = data?._runStatus && data._runStatus !== 'idle' && data?._runOutput;
+      const hasOutput = data?._runStatusHint && data._runStatusHint !== 'idle';
       const measured_h = node.height || node.measured?.height || DEFAULT_H;
       const h = hasOutput ? Math.max(measured_h, 280) : Math.max(measured_h, DEFAULT_H);
       return { w: Math.max(measured_w, DEFAULT_W), h };

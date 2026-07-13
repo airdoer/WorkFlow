@@ -38,12 +38,12 @@ const PORT_COLORS: Record<string, string> = {
 
 function DiffNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, getRunStatus, getRunOutput } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const nodeData = data as Record<string, unknown>;
-  const runStatus = (nodeData._runStatus as RunStatus) || 'idle';
-  const runOutput = nodeData._runOutput as any;
+  const runStatus = (getRunStatus(id) as RunStatus) || (nodeData._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
@@ -69,9 +69,10 @@ function DiffNode({ data, id, selected }: NodeProps) {
       const savedId = await ensureSaved();
       if (!savedId) return;
 
+      // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
         ),
       );
 
@@ -80,8 +81,8 @@ function DiffNode({ data, id, selected }: NodeProps) {
       nodeDataOverrides[id] = {};
       for (const n of allNodes) {
         if (n.id !== id) {
-          const out = (n.data as any)?._runOutput;
-          if (out && !out.error) nodeDataOverrides[n.id] = out;
+          const nodeOutput = getRunOutput(n.id);
+          if (nodeOutput && !nodeOutput.error) nodeDataOverrides[n.id] = nodeOutput;
         }
       }
 
@@ -89,24 +90,23 @@ function DiffNode({ data, id, selected }: NodeProps) {
         if (error) console.error('[DiffNode] run error:', error);
       });
     },
-    [id, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
+    [id, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes, getRunOutput],
   );
 
-  // Retrieve upstream string values for display before run
+  // Retrieve upstream string values for display before run — from external store
   const upstreamContentA = useStore(
     useCallback(
       (s) => {
         if (!hasContentAEdge) return undefined;
         const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'contentA');
         if (!edge) return undefined;
-        const srcNode = s.nodeInternals.get(edge.source);
-        const out = (srcNode?.data as any)?._runOutput;
+        const out = getRunOutput(edge.source);
         if (!out) return undefined;
         return edge.sourceHandle && out[edge.sourceHandle] !== undefined
           ? String(out[edge.sourceHandle])
           : out.value !== undefined ? String(out.value) : undefined;
       },
-      [id, hasContentAEdge],
+      [id, hasContentAEdge, getRunOutput],
     ),
   );
 
@@ -116,14 +116,13 @@ function DiffNode({ data, id, selected }: NodeProps) {
         if (!hasContentBEdge) return undefined;
         const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'contentB');
         if (!edge) return undefined;
-        const srcNode = s.nodeInternals.get(edge.source);
-        const out = (srcNode?.data as any)?._runOutput;
+        const out = getRunOutput(edge.source);
         if (!out) return undefined;
         return edge.sourceHandle && out[edge.sourceHandle] !== undefined
           ? String(out[edge.sourceHandle])
           : out.value !== undefined ? String(out.value) : undefined;
       },
-      [id, hasContentBEdge],
+      [id, hasContentBEdge, getRunOutput],
     ),
   );
 
@@ -269,7 +268,8 @@ function DiffNode({ data, id, selected }: NodeProps) {
 
         {/* Content: Diff output or idle state */}
         <div style={{ padding: '6px 8px' }}>
-          {showDiff && (
+          {/* Diff summary — hidden in compact mode */}
+          {!compactMode && showDiff && (
             <div style={{ marginTop: 4 }}>
               <DiffSummary
                 contentA={String(contentA)}
@@ -283,13 +283,25 @@ function DiffNode({ data, id, selected }: NodeProps) {
             </div>
           )}
 
+          {/* Compact mode: show only status badge */}
+          {compactMode && runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+              {runStatus === 'error' ? (
+                <span style={{ color: '#cf1322' }}>❌ 错误</span>
+              ) : (
+                <span style={{ color: isSameResult ? '#389e0d' : '#cf1322' }}>{isSameResult ? '✅ 相同' : '❌ 不同'}</span>
+              )}
+            </div>
+          )}
+
           {!showDiff && (hasContentAEdge || hasContentBEdge) && runStatus === 'idle' && (
             <div style={{ fontSize: 10, color: '#bfbfbf', textAlign: 'center', padding: '4px 0' }}>
               点击 ▶ 运行以查看差异
             </div>
           )}
 
-          {runOutput && runStatus === 'error' && (
+          {/* Error detail — hidden in compact mode */}
+          {!compactMode && runOutput && runStatus === 'error' && (
             <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, overflow: 'hidden', marginTop: 4 }}>
               <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#cf1322', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />

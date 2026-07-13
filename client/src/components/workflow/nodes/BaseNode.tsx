@@ -168,18 +168,23 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   extraContentAfterFields,
 }) => {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
   const detailOpen = detailNodeId === id;
-  // const [detailOpen, setDetailOpen] = useState(false);
 
-  const runStatus = (data._runStatus as RunStatus) || 'idle';
-  const runOutput = data._runOutput as any;
+  // Read run status/output from the external store (not from node.data)
+  // This keeps node.data small and prevents expensive re-renders
+  const runStatus = (getRunStatus(id) as RunStatus) || (data._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   // Whether this node is part of a multi-selection
   const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
 
   // Reactively track which input ports are connected via edges
+  // Use a ref to cache the previous result so the selector returns a stable
+  // reference when the connected ports haven't actually changed — this prevents
+  // Zustand from triggering a re-render on every store update (e.g. node position).
+  const prevPortsRef = useRef<Record<string, boolean>>({});
   const connectedInputPorts = useStore(
     useCallback(
       (s) => {
@@ -189,6 +194,14 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             result[e.targetHandle] = true;
           }
         }
+        // Compare with previous — return same reference if unchanged
+        const prev = prevPortsRef.current;
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(result);
+        if (prevKeys.length === nextKeys.length && prevKeys.every(k => result[k] === prev[k])) {
+          return prev;
+        }
+        prevPortsRef.current = result;
         return result;
       },
       [id],
@@ -238,10 +251,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       const savedId = await ensureSaved();
       if (!savedId) return;
 
-      // Mark this node (and reset downstream) to running immediately for visual feedback
+      // Mark this node as running immediately for visual feedback
+      // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
         ),
       );
 
@@ -253,15 +267,15 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         }
       }
 
-      // Collect all other nodes' last known _runOutput as upstream context
+      // Collect all other nodes' last known runOutput from the external store
       const allNodes = getNodes();
       const nodeDataOverrides: Record<string, any> = {};
       nodeDataOverrides[id] = cleanConfig;
       for (const n of allNodes) {
         if (n.id !== id) {
-          const runOutput = (n.data as any)?._runOutput;
-          if (runOutput && !runOutput.error) {
-            nodeDataOverrides[n.id] = runOutput;
+          const nodeOutput = getRunOutput(n.id);
+          if (nodeOutput && !nodeOutput.error) {
+            nodeDataOverrides[n.id] = nodeOutput;
           }
         }
       }
@@ -278,7 +292,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         },
       );
     },
-    [id, nodeType, data, fields, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
+    [id, nodeType, data, fields, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes, getRunOutput],
   );
 
   const borderColor =
@@ -442,7 +456,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           const locked = !!(f.linkedPortKey && connectedInputPorts[f.linkedPortKey]);
           const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
           // Resolve options: dynamic fn takes priority over static array
-          const resolvedOptions = f.optionsFn ? f.optionsFn(data as Record<string, any>) : (f.options ?? []);
+          // Merge _runOutput from external store so optionsFn can read it
+          const enrichedData = { ...(data as Record<string, any>), _runOutput: runOutput };
+          const resolvedOptions = f.optionsFn ? f.optionsFn(enrichedData) : (f.options ?? []);
 
           const lockedStyle: React.CSSProperties = {
             width: '100%', fontSize: 11, padding: '3px 6px',

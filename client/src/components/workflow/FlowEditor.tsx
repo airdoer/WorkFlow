@@ -64,6 +64,11 @@ function FlowEditorInner({
 }: FlowEditorProps) {
   const initialNodes = initialData?.nodes || [];
 
+  // ── Fast lookup cache for run status/output ──────────────────────────────
+  // This mirrors _runStatus/_runOutput from node.data for quick access
+  // without iterating over all nodes. Updated in sync with setNodes calls.
+  const runStateCacheRef = useRef<Record<string, { status: string; output: any }>>({});
+
   // Re-compute matchStatus for all edges on load
   const initialEdges = useMemo(() => {
     const nodeMap: Record<string, any> = {};
@@ -97,7 +102,29 @@ function FlowEditorInner({
     });
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  // Ensure _runStatusHint is present on initial load (for nodes with saved _runStatus)
+  const initialNodesCleaned = useMemo(() => {
+    return initialNodes.map((n: any) => {
+      const data = n.data || {};
+      // Pre-populate the fast lookup cache from saved data
+      if (data._runStatus && data._runOutput) {
+        runStateCacheRef.current[n.id] = {
+          status: data._runStatus,
+          output: data._runOutput,
+        };
+      }
+      // If _runStatusHint is missing but _runStatus exists, derive it
+      return {
+        ...n,
+        data: {
+          ...data,
+          _runStatusHint: data._runStatusHint || data._runStatus || undefined,
+        },
+      };
+    });
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodesCleaned);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeIdRaw] = useState<string | null>(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -228,49 +255,42 @@ function FlowEditorInner({
     error: 'error',
   };
 
+  /** Read a node's run status (fast lookup from cache, falls back to node.data) */
+  const getRunStatus = useCallback((nodeId: string): RunStatus => {
+    const cached = runStateCacheRef.current[nodeId];
+    if (cached) return cached.status as RunStatus;
+    return 'idle';
+  }, []);
+
+  /** Read a node's run output (fast lookup from cache) */
+  const getRunOutput = useCallback((nodeId: string): any => {
+    return runStateCacheRef.current[nodeId]?.output;
+  }, []);
+
   /**
-   * Shared node update handler
+   * Shared node update handler — updates _runStatus, _runOutput,
+   * and _runStatusHint in node.data so that:
+   * - toObject() includes full run data for save persistence
+   * - _runStatusHint triggers the lightweight re-render for the specific node
    */
   const handleNodeUpdate = useCallback(
     (nodeId: string, nodeStatus: string, output: any) => {
       const frontendStatus = statusMap[nodeStatus] ?? nodeStatus;
+      // Update fast lookup cache
+      runStateCacheRef.current[nodeId] = { status: frontendStatus, output };
+      // Update node.data (persists through toObject/save)
       setNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output } }
+            ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output, _runStatusHint: frontendStatus } }
             : n,
         ),
       );
+
       if (nodeStatus === 'success') {
         setEdges((eds) => {
-          // Build a quick lookup of node _runOutput from current nodes state
-          // We need to use the functional form of setNodes/setEdges to get latest state,
-          // so we read nodes via getNodes() here.
-          const allNodes = getNodes();
-          const nodeOutputMap: Record<string, any> = {};
-          for (const n of allNodes) {
-            // Include the just-succeeded node's output too
-            if (n.id === nodeId) {
-              nodeOutputMap[n.id] = output;
-            } else {
-              const ro = (n.data as any)?._runOutput;
-              if (ro && !ro.error) nodeOutputMap[n.id] = ro;
-            }
-          }
-
           return eds.map((e) => {
-            // Activate out-edges of the succeeded node (original logic)
             if (e.source === nodeId && e.data?.matchStatus === 'matched') {
-              return { ...e, data: { ...e.data, activated: true } };
-            }
-            // Also activate in-edges of the succeeded node whose source already has valid output
-            // This handles the case where an upstream node was run previously (cached output)
-            // but the edge was added after that run (e.g. X ran → new Y added → X→Y edge connected → Y ran)
-            if (
-              e.target === nodeId &&
-              e.data?.matchStatus === 'matched' &&
-              nodeOutputMap[e.source]
-            ) {
               return { ...e, data: { ...e.data, activated: true } };
             }
             return e;
@@ -278,7 +298,7 @@ function FlowEditorInner({
         });
       }
     },
-    [setNodes, setEdges, getNodes],
+    [setNodes, setEdges, statusMap],
   );
 
   /**
@@ -352,10 +372,14 @@ function FlowEditorInner({
             if (e.source === nid && !visited.has(e.target)) queue.push(e.target);
           });
         }
+        // Clear run state from node.data and cache
+        for (const nid of visited) {
+          delete runStateCacheRef.current[nid];
+        }
         setNodes((nds) =>
           nds.map((n) =>
             visited.has(n.id)
-              ? { ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null } }
+              ? { ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null, _runStatusHint: 'idle' } }
               : n,
           ),
         );
@@ -523,7 +547,7 @@ function FlowEditorInner({
       if (!node) return;
 
       const newNodeId = `${node.type}_${Date.now()}`;
-      const { _runStatus, _runOutput, ...cleanData } = node.data as any;
+      const { _runStatusHint, _runStatus, _runOutput, ...cleanData } = node.data as any;
 
       const newNode: Node = {
         id: newNodeId,
@@ -554,8 +578,10 @@ function FlowEditorInner({
         return;
       }
 
+      // Clear run status and output from all nodes + cache
+      runStateCacheRef.current = {};
       setNodes((nds) =>
-        nds.map((n) => ({ ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null } })),
+        nds.map((n) => ({ ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null, _runStatusHint: 'idle' } })),
       );
       setEdges((eds) =>
         eds.map((e) => ({ ...e, data: { ...e.data, activated: false } })),
@@ -648,7 +674,7 @@ function FlowEditorInner({
         const sEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
         return {
           nodes: sNodes.map((n) => {
-            const { _runStatus, _runOutput, ...cleanData } = n.data as any;
+            const { _runStatusHint, _runStatus, _runOutput, ...cleanData } = n.data as any;
             return { id: n.id, type: n.type || '', data: cleanData, position: n.position };
           }),
           edges: sEdges.map((e) => ({
@@ -746,8 +772,26 @@ function FlowEditorInner({
     [nodes, edges, selectedNodeId, handleDuplicateNode, setNodes, setEdges, getNode, pushUndo, doSave],
   );
 
+  // ── Memoized context value: prevents unnecessary re-renders of all BaseNode ──
+  // components when only node positions change (e.g. during dragging).
+  const contextValue = useMemo(() => ({
+    workflowId,
+    workflowName: workflowName || '',
+    onNodeUpdate: handleNodeUpdate,
+    ensureSaved,
+    multiSelectedIds,
+    compactMode,
+    setCompactMode,
+    selectedNodeId,
+    setSelectedNodeId,
+    detailNodeId,
+    setDetailNodeId,
+    getRunStatus,
+    getRunOutput,
+  }), [workflowId, workflowName, handleNodeUpdate, ensureSaved, multiSelectedIds, compactMode, setCompactMode, selectedNodeId, setSelectedNodeId, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput]);
+
   return (
-    <WorkflowContext.Provider value={{ workflowId, workflowName: workflowName || '', onNodeUpdate: handleNodeUpdate, ensureSaved, multiSelectedIds, compactMode, setCompactMode, selectedNodeId, setSelectedNodeId, detailNodeId, setDetailNodeId }}>
+    <WorkflowContext.Provider value={contextValue}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar
         nodes={nodes}

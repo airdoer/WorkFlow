@@ -1,12 +1,14 @@
 import React, { memo, useMemo, useCallback, useRef } from 'react';
 import { NodeProps, useReactFlow } from 'reactflow';
+import { useWorkflowContext } from '../../WorkflowContext';
 import BaseNode, { type NodeField } from '../BaseNode';
 import UniverRenderer, { type ExcelTableData, type SheetData } from './UniverRenderer';
 
 /* ─── ExcelNode ─────────────────────────────────────────────────────────── */
 function ExcelNode({ data, id, selected }: NodeProps) {
   const nodeData = data as Record<string, unknown>;
-  const runOutput = nodeData._runOutput as any;
+  const { getRunOutput } = useWorkflowContext();
+  const runOutput = getRunOutput(id);
   const { setNodes } = useReactFlow();
 
   // helpers

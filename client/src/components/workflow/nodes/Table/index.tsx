@@ -157,12 +157,12 @@ function MiniTable({ table, maxRows = 50, compact = false }: { table: TableData;
 /* ─── TableNode ─────────────────────────────────────────────────────────── */
 function TableNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, multiSelectedIds } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, getRunStatus, getRunOutput } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const nodeData = data as Record<string, unknown>;
-  const runStatus = (nodeData._runStatus as RunStatus) || 'idle';
-  const runOutput = nodeData._runOutput as any;
+  const runStatus = (getRunStatus(id) as RunStatus) || (nodeData._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   const ports = getNodePorts('table');
@@ -177,9 +177,10 @@ function TableNode({ data, id, selected }: NodeProps) {
       e.stopPropagation();
       if (!canRun || !workflowId) return;
 
+      // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
         ),
       );
 
@@ -188,8 +189,8 @@ function TableNode({ data, id, selected }: NodeProps) {
       nodeDataOverrides[id] = {};
       for (const n of allNodes) {
         if (n.id !== id) {
-          const ro = (n.data as any)?._runOutput;
-          if (ro && !ro.error) nodeDataOverrides[n.id] = ro;
+          const nodeOutput = getRunOutput(n.id);
+          if (nodeOutput && !nodeOutput.error) nodeDataOverrides[n.id] = nodeOutput;
         }
       }
 
@@ -198,7 +199,7 @@ function TableNode({ data, id, selected }: NodeProps) {
         (_status, error) => { if (error) console.error('[TableNode] run error:', error); },
       );
     },
-    [id, setNodes, canRun, workflowId, onNodeUpdate, getNodes],
+    [id, setNodes, canRun, workflowId, onNodeUpdate, getNodes, getRunOutput],
   );
 
   const borderColor =
@@ -323,8 +324,8 @@ function TableNode({ data, id, selected }: NodeProps) {
 
         {/* ===== Content ===== */}
         <div style={{ padding: '8px 10px' }}>
-          {/* Error */}
-          {runStatus === 'error' && runOutput && (
+          {/* Error — compact mode only shows status badge */}
+          {runStatus === 'error' && runOutput && !compactMode && (
             <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#cf1322', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff4d4f', display: 'inline-block' }} />
@@ -339,8 +340,19 @@ function TableNode({ data, id, selected }: NodeProps) {
             </div>
           )}
 
-          {/* Tables — antd Table with search */}
-          {tables && tables.length > 0 && (
+          {/* Compact mode: show only status badge */}
+          {compactMode && runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+              {runStatus === 'error' ? (
+                <span style={{ color: '#cf1322' }}>❌ 错误</span>
+              ) : (
+                <span style={{ color: '#389e0d' }}>✅ 已执行</span>
+              )}
+            </div>
+          )}
+
+          {/* Tables — antd Table with search — hidden in compact mode */}
+          {!compactMode && tables && tables.length > 0 && (
             <div className="nowheel nopan">
               {tables.map((t, i) => (
                 <MiniTable key={i} table={t} maxRows={50} compact={tables.length > 1} />

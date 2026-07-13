@@ -34,6 +34,10 @@ export interface WorkflowContextValue {
   detailNodeId: string | null;
   /** Open/close detail modal for a node (also syncs to URL) */
   setDetailNodeId: (id: string | null) => void;
+  /** Read a node's run status from the external run-output store */
+  getRunStatus: (nodeId: string) => string;
+  /** Read a node's run output from the external run-output store */
+  getRunOutput: (nodeId: string) => any;
 }
 
 export const WorkflowContext = createContext<WorkflowContextValue>({
@@ -48,6 +52,8 @@ export const WorkflowContext = createContext<WorkflowContextValue>({
   setSelectedNodeId: () => {},
   detailNodeId: null,
   setDetailNodeId: () => {},
+  getRunStatus: () => 'idle',
+  getRunOutput: () => undefined,
 });
 
 export function useWorkflowContext() {

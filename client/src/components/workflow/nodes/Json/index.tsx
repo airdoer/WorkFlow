@@ -41,13 +41,13 @@ const PORT_COLORS: Record<string, string> = {
 
 function JsonNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
   const detailOpen = detailNodeId === id;
   const [overrideWarning, setOverrideWarning] = useState(false);
 
   const nodeData = data as Record<string, unknown>;
-  const runStatus = (nodeData._runStatus as RunStatus) || 'idle';
-  const runOutput = nodeData._runOutput as any;
+  const runStatus = (getRunStatus(id) as RunStatus) || (nodeData._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   const ports = getNodePorts('json');
@@ -104,10 +104,10 @@ function JsonNode({ data, id, selected }: NodeProps) {
         return;
       }
 
-      // Mark this node as running immediately
+      // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
         ),
       );
 
@@ -122,12 +122,12 @@ function JsonNode({ data, id, selected }: NodeProps) {
       }
       nodeDataOverrides[id] = cleanConfig;
 
-      // Pass cached outputs of other nodes for upstream context
+      // Pass cached outputs of other nodes from the external store
       for (const n of allNodes) {
         if (n.id !== id) {
-          const runOutput = (n.data as any)?._runOutput;
-          if (runOutput && !runOutput.error) {
-            nodeDataOverrides[n.id] = runOutput;
+          const nodeOutput = getRunOutput(n.id);
+          if (nodeOutput && !nodeOutput.error) {
+            nodeDataOverrides[n.id] = nodeOutput;
           }
         }
       }
@@ -142,26 +142,25 @@ function JsonNode({ data, id, selected }: NodeProps) {
         },
       );
     },
-    [id, setNodes, canRun, workflowId, onNodeUpdate, getNodes, hasJsonPathEdge, manualJsonPath],
+    [id, setNodes, canRun, workflowId, onNodeUpdate, getNodes, hasJsonPathEdge, manualJsonPath, getRunOutput],
   );
 
-  // Display the upstream jsonPath value (from other node's _runOutput)
+  // Display the upstream jsonPath value (from external run output store)
   const upstreamJsonPath = useStore(
     useCallback(
       (s) => {
         if (!hasJsonPathEdge) return undefined;
         const edge = s.edges.find((e) => e.target === id && e.targetHandle === 'jsonPath');
         if (!edge) return undefined;
-        const srcNode = s.nodeInternals.get(edge.source);
-        if (!srcNode) return undefined;
-        const srcOutput = (srcNode.data as any)?._runOutput;
+        // Read from external store instead of node.data
+        const srcOutput = getRunOutput(edge.source);
         if (!srcOutput) return undefined;
         if (edge.sourceHandle && srcOutput[edge.sourceHandle] !== undefined) {
           return String(srcOutput[edge.sourceHandle]);
         }
         return srcOutput.value !== undefined ? String(srcOutput.value) : undefined;
       },
-      [id, hasJsonPathEdge],
+      [id, hasJsonPathEdge, getRunOutput],
     ),
   );
 

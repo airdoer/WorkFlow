@@ -47,14 +47,16 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState('');
   const [modalTitle, setModalTitle] = useState('');
-  const { workflowId, onNodeUpdate, ensureSaved } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, getRunStatus, getRunOutput } = useWorkflowContext();
 
   const nodeType = selectedNode?.type ?? '';
   const nodeData = (selectedNode?.data || {}) as Record<string, unknown>;
   const entry = selectedNode ? getNodeRegistry(nodeType) : null;
+  const selectedNodeId = selectedNode?.id ?? '';
 
-  const runStatus = (nodeData._runStatus as RunStatus) || 'idle';
-  const runOutput = nodeData._runOutput as any;
+  // Read run status/output from the external store (lightweight)
+  const runStatus = (getRunStatus(selectedNodeId) as RunStatus) || (nodeData._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(selectedNodeId);
   const running = runStatus === 'running';
 
   const ports = getNodePorts(nodeType);
@@ -97,9 +99,8 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       const srcHandle = e.sourceHandle;
       const tgtHandle = e.targetHandle;
       const tgtPort = inputPorts.find((p) => p.key === tgtHandle);
-      // Read upstream node's actual output
-      const srcNode = nodes.find((n) => n.id === e.source);
-      const srcOutput = (srcNode?.data as any)?._runOutput;
+      // Read upstream node's actual output from external store
+      const srcOutput = getRunOutput(e.source);
       // Extract the value for this specific port handle
       let previewValue: any = undefined;
       if (srcOutput && !srcOutput.error) {
@@ -144,10 +145,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
     if (!savedId) return;
 
     // Mark this node as running immediately for visual feedback
+    // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
     setNodes((nds) =>
       nds.map((n) =>
         n.id === selectedNode.id
-          ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } }
+          ? { ...n, data: { ...n.data, _runStatusHint: 'running' } }
           : n,
       ),
     );
@@ -160,14 +162,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       }
     }
 
-    // Collect all other nodes' last known _runOutput as upstream context
+    // Collect all other nodes' last known runOutput from the external store
     const nodeDataOverrides: Record<string, any> = {};
     nodeDataOverrides[selectedNode.id] = cleanConfig;
     for (const n of nodes) {
       if (n.id !== selectedNode.id) {
-        const runOutput = (n.data as any)?._runOutput;
-        if (runOutput && !runOutput.error) {
-          nodeDataOverrides[n.id] = runOutput;
+        const nodeOutput = getRunOutput(n.id);
+        if (nodeOutput && !nodeOutput.error) {
+          nodeDataOverrides[n.id] = nodeOutput;
         }
       }
     }
@@ -181,7 +183,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         if (error) message.error(`运行失败: ${error}`);
       },
     );
-  }, [selectedNode, nodeData, nodes, setNodes, ensureSaved, onNodeUpdate]);
+  }, [selectedNode, nodeData, nodes, setNodes, ensureSaved, onNodeUpdate, getRunOutput]);
 
   // Format output for display
   const formatOutput = (output: any): string => {

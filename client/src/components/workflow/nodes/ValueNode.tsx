@@ -75,12 +75,12 @@ const ValueNode: React.FC<ValueNodeProps> = ({
   inputPortLabel = '输入值',
 }) => {
   const { setNodes, getEdges, getNode, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, getRunStatus, getRunOutput } = useWorkflowContext();
   const [detailOpen, setDetailOpen] = useState(false);
   const [overrideWarning, setOverrideWarning] = useState(false);
 
-  const runStatus = (data._runStatus as RunStatus) || 'idle';
-  const runOutput = data._runOutput as any;
+  const runStatus = (getRunStatus(id) as RunStatus) || (data._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   // Whether this node is part of a multi-selection
@@ -94,20 +94,18 @@ const ValueNode: React.FC<ValueNodeProps> = ({
     ),
   );
 
-  // 从连线获取上游值（用于显示）
+  // 从连线获取上游值（用于显示）— 从外部 store 读取
   const upstreamValue = useMemo(() => {
     const edges = getEdges();
     const inEdge = edges.find((e) => e.target === id && e.targetHandle === inputPortKey);
     if (!inEdge) return undefined;
-    const srcNode = getNode(inEdge.source);
-    if (!srcNode) return undefined;
-    const srcOutput = (srcNode.data as any)?._runOutput;
+    const srcOutput = getRunOutput(inEdge.source);
     if (!srcOutput) return undefined;
     if (inEdge.sourceHandle && srcOutput[inEdge.sourceHandle] !== undefined) {
       return srcOutput[inEdge.sourceHandle];
     }
     return srcOutput[outputPortKey] ?? Object.values(srcOutput)[0];
-  }, [getEdges, getNode, id, inputPortKey, outputPortKey]);
+  }, [getEdges, getRunOutput, id, inputPortKey, outputPortKey]);
 
   const manualValue = data[valueKey];
 
@@ -143,10 +141,10 @@ const ValueNode: React.FC<ValueNodeProps> = ({
       const savedId = await ensureSaved();
       if (!savedId) return;
 
-      // Mark this node as running immediately for visual feedback
+      // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+          n.id === id ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
         ),
       );
 
@@ -157,12 +155,12 @@ const ValueNode: React.FC<ValueNodeProps> = ({
       // Override current node's config with latest field values
       nodeDataOverrides[id] = { [valueKey]: effectiveValue };
 
-      // Pass cached outputs of other nodes for upstream context
+      // Pass cached outputs of other nodes from the external store
       for (const n of allNodes) {
         if (n.id !== id) {
-          const runOutput = (n.data as any)?._runOutput;
-          if (runOutput && !runOutput.error) {
-            nodeDataOverrides[n.id] = runOutput;
+          const nodeOutput = getRunOutput(n.id);
+          if (nodeOutput && !nodeOutput.error) {
+            nodeDataOverrides[n.id] = nodeOutput;
           }
         }
       }
@@ -177,7 +175,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
         },
       );
     },
-    [id, nodeType, effectiveValue, valueKey, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes],
+    [id, nodeType, effectiveValue, valueKey, setNodes, canRun, ensureSaved, onNodeUpdate, getNodes, getRunOutput],
   );
 
   const borderColor =
@@ -430,8 +428,17 @@ const ValueNode: React.FC<ValueNodeProps> = ({
             {renderInput()}
           </div>
 
-          {/* Run output */}
+          {/* Run output — compact mode shows only status badge */}
           {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+            compactMode ? (
+              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+                {runStatus === 'error' ? (
+                  <span style={{ color: '#cf1322' }}>❌ 错误</span>
+                ) : (
+                  <span style={{ color: '#389e0d' }}>✅ 已执行</span>
+                )}
+              </div>
+            ) : (
             <div style={{ marginTop: 6 }}>
               {runStatus === 'error' ? (
                 <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, overflow: 'hidden' }}>
@@ -463,6 +470,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
                 </div>
               )}
             </div>
+            ) /* end compactMode ternary */
           )}
         </div>
       </div>

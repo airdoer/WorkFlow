@@ -63,7 +63,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
 }) => {
   const [closeHovered, setCloseHovered] = React.useState(false);
   const { setNodes, getEdges, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, getRunStatus, getRunOutput } = useWorkflowContext();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to live node data via useStore so any setNodes update re-renders this component
@@ -78,8 +78,9 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   );
 
   const data = nodeData;
-  const runStatus: RunStatus = data._runStatus || 'idle';
-  const runOutput = data._runOutput as any;
+  // Read run status/output from the external store (lightweight, doesn't bloat node.data)
+  const runStatus: RunStatus = (getRunStatus(nodeId) as RunStatus) || (data._runStatusHint as RunStatus) || 'idle';
+  const runOutput = getRunOutput(nodeId);
   const statusCfg = STATUS_CONFIG[runStatus];
 
   const ports = getNodePorts(nodeType);
@@ -87,10 +88,28 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   const outputPorts = ports.filter((p) => p.direction === 'output');
 
   // Subscribe to all nodes so upstream data changes also trigger re-render
-  const allNodes = useStore((s) => Array.from(s.nodeInternals.values()));
+  // Only subscribe when modal is open to avoid unnecessary re-renders when closed
+  const allNodes = useStore(
+    useCallback(
+      (s) => {
+        if (!open) return [] as any[];
+        return Array.from(s.nodeInternals.values());
+      },
+      [open],
+    ),
+  );
 
   // Subscribe to edges reactively so linkedPortKey checks update in real-time
-  const allEdges = useStore((s) => s.edges);
+  // Only subscribe when modal is open
+  const allEdges = useStore(
+    useCallback(
+      (s) => {
+        if (!open) return [] as any[];
+        return s.edges;
+      },
+      [open],
+    ),
+  );
 
   /**
    * Map of portKey -> true when that input port has an active connected edge.
@@ -143,8 +162,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
     const incoming = edges.filter((e) => e.target === nodeId && e.data?.matchStatus === 'matched');
     return incoming.map((e) => {
       const tgtPort = inputPorts.find((p) => p.key === e.targetHandle);
-      const srcNode = allNodes.find((n) => n.id === e.source);
-      const srcOutput = (srcNode?.data as any)?._runOutput;
+      // Read upstream output from external store (lightweight)
+      const srcOutput = getRunOutput(e.source);
       let previewValue: any = undefined;
       if (srcOutput && !srcOutput.error) {
         if (e.sourceHandle && srcOutput[e.sourceHandle] !== undefined) {
@@ -164,7 +183,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
         isBinary: typeof previewValue === 'string' ? isBinaryContent(previewValue) : (!!(typeof previewValue === 'object' && previewValue?.fileContent && typeof previewValue.fileContent === 'string' && isBinaryContent(previewValue.fileContent))),
       };
     });
-  }, [getEdges, allNodes, nodeId, inputPorts]);
+  }, [getEdges, getRunOutput, nodeId, inputPorts]);
 
   // Check required fields — a required field is satisfied if it has a value OR its linked port is connected
   const canRun = useMemo(() => {
@@ -204,9 +223,10 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
     }
 
     // Mark this node as running immediately for visual feedback
+    // Use lightweight _runStatusHint instead of full _runStatus + _runOutput
     setNodes((nds) =>
       nds.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, _runStatus: 'running', _runOutput: null } } : n,
+        n.id === nodeId ? { ...n, data: { ...n.data, _runStatusHint: 'running' } } : n,
       ),
     );
 
@@ -218,15 +238,15 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       }
     }
 
-    // Collect all other nodes' last known _runOutput as upstream context
-    const allNodes = getNodes();
+    // Collect all other nodes' last known runOutput from the external store
+    const allNodesLocal = getNodes();
     const nodeDataOverrides: Record<string, any> = {};
     nodeDataOverrides[nodeId] = cleanConfig;
-    for (const n of allNodes) {
+    for (const n of allNodesLocal) {
       if (n.id !== nodeId) {
-        const runOutput = (n.data as any)?._runOutput;
-        if (runOutput && !runOutput.error) {
-          nodeDataOverrides[n.id] = runOutput;
+        const nodeOutput = getRunOutput(n.id);
+        if (nodeOutput && !nodeOutput.error) {
+          nodeDataOverrides[n.id] = nodeOutput;
         }
       }
     }
@@ -240,7 +260,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
         if (error) console.error('[NodeDetailModal] NodeRun error:', error);
       },
     );
-  }, [nodeId, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes]);
+  }, [nodeId, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes, getRunOutput]);
 
   const copyToClipboard = useCallback((text: string) => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
