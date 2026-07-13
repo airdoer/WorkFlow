@@ -6,6 +6,7 @@ import { ExpandOutlined, CopyOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
+import { stripRuntimeMeta } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
 import { PanelSection } from './PanelSection';
 import DiffSummary from './nodes/Diff/DiffSummary';
@@ -90,7 +91,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       const { fileContent, ...rest } = value;
       return JSON.stringify({ ...rest, fileContent: '📦 二进制文件，不支持文本预览' }, null, 2);
     }
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(stripRuntimeMeta(value), null, 2);
   };
 
   const upstreamData = incomingEdges
@@ -195,7 +196,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       const { fileContent, ...rest } = output;
       return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
     }
-    return JSON.stringify(output, null, 2);
+    return JSON.stringify(stripRuntimeMeta(output), null, 2);
   };
 
   const outputText = runOutput ? formatOutput(runOutput) : '';
@@ -638,14 +639,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               <span style={{ fontWeight: 600, fontSize: 11, color: '#cf1322' }}>错误</span>
             </div>
             <pre style={{ margin: 0, padding: '4px 6px', background: '#fff', border: '1px solid #ffccc7', borderRadius: 3, fontSize: 9, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
-              {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(runOutput, null, 2)}
+              {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(stripRuntimeMeta(runOutput), null, 2)}
             </pre>
           </div>
         ) : outputPorts.length > 0 ? (
           outputPorts.map((p) => {
             const portValue = runOutput?.[p.key];
             const hasValue = portValue !== undefined && portValue !== null;
-            const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+            const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? stripRuntimeMeta(runOutput) : undefined);
             const hasDisplay = displayValue !== undefined && displayValue !== null;
             // For Diff node: show side-by-side diff instead of raw output
             const isDiffPort = nodeType === 'diff' && p.key === 'isSame' && runOutput?.contentA !== undefined && runOutput?.contentB !== undefined;
@@ -663,7 +664,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               ? (typeof displayValue === 'string' 
                   ? (isBinaryContent(displayValue) ? '📦 二进制文件，不支持文本预览' : displayValue) 
                   : (() => {
-                      const json = displayValue;
+                      const json = stripRuntimeMeta(displayValue);
                       if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
                         const { fileContent, ...rest } = json;
                         return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);

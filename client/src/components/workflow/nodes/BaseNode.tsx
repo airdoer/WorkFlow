@@ -7,6 +7,19 @@ import { getNodePorts } from '../PortTypes';
 import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
 
+// Internal meta keys injected by the backend runtime type system —
+// these should never be shown to the user in output display.
+const RUNTIME_META_KEYS = new Set(['__runtime_type__', '__value__']);
+
+/** Strip backend runtime meta keys from an output object for display purposes. */
+export function stripRuntimeMeta<T>(obj: T): T {
+  if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj;
+  const entries = Object.entries(obj as Record<string, unknown>)
+    .filter(([k]) => !RUNTIME_META_KEYS.has(k));
+  return Object.fromEntries(entries) as T;
+}
+
 // Lazy load renderers to reduce initial bundle
 const ExcelRenderer = lazy(() => import('./Excel/UniverRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
@@ -636,7 +649,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 <div style={{ padding: '4px 6px', maxHeight: 80, overflowY: 'auto', borderTop: '1px solid #ffccc7', fontSize: 9 }}
                      className="nowheel nopan">
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
-                    {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(runOutput, null, 2)}
+                    {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(stripRuntimeMeta(runOutput), null, 2)}
                   </pre>
                 </div>
               </div>
@@ -644,7 +657,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               outputPorts.map((p) => {
                 const portValue = runOutput?.[p.key];
                 const hasValue = portValue !== undefined && portValue !== null;
-                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? stripRuntimeMeta(runOutput) : undefined);
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
                 // For Excel node: merge allSheets from runOutput into the data prop
@@ -684,7 +697,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                         ) : (
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                             {(() => {
-                              const json = displayValue;
+                              const json = stripRuntimeMeta(displayValue);
                               if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
                                 const { fileContent, ...rest } = json;
                                 return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
@@ -706,7 +719,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                 <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {(() => {
-                      const val = typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(runOutput, null, 2);
+                      const val = typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(stripRuntimeMeta(runOutput), null, 2);
                       if (typeof val === 'string' && isBinaryContent(val)) return '📦 二进制文件';
                       return val;
                     })()}

@@ -3,7 +3,7 @@ import { Modal, Button, Tag, message, Select } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
-import { FieldTextInput, FieldTextarea } from './BaseNode';
+import { FieldTextInput, FieldTextarea, stripRuntimeMeta } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -287,7 +287,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       const { fileContent, ...rest } = runOutput;
       return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
     }
-    return JSON.stringify(runOutput, null, 2);
+    return JSON.stringify(stripRuntimeMeta(runOutput), null, 2);
   }, [runOutput]);
 
   if (!open) return null;
@@ -576,7 +576,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                   <span style={{ fontWeight: 600, fontSize: 13, color: '#cf1322' }}>错误</span>
                 </div>
                 <pre style={{ margin: 0, padding: '6px 8px', background: '#fff', border: '1px solid #ffccc7', borderRadius: 4, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
-                  {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(runOutput, null, 2)}
+                  {typeof runOutput === 'string' ? runOutput : runOutput?.error || JSON.stringify(stripRuntimeMeta(runOutput), null, 2)}
                 </pre>
               </div>
             ) : outputPorts.length > 0 ? (
@@ -584,7 +584,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                 const portValue = runOutput?.[p.key];
                 const hasValue = portValue !== undefined && portValue !== null;
                 // For nodes with a single output port, also check top-level keys if port key not found
-                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? runOutput : undefined);
+                const displayValue = hasValue ? portValue : (outputPorts.length === 1 ? stripRuntimeMeta(runOutput) : undefined);
                 const hasDisplay = displayValue !== undefined && displayValue !== null;
 
                 // Determine renderer based on port type
@@ -653,7 +653,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                         ) : isPre ? (
                           <pre style={{ margin: 0, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
                             {(() => {
-                              const json = displayValue;
+                              const json = stripRuntimeMeta(displayValue);
                               if (typeof json === 'object' && json?.fileContent && typeof json.fileContent === 'string' && isBinaryContent(json.fileContent)) {
                                 const { fileContent, ...rest } = json;
                                 return JSON.stringify({ ...rest, fileContent: '📦 二进制文件' }, null, 2);
@@ -671,7 +671,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
               <div style={{ background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden', padding: 10 }}>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
                   {(() => {
-                    const val = typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(runOutput, null, 2);
+                    const val = typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(stripRuntimeMeta(runOutput), null, 2);
                     if (typeof val === 'string' && isBinaryContent(val)) return '📦 二进制文件，不支持文本预览';
                     return val;
                   })()}
