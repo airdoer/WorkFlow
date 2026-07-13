@@ -22,7 +22,7 @@ import {
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
-import { NodeField, FieldTextInput } from './BaseNode';
+import { NodeField, FieldTextInput, SeqBadge } from './BaseNode';
 
 export type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -283,6 +283,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
           }}
         >
           <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+            {(data as any)._seq != null && <SeqBadge seq={(data as any)._seq} />}
             <span style={{ fontSize: 16 }}>{icon}</span>
             <span>{label}</span>
           </div>

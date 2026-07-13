@@ -3,7 +3,7 @@ import { Modal, Button, Tag, message, Select } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
-import { FieldTextInput, FieldTextarea, stripRuntimeMeta } from './BaseNode';
+import { FieldTextInput, FieldTextarea, stripRuntimeMeta, SeqBadge } from './BaseNode';
 import { getNodePorts } from '../PortTypes';
 import { FlowApi } from '../services/FlowApi';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -339,6 +339,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
           borderBottom: `2px solid ${runStatus === 'error' ? '#ffccc7' : runStatus === 'success' ? '#b7eb8f' : '#e8e8e8'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {(data._seq != null) && <SeqBadge seq={data._seq as number} size="lg" />}
             <span style={{ fontSize: 22 }}>{icon}</span>
             <span style={{ fontWeight: 700, fontSize: 18, color: '#333' }}>{label}</span>
             <Tag color={runStatus === 'success' ? 'green' : runStatus === 'error' ? 'red' : runStatus === 'running' ? 'blue' : 'default'} style={{ fontSize: 12 }}>

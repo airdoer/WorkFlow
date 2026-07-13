@@ -20,6 +20,24 @@ export function stripRuntimeMeta<T>(obj: T): T {
   return Object.fromEntries(entries) as T;
 }
 
+// ── Node sequence badge ──────────────────────────────────────────────
+// Blue rounded-rect badge for the node's topological sequence number.
+type SeqBadgeSize = 'sm' | 'lg';
+export const SeqBadge: React.FC<{ seq: number; size?: SeqBadgeSize }> = ({ seq, size = 'sm' }) => {
+  const isLg = size === 'lg';
+  return (
+    <span style={{
+      fontSize: isLg ? 14 : 11, fontWeight: 700, color: '#fff',
+      background: '#1677ff', borderRadius: isLg ? 4 : 3,
+      padding: isLg ? '1px 7px' : '0 4px',
+      lineHeight: isLg ? '20px' : '16px',
+      minWidth: isLg ? 26 : 18, textAlign: 'center', flexShrink: 0,
+      position: 'relative', top: isLg ? 0 : -2,
+      boxShadow: `0 1px 3px rgba(22,119,255,${isLg ? 0.4 : 0.3})`,
+    }}>{seq}</span>
+  );
+};
+
 // Lazy load renderers to reduce initial bundle
 const ExcelRenderer = lazy(() => import('./Excel/UniverRenderer'));
 const JsonRenderer = lazy(() => import('./Json/JsonRenderer'));
@@ -345,6 +363,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         }}
       >
         <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {(data as any)._seq != null && <SeqBadge seq={(data as any)._seq} />}
           <span style={{ fontSize: 16 }}>{icon}</span>
           <span>{label}</span>
         </div>

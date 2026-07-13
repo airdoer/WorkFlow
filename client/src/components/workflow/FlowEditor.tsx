@@ -126,6 +126,60 @@ function FlowEditorInner({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodesCleaned);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // ── Node sequence numbering (topological sort) ───────────────────────
+  const renumberNodes = useCallback((currentNodes: Node[], currentEdges: Edge[]): Node[] => {
+    const inDegree: Record<string, number> = {};
+    const adj: Record<string, string[]> = {};
+    const nodeIds = new Set(currentNodes.map((n) => n.id));
+    for (const nid of nodeIds) { inDegree[nid] = 0; adj[nid] = []; }
+    for (const e of currentEdges) {
+      if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
+        adj[e.source].push(e.target);
+        inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+      }
+    }
+    const queue: string[] = [];
+    for (const nid of nodeIds) { if (inDegree[nid] === 0) queue.push(nid); }
+    queue.sort((a, b) => {
+      const sA = (currentNodes.find(n => n.id === a)?.data as any)?._seq ?? 9999;
+      const sB = (currentNodes.find(n => n.id === b)?.data as any)?._seq ?? 9999;
+      return sA - sB;
+    });
+    const sorted: string[] = [];
+    while (queue.length) {
+      const nid = queue.shift()!;
+      sorted.push(nid);
+      const targets = adj[nid].slice().sort((a, b) => {
+        const sA = (currentNodes.find(n => n.id === a)?.data as any)?._seq ?? 9999;
+        const sB = (currentNodes.find(n => n.id === b)?.data as any)?._seq ?? 9999;
+        return sA - sB;
+      });
+      for (const t of targets) { inDegree[t]--; if (inDegree[t] === 0) queue.push(t); }
+    }
+    for (const nid of nodeIds) { if (!sorted.includes(nid)) sorted.push(nid); }
+    const seqMap: Record<string, number> = {};
+    sorted.forEach((nid, idx) => { seqMap[nid] = idx + 1; });
+    return currentNodes.map((n) => {
+      const newSeq = seqMap[n.id];
+      if ((n.data as any)._seq === newSeq) return n;
+      return { ...n, data: { ...n.data, _seq: newSeq } };
+    });
+  }, []);
+
+  // Re-number nodes whenever the graph structure changes (add/delete/reconnect)
+  const prevStructRef = useRef<string>('');
+  useEffect(() => {
+    const structKey = nodes.map(n => n.id).join(',') + '|' + edges.map(e => `${e.source}->${e.target}`).join(',');
+    if (structKey !== prevStructRef.current) {
+      prevStructRef.current = structKey;
+      const renumbered = renumberNodes(nodes, edges);
+      // Only update if any seq actually changed
+      const changed = renumbered.some((n, i) => n !== nodes[i]);
+      if (changed) setNodes(renumbered);
+    }
+  }, [nodes, edges, renumberNodes, setNodes]);
+
   const [selectedNodeId, setSelectedNodeIdRaw] = useState<string | null>(() => {
     const sp = new URLSearchParams(window.location.search);
     return sp.get('node') || null;
@@ -547,7 +601,7 @@ function FlowEditorInner({
       if (!node) return;
 
       const newNodeId = `${node.type}_${Date.now()}`;
-      const { _runStatusHint, _runStatus, _runOutput, ...cleanData } = node.data as any;
+      const { _runStatusHint, _runStatus, _runOutput, _seq, ...cleanData } = node.data as any;
 
       const newNode: Node = {
         id: newNodeId,
@@ -674,7 +728,7 @@ function FlowEditorInner({
         const sEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
         return {
           nodes: sNodes.map((n) => {
-            const { _runStatusHint, _runStatus, _runOutput, ...cleanData } = n.data as any;
+            const { _runStatusHint, _runStatus, _runOutput, _seq, ...cleanData } = n.data as any;
             return { id: n.id, type: n.type || '', data: cleanData, position: n.position };
           }),
           edges: sEdges.map((e) => ({

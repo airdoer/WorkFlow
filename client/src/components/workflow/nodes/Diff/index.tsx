@@ -18,7 +18,7 @@ import { FlowApi } from '../../services/FlowApi';
 import { getNodePorts } from '../../PortTypes';
 import { useWorkflowContext } from '../../WorkflowContext';
 import NodeDetailModal from '../NodeDetailModal';
-import { NodeField, RunStatus } from '../BaseNode';
+import { NodeField, RunStatus, SeqBadge } from '../BaseNode';
 import DiffSummary from './DiffSummary';
 
 const DiffRenderer = lazy(() => import('./DiffRenderer'));
@@ -164,6 +164,7 @@ function DiffNode({ data, id, selected }: NodeProps) {
           padding: '8px 10px 6px', borderBottom: '1px solid #f0f0f0',
         }}>
           <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+            {(data as any)._seq != null && <SeqBadge seq={(data as any)._seq} />}
             <span style={{ fontSize: 16 }}>🔀</span>
             <span>Diff</span>
             {isSameResult !== undefined && (

@@ -21,7 +21,7 @@ import { FlowApi } from '../../services/FlowApi';
 import { getNodePorts } from '../../PortTypes';
 import { useWorkflowContext } from '../../WorkflowContext';
 import NodeDetailModal from '../NodeDetailModal';
-import { NodeField, FieldTextInput } from '../BaseNode';
+import { NodeField, FieldTextInput, SeqBadge } from '../BaseNode';
 
 type RunStatus = 'idle' | 'running' | 'success' | 'error';
 
@@ -208,6 +208,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
           }}
         >
           <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+            {(data as any)._seq != null && <SeqBadge seq={(data as any)._seq} />}
             <span style={{ fontSize: 16 }}>📋</span>
             <span>JSON</span>
           </div>

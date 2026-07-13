@@ -6,7 +6,7 @@ import { ExpandOutlined, CopyOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { useWorkflowContext } from './WorkflowContext';
 import type { RunStatus } from './nodes/BaseNode';
-import { stripRuntimeMeta } from './nodes/BaseNode';
+import { stripRuntimeMeta, SeqBadge } from './nodes/BaseNode';
 import { getNodePorts, type PortDefinition } from './PortTypes';
 import { PanelSection } from './PanelSection';
 import DiffSummary from './nodes/Diff/DiffSummary';
@@ -341,6 +341,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
           >
             ▶
           </button>
+          {(nodeData._seq != null) && <SeqBadge seq={nodeData._seq as number} size="lg" />}
           {entry.icon}
           <span style={{ fontWeight: 600, fontSize: 14 }}>{entry.label} 节点</span>
           {entry.category && (
