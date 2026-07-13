@@ -10,6 +10,9 @@ WORKFLOW_TRASH_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data',
 
 logger = logging.getLogger(__name__)
 
+# Internal meta keys that should NOT be passed to downstream nodes via fallback update.
+_META_KEYS = frozenset({'__runtime_type__', '__value__'})
+
 
 def _ensure_dir():
     os.makedirs(WORKFLOW_DATA_DIR, exist_ok=True)
@@ -429,6 +432,7 @@ class WorkflowRuntime:
                     target_handle = edge.get('targetHandle')
                     source_handle = edge.get('sourceHandle')
                     if target_handle and source_handle and source_handle in src_output:
+                        # Precise mapping: source_handle key exists in output → direct assign
                         input_data[target_handle] = src_output[source_handle]
                         # Propagate file metadata alongside file content so downstream
                         # renderers (Excel, Lua, etc.) can use localPath / fileType.
@@ -436,10 +440,27 @@ class WorkflowRuntime:
                             for meta_key in ('localPath', 'fileType', 'filePath'):
                                 if meta_key in src_output:
                                     input_data.setdefault(meta_key, src_output[meta_key])
+                    elif target_handle and source_handle:
+                        # source_handle NOT in src_output → try __value__ fallback
+                        # This handles cases where port key (e.g. 'result') differs
+                        # from executor output key (e.g. 'value', 'rows', etc.)
+                        if '__value__' in src_output:
+                            input_data[target_handle] = src_output['__value__']
+                        else:
+                            # Last resort: merge all business keys, strip meta
+                            for k, v in src_output.items():
+                                if k not in _META_KEYS:
+                                    input_data[k] = v
                     elif target_handle:
-                        input_data.update(src_output)
+                        # No source_handle: merge all business keys, strip internal meta
+                        for k, v in src_output.items():
+                            if k not in _META_KEYS:
+                                input_data[k] = v
                     else:
-                        input_data.update(src_output)
+                        # No handle info: merge all business keys, strip internal meta
+                        for k, v in src_output.items():
+                            if k not in _META_KEYS:
+                                input_data[k] = v
 
             # Merge node data with any frontend overrides
             node_data = dict(node.get('data', {}))

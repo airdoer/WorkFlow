@@ -2532,3 +2532,877 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
   - 输入端口 maxConnections: 1 → 只能接一条线
   - 输入端口 maxConnections: undefined → 可接多条线
 ```
+
+---
+
+## 十三、Data Source（数据源）
+
+### 13.1 设计理念
+
+Data Source 节点负责**获取数据**。所有数据源均通过 Adapter 模式输出 Runtime Value。
+
+核心原则：
+- Runtime 不关心数据来自哪里，只关心 Runtime Value
+- 新增数据源时，仅新增 Adapter，Runtime 无需修改
+- 所有数据源输出必须经过 Adapter 转换为 Runtime Value
+
+### 13.2 Runtime Value（统一运行时数据模型）
+
+所有节点之间禁止直接约定 Python dict、JavaScript Object、Lua Table。
+
+支持的数据类型：
+
+```
+Primitive
+├── Null
+├── Boolean
+├── Number
+├── String
+
+Collection
+├── List
+├── Object
+
+Extended
+├── Binary（预留）
+├── Schema（类型信息）
+```
+
+Object：`Object<string, RuntimeValue>`
+
+List：`RuntimeValue[]`
+
+### 13.3 Adapter（数据源适配层）
+
+所有数据必须经过 Adapter：
+
+| 数据源 | Adapter | 转换规则 |
+|--------|---------|---------|
+| Lua | Lua Adapter | `{ id=1001, count=5 }` → `{ "id":1001, "count":5 }` |
+| Excel | Excel Adapter | 表格行 → `[{"id":1001,"name":"Sword"},...]` |
+| JSON | — | 无需处理 |
+| Python dict | — | 无需处理 |
+| HTTP | HTTP Adapter | Response body → Runtime Value |
+| Redis | Redis Adapter | GET/GET → Runtime Value |
+| 用户输入 | — | 直接作为 Runtime Value |
+
+### 13.4 Data Source 节点清单
+
+| 节点 | type | 说明 | 状态 |
+|------|------|------|------|
+| P4File | `p4file` | P4 文件同步 + 输出 | 已有（见 3.2） |
+| HTTP Request | `http` | HTTP GET/POST 请求 | **新增** |
+| Redis | `redis` | Redis 读写 | **新增** |
+| File | `file` | 本地文件读取 | **新增** |
+| ExcelSearch | `excelsearch` | Excel 文件选择器 | 已有（见 16.2） |
+| C7Server | `c7server` | 服务器选择器 | 已有（见 3.11） |
+
+### 13.5 HTTP Request 节点（新增）
+
+**Schema:**
+
+```typescript
+interface HTTPConfig {
+  url: string;             // 请求 URL（必填）
+  method: string;          // GET / POST（默认 GET）
+  headers?: string;        // JSON 格式 Headers（可选）
+  body?: string;           // 请求 Body（POST 时使用）
+  timeout?: number;        // 超时秒数（默认 30）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | url | URL | string |
+| input | body | Body | any |
+| output | response | 响应 | any |
+| output | statusCode | 状态码 | number |
+
+**执行流程:**
+```
+1. 从 input_data.url 或 config.url 获取 URL（连线优先）
+2. 构建请求（method/headers/body/timeout）
+3. 执行 HTTP 请求
+4. 返回 { response: body, statusCode: code, headers: respHeaders }
+```
+
+### 13.6 Redis 节点（新增）
+
+**Schema:**
+
+```typescript
+interface RedisConfig {
+  command: string;    // GET / SET / HGET / HSET / DEL / KEYS（必填）
+  key: string;        // Redis key（必填，除 KEYS 外）
+  field?: string;     // Hash field（HGET/HSET 时使用）
+  value?: string;     // 写入值（SET/HSET 时使用）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | key | Key | string |
+| input | value | Value | any |
+| output | result | 结果 | any |
+| output | success | 成功与否 | boolean |
+
+### 13.7 File 节点（新增）
+
+**Schema:**
+
+```typescript
+interface FileConfig {
+  path: string;      // 本地文件路径（必填）
+  encoding?: string;  // 编码（默认 utf-8）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | path | 文件路径 | string |
+| output | content | 文件内容 | file-content |
+| output | size | 文件大小 | number |
+
+---
+
+## 十四、Collection（集合处理）
+
+### 14.1 设计理念
+
+Collection 节点统一采用**函数式接口**，输入 `List<T>`，输出 `List<R>` 或 `Object` 或 `Primitive`。
+
+表达式变量：
+- `item` — 当前元素
+- `index` — 当前索引
+- `acc` — 累加器（Reduce）
+- `group` — 当前分组（GroupBy）
+
+Collection 节点不关心数据来源，仅处理 Runtime Value。
+
+### 14.2 Collection 节点清单
+
+| 节点 | type | 说明 | 对标 n8n |
+|------|------|------|---------|
+| Map | `map` | 对列表每个元素应用表达式 | Edit Fields |
+| Filter | `filter` | 过滤列表元素 | Filter |
+| Reduce | `reduce` | 将列表归约为单值 | Aggregate |
+| Sort | `sort` | 排序列表 | Sort |
+| Join | `join` | 按键/按位置合并数据源 | Merge |
+| Lookup | `lookup` | 按键查找 | — |
+| Split | `split` | 拆分列表 | Split Out |
+| Distinct | `distinct` | 去重 | Remove Duplicates |
+| Flatten | `flatten` | 展平嵌套列表 | — |
+| GroupBy | `groupby` | 按字段分组 | Summarize |
+
+### 14.3 Map 节点
+
+**Schema:**
+
+```typescript
+interface MapConfig {
+  expression: string;   // 表达式，如 "item * 2" 或 "item.name"（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果列表 | list |
+
+**执行流程:**
+```python
+for index, item in enumerate(input_list):
+    result.append(evaluate(expression, {"item": item, "index": index}))
+```
+
+**示例:**
+- 输入 `[1, 2, 3]`，表达式 `"item * 2"` → 输出 `[2, 4, 6]`
+- 输入 `[{"name":"a"},{"name":"b"}]`，表达式 `"item.name"` → 输出 `["a", "b"]`
+
+### 14.4 Filter 节点
+
+**Schema:**
+
+```typescript
+interface FilterConfig {
+  expression: string;   // 布尔表达式，如 "item > 2"（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果列表 | list |
+
+**示例:**
+- 输入 `[1, 2, 3, 4]`，表达式 `"item > 2"` → 输出 `[3, 4]`
+
+### 14.5 Reduce 节点
+
+**Schema:**
+
+```typescript
+interface ReduceConfig {
+  expression: string;     // 归约表达式，如 "acc + item"（必填）
+  initialValue?: string;  // 初始值（默认 null）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果 | any |
+
+**示例:**
+- 输入 `[1, 2, 3]`，表达式 `"acc + item"`，初始值 `0` → 输出 `6`
+
+### 14.6 Sort 节点
+
+**Schema:**
+
+```typescript
+interface SortConfig {
+  key?: string;          // 排序字段（可选，元素为对象时使用）
+  order?: string;        // asc / desc（默认 asc）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果列表 | list |
+
+### 14.7 Join 节点（核心：数据串联）
+
+**Schema:**
+
+```typescript
+interface JoinConfig {
+  mode: string;          // combine_by_key / combine_by_position / append / zip（必填）
+  joinType?: string;     // inner / outer / left / right（默认 inner，combine_by_key 模式下）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | source1 | 数据源1 | list |
+| input | source2 | 数据源2 | list |
+| output | result | 合并结果 | list |
+
+**模式详解：**
+
+**Combine By Key（按键合并）** — 用户核心需求场景：
+```
+输入1: {1: 100, 2: 200}
+输入2: {1: "宝刀", 2: "长剑"}
+
+inner join → {1: [100, "宝刀"], 2: [200, "长剑"]}
+outer join → {1: [100, "宝刀"], 2: [200, "长剑"], 3: [null, "匕首"]}
+left join  → {1: [100, "宝刀"], 2: [200, "长剑"], 4: [300, null]}
+```
+
+**Combine By Position（按位置合并）**：
+```
+输入1: [100, 200]
+输入2: ["宝刀", "长剑"]
+
+输出: [[100, "宝刀"], [200, "长剑"]]
+```
+
+**Append（追加合并）**：
+```
+输入1: [1, 2]
+输入2: [3, 4]
+
+输出: [1, 2, 3, 4]
+```
+
+**Zip（按索引配对）**：
+```
+输入1: [100, 200, 300]
+输入2: ["宝刀", "长剑"]
+
+输出: [[100, "宝刀"], [200, "长剑"], [300, null]]
+```
+
+### 14.8 Lookup 节点
+
+**Schema:**
+
+```typescript
+interface LookupConfig {
+  key: string;          // 查找键（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | source | 数据源 | object |
+| output | result | 查找结果 | any |
+| output | found | 是否找到 | boolean |
+
+### 14.9 Split 节点
+
+**Schema:**
+
+```typescript
+interface SplitConfig {
+  field?: string;       // 按字段拆分（可选）
+  chunkSize?: number;   // 分块大小（可选，默认不拆分）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果列表 | list |
+
+**示例:**
+- 输入 `[1,2,3,4,5]`，chunkSize=2 → 输出 `[[1,2],[3,4],[5]]`
+- 输入 `[{a:[1,2]}, {a:[3,4]}]`，field="a" → 输出 `[1,2,3,4]`
+
+### 14.10 Distinct 节点
+
+**Schema:**
+
+```typescript
+interface DistinctConfig {
+  key?: string;        // 去重字段（可选，对象列表时使用）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 结果列表 | list |
+
+### 14.11 Flatten 节点
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 嵌套列表 | list |
+| output | result | 展平列表 | list |
+
+**示例:**
+- 输入 `[[1,2],[3,[4,5]]]` → 输出 `[1,2,3,4,5]`（深度展平）
+
+### 14.12 GroupBy 节点
+
+**Schema:**
+
+```typescript
+interface GroupByConfig {
+  expression: string;   // 分组表达式，如 "item.category"（必填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| output | result | 分组结果 | object |
+
+**示例:**
+- 输入 `[{cat:"A",v:1},{cat:"B",v:2},{cat:"A",v:3}]`，表达式 `"item.cat"`
+- 输出 `{"A": [{cat:"A",v:1},{cat:"A",v:3}], "B": [{cat:"B",v:2}]}`
+
+---
+
+## 十五、Builders（构建器）
+
+### 15.1 设计理念
+
+Builder 节点用于**从零构建数据结构**，支持动态增减参数（Dynamic Arguments）。
+
+### 15.2 Dynamic Arguments
+
+```typescript
+interface DynamicArgument {
+    id: string
+    name: string
+    type: string
+    source: "literal" | "connection" | "expression"
+    value: any
+}
+```
+
+Property Panel 支持：新增参数、删除参数、修改名称、修改类型、调整顺序。
+
+### 15.3 Builder 节点清单
+
+| 节点 | type | 说明 |
+|------|------|------|
+| List Builder | `listbuilder` | 从多个输入端口构建列表 |
+| Object Builder | `objectbuilder` | 从键值对构建对象 |
+| Dictionary Builder | `dictbuilder` | 从键值对构建字典（面向游戏配置场景） |
+
+### 15.4 List Builder 节点
+
+**Schema:**
+
+```typescript
+interface ListBuilderConfig {
+  arguments: DynamicArgument[]   // 动态参数列表
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| input | item1 | 元素1 | any | 动态参数，可增删 |
+| input | item2 | 元素2 | any | 动态参数，可增删 |
+| output | result | 列表 | list | 构建的列表 |
+
+**示例:**
+- 参数 `item1=100, item2="宝刀", item3=true`
+- 输出 `[100, "宝刀", true]`
+
+### 15.5 Object Builder 节点
+
+**Schema:**
+
+```typescript
+interface ObjectBuilderConfig {
+  arguments: DynamicArgument[]   // 动态键值对列表
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| input | value_1 | 值1 | any | key 由参数名决定 |
+| input | value_2 | 值2 | any | key 由参数名决定 |
+| output | result | 对象 | object | 构建的对象 |
+
+**示例:**
+- 参数 `id=1001, name="宝刀", quality=5`
+- 输出 `{"id": 1001, "name": "宝刀", "quality": 5}`
+
+### 15.6 Dictionary Builder 节点
+
+与 Object Builder 相同，命名偏向游戏配置场景（Lua Table / 配置字典）。
+
+**示例:**
+- 参数 `1001={name="宝刀",quality=5}, 1002={name="长剑",quality=3}`
+- 输出 `{"1001": {"name":"宝刀","quality":5}, "1002": {"name":"长剑","quality":3}}`
+
+---
+
+## 十六、Expression（表达式）
+
+### 16.1 Expression Engine
+
+所有表达式由统一 Expression Engine 执行。Expression Engine 提供：
+- Parser + AST + Evaluator
+- Type Inference + Variable Resolver
+- Function Registry + AST Cache
+- Auto Completion
+
+### 16.2 Expression 节点清单
+
+| 节点 | type | 说明 |
+|------|------|------|
+| Calculate | `calculate` | 数学计算表达式 |
+| Template | `template` | 模板字符串插值 |
+| Condition | `condition` | 条件表达式（三元/布尔判断） |
+
+### 16.3 Calculate 节点
+
+**Schema:**
+
+```typescript
+interface CalculateConfig {
+  expression: string;           // 计算表达式，如 "price * count * discount"（必填）
+  arguments: DynamicArgument[]  // 动态参数列表
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | price | 价格 | number |
+| input | count | 数量 | number |
+| output | result | 计算结果 | number |
+
+**示例:**
+- 参数 `price=100, count=2, discount=0.8`，表达式 `"price * count * discount"`
+- 输出 `160`
+
+### 16.4 Template 节点
+
+**Schema:**
+
+```typescript
+interface TemplateConfig {
+  template: string;             // 模板字符串，如 "物品{{name}}，数量{{count}}"（必填）
+  arguments: DynamicArgument[]  // 动态参数列表
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | name | 名称 | string |
+| input | count | 数量 | number |
+| output | result | 渲染结果 | string |
+
+**示例:**
+- 模板 `"物品{{name}}，数量{{count}}"`
+- 参数 `name="宝刀", count=5`
+- 输出 `"物品宝刀，数量5"`
+
+### 16.5 Condition 节点
+
+**Schema:**
+
+```typescript
+interface ConditionConfig {
+  expression: string;            // 条件表达式，如 "score >= 60"（必填）
+  arguments: DynamicArgument[]   // 动态参数列表
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | score | 分数 | number |
+| output | result | 判断结果 | boolean |
+| output | true | True 值 | any |
+| output | false | False 值 | any |
+
+**示例:**
+- 表达式 `"score >= 60"`，参数 `score=85`
+- 输出 `{"result": true, "true": 85, "false": null}`
+
+---
+
+## 十七、AI
+
+### 17.1 AI 节点清单
+
+| 节点 | type | 说明 | 状态 |
+|------|------|------|------|
+| Prompt | `prompt` | LLM Prompt + 变量插值 | 已有（见 3.6） |
+| LLM | `llm` | 原始 LLM 调用（不带 Prompt 模板） | **新增** |
+| Embedding | `embedding` | 文本向量化 | **新增**（预留） |
+
+### 17.2 LLM 节点（新增）
+
+**Schema:**
+
+```typescript
+interface LLMConfig {
+  model?: string;         // 模型名称（默认由后端配置）
+  temperature?: number;    // 温度（默认 0.7）
+  maxTokens?: number;     // 最大 token 数
+  systemPrompt?: string;  // 系统提示词（可选）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | message | 消息 | string |
+| input | systemPrompt | 系统提示 | string |
+| output | response | 回复 | text |
+| output | usage | Token 用量 | object |
+
+**区别于 Prompt 节点：** LLM 节点不内置 Prompt 模板，直接将输入消息发送给 LLM；Prompt 节点支持 `{{var}}` 变量插值和模板渲染。
+
+### 17.3 Embedding 节点（预留）
+
+**Schema:**
+
+```typescript
+interface EmbeddingConfig {
+  model?: string;    // Embedding 模型名称
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | text | 文本 | string |
+| output | vector | 向量 | list |
+| output | dimensions | 维度 | number |
+
+---
+
+## 十八、Control Flow（流程控制）
+
+### 18.1 Control Flow 节点清单
+
+| 节点 | type | 说明 | 对标 n8n |
+|------|------|------|---------|
+| If | `if` | 条件分支（True/False 双输出） | If |
+| Loop | `loop` | 循环迭代 | Loop Over Items |
+| Switch | `switch` | 多路分支 | Switch |
+| Parallel | `parallel` | 并行执行 | — |
+
+### 18.2 If 节点（新增）
+
+**设计原则：** If 是流程控制节点，True 时走 `true` 输出端口，False 时走 `false` 输出端口，两种情况都不中断流程。区别于 BoolGate（False 时报错中断）。
+
+**Schema:**
+
+```typescript
+interface IfConfig {
+  expression?: string;   // 条件表达式（可选，有连线时可不填）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | condition | 条件 | boolean |
+| input | trueValue | True 值 | any |
+| input | falseValue | False 值 | any |
+| output | result | 输出值 | any |
+| output | branch | 分支 | string |
+
+**执行流程:**
+```python
+if condition:
+    return {"result": trueValue, "branch": "true"}
+else:
+    return {"result": falseValue, "branch": "false"}
+```
+
+### 18.3 Loop 节点（新增）
+
+**Schema:**
+
+```typescript
+interface LoopConfig {
+  mode: string;            // for_each / while / count
+  maxIterations?: number;  // 最大迭代次数（安全限制，默认 1000）
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | list | 列表 | list |
+| input | condition | 循环条件 | boolean |
+| output | result | 循环结果 | list |
+| output | iterations | 迭代次数 | number |
+
+**执行流程:**
+```
+for_each 模式：对列表每个元素执行一次子流程
+while 模式：条件为 true 时继续执行
+count 模式：执行 N 次
+```
+
+### 18.4 Switch 节点（新增）
+
+**Schema:**
+
+```typescript
+interface SwitchConfig {
+  rules: SwitchRule[];  // 路由规则列表
+}
+
+interface SwitchRule {
+  id: string;
+  expression: string;   // 匹配条件
+  output: number;       // 输出端口序号
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type | 说明 |
+|------|-----|-------|------|------|
+| input | value | 输入值 | any | 待判断的值 |
+| output | case1 | 分支1 | any | 匹配规则1时激活 |
+| output | case2 | 分支2 | any | 匹配规则2时激活 |
+| output | default | 默认 | any | 无匹配时激活 |
+
+**示例:**
+- 输入 `"A"`
+- 规则1: `value == "A"` → case1
+- 规则2: `value == "B"` → case2
+- 默认 → default
+- 输出：case1 激活
+
+### 18.5 Parallel 节点（预留）
+
+**Schema:**
+
+```typescript
+interface ParallelConfig {
+  // 无配置参数，由连线决定并行分支
+}
+```
+
+**端口定义:**
+
+| 方向 | key | label | type |
+|------|-----|-------|------|
+| input | input1 | 输入1 | any |
+| input | input2 | 输入2 | any |
+| output | output1 | 输出1 | any |
+| output | output2 | 输出2 | any |
+
+**说明：** Parallel 节点将所有输入同时传递到对应输出，实现多个并行分支的同步触发。实际并行由后端 `asyncio.gather` 自然支持。
+
+---
+
+## 十九、节点分类体系更新
+
+### 19.1 新分类体系（9 类）
+
+替换现有 7 个分类：
+
+| 序号 | 分类名 | 节点 |
+|------|--------|------|
+| 1 | **数据源** | P4File, HTTP, Redis, File, ExcelSearch |
+| 2 | **集合处理** | Map, Filter, Reduce, Sort, Join, Lookup, Split, Distinct, Flatten, GroupBy |
+| 3 | **构建器** | List Builder, Object Builder, Dictionary Builder |
+| 4 | **表达式** | Calculate, Template, Condition |
+| 5 | **AI** | Prompt, LLM, Embedding |
+| 6 | **流程控制** | If, Loop, Switch, Parallel, BoolGate |
+| 7 | **基础值** | String, Bool, Number |
+| 8 | **渲染器** | Excel, JSON, Lua, Table, Diff |
+| 9 | **工具** | C7Server, KDIP, KimNotify, Cron, SetGlobalValue, GetGlobalValue |
+
+### 19.2 新增端口类型
+
+| type | 颜色 | Hex | 说明 |
+|------|------|-----|------|
+| `list` | 蓝绿 | #36cfc9 | 列表数据 |
+| `object` | 橘红 | #fa541c | 对象/字典数据 |
+
+**兼容性矩阵更新：**
+
+```typescript
+const PORT_TYPE_COMPATIBILITY = {
+  // ... 现有类型保持不变
+  'list':     ['list', 'any', 'table-data', 'json-data'],
+  'object':   ['object', 'any', 'json-data'],
+};
+```
+
+### 19.3 新节点端口汇总
+
+| 节点 | Input Ports | Output Ports |
+|------|-------------|-------------|
+| HTTP | url (string), body (any) | response (any), statusCode (number) |
+| Redis | key (string), value (any) | result (any), success (boolean) |
+| File | path (string) | content (file-content), size (number) |
+| Map | list (list) | result (list) |
+| Filter | list (list) | result (list) |
+| Reduce | list (list) | result (any) |
+| Sort | list (list) | result (list) |
+| Join | source1 (list), source2 (list) | result (list) |
+| Lookup | source (object) | result (any), found (boolean) |
+| Split | list (list) | result (list) |
+| Distinct | list (list) | result (list) |
+| Flatten | list (list) | result (list) |
+| GroupBy | list (list) | result (object) |
+| ListBuilder | item1 (any), item2 (any), ... | result (list) |
+| ObjectBuilder | value_1 (any), value_2 (any), ... | result (object) |
+| DictBuilder | value_1 (any), value_2 (any), ... | result (object) |
+| Calculate | price (number), count (number), ... | result (number) |
+| Template | name (string), count (number), ... | result (string) |
+| Condition | score (number), ... | result (boolean), true (any), false (any) |
+| LLM | message (string), systemPrompt (string) | response (text), usage (object) |
+| Embedding | text (string) | vector (list), dimensions (number) |
+| If | condition (boolean), trueValue (any), falseValue (any) | result (any), branch (string) |
+| Loop | list (list), condition (boolean) | result (list), iterations (number) |
+| Switch | value (any) | case1 (any), case2 (any), default (any) |
+| Parallel | input1 (any), input2 (any) | output1 (any), output2 (any) |
+
+---
+
+## 二十、Runtime Value 传递规范
+
+### 20.1 后端统一输出格式
+
+所有执行器输出必须包含 `__runtime_type__` 标记：
+
+```python
+{
+    "__runtime_type__": "list",     # list | object | string | number | boolean | null
+    "__value__": [...],             # 实际值
+    "__schema__": {...}             # 可选，类型描述
+}
+```
+
+### 20.2 端口映射时自动适配
+
+- 上游输出 `__runtime_type__: "list"` → 下游 input_data 传入 `__value__`
+- 上游输出 `__runtime_type__: "object"` → 下游 input_data 传入 `__value__`
+- 上游输出 `__runtime_type__: "string"` → 下游 input_data 传入 `__value__`
+- 无 `__runtime_type__` 标记时，直接使用原始输出（兼容现有节点）
+
+### 20.3 Schema（类型系统）
+
+```
+Item
+id:number
+name:string
+quality:number
+
+List：
+List<Item>
+```
+
+Schema 用于：
+- 自动补全
+- Property Panel
+- Expression 提示
+- 类型检查
+- 节点之间类型推导
+
+Schema 不参与运行，仅负责类型描述。
+
+### 20.4 Runtime 原则
+
+整个 Workflow Runtime 遵循以下原则：
+
+1. 所有节点使用统一 Runtime Value
+2. 所有数据源必须经过 Adapter
+3. Expression Engine 全局唯一
+4. Collection 节点统一采用函数式接口
+5. Schema 负责类型描述，不参与运行
+6. 节点不得依赖 Python dict、Lua Table 或 JavaScript Object
+7. 所有节点输入输出保持 Runtime Value
+8. 新增数据源无需修改 Runtime，仅新增 Adapter
+9. 新增节点无需修改 Expression Engine，仅实现对应 Executor
+10. Runtime 与节点解耦，所有节点共享同一套运行时

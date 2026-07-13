@@ -6,9 +6,11 @@ interface ToolboxProps {
   nodes: Node[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   onAddNode?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode }) => {
+const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode, collapsed, onToggleCollapse }) => {
   const dragRef = useRef<{ nodeType: string; offsetX: number; offsetY: number } | null>(null);
   const [search, setSearch] = useState('');
 
@@ -57,53 +59,114 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode }) => {
     return acc;
   }, {});
 
+  // Collapsed state — show a narrow sidebar strip with expand button
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width: 36,
+          borderRight: '1px solid #e8e8e8',
+          background: '#fafafa',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 8,
+          gap: 6,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onToggleCollapse}
+          title="展开工具箱"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 4,
+            border: '1px solid #d9d9d9',
+            background: '#fff',
+            cursor: 'pointer',
+            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#595959',
+          }}
+        >
+          ▶
+        </button>
+        <div style={{ writingMode: 'vertical-rl', fontSize: 11, color: '#999', letterSpacing: 2, marginTop: 8 }}>
+          工具箱
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
         width: 180,
         borderRight: '1px solid #e8e8e8',
-        padding: '10px 10px 12px',
         background: '#fafafa',
-        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
+        position: 'relative',
+        flexShrink: 0,
+        height: '100%',
       }}
     >
-      <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>节点工具箱</div>
-
-      {/* Search input */}
-      <div style={{ position: 'relative', marginBottom: 10 }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索节点..."
-          style={{
-            width: '100%',
-            fontSize: 12,
-            padding: '4px 24px 4px 8px',
-            border: '1px solid #d9d9d9',
-            borderRadius: 4,
-            outline: 'none',
-            boxSizing: 'border-box',
-            background: '#fff',
-            color: '#262626',
-          }}
-        />
-        {search && (
-          <span
-            onClick={() => setSearch('')}
+      {/* Fixed header — always visible */}
+      <div style={{ padding: '10px 10px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>节点工具箱</div>
+          <button
+            onClick={onToggleCollapse}
+            title="折叠工具箱"
             style={{
-              position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-              cursor: 'pointer', color: '#bfbfbf', fontSize: 12, lineHeight: 1,
+              width: 20, height: 20, borderRadius: 3,
+              border: 'none', background: 'transparent',
+              cursor: 'pointer', fontSize: 12, color: '#999',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            ✕
-          </span>
-        )}
+            ◀
+          </button>
+        </div>
+
+        {/* Search input */}
+        <div style={{ position: 'relative', marginBottom: 6 }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索节点..."
+            style={{
+              width: '100%',
+              fontSize: 12,
+              padding: '4px 24px 4px 8px',
+              border: '1px solid #d9d9d9',
+              borderRadius: 4,
+              outline: 'none',
+              boxSizing: 'border-box',
+              background: '#fff',
+              color: '#262626',
+            }}
+          />
+          {search && (
+            <span
+              onClick={() => setSearch('')}
+              style={{
+                position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                cursor: 'pointer', color: '#bfbfbf', fontSize: 12, lineHeight: 1,
+              }}
+            >
+              ✕
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 10, color: '#999', marginBottom: 6 }}>点击添加 / 拖拽到画布</div>
       </div>
 
-      <div style={{ fontSize: 10, color: '#999', marginBottom: 8 }}>点击添加 / 拖拽到画布</div>
-
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 12px' }}>
       {Object.keys(grouped).length === 0 ? (
         <div style={{ fontSize: 12, color: '#bfbfbf', textAlign: 'center', marginTop: 20 }}>
           无匹配节点
@@ -143,6 +206,7 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode }) => {
           </div>
         ))
       )}
+      </div>
     </div>
   );
 };

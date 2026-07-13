@@ -33,6 +33,9 @@ import {
   CopyOutlined,
   ClockCircleOutlined,
   DatabaseOutlined,
+  ApartmentOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { listCrons, stopCron } from './nodes/Cron/executor';
@@ -138,6 +141,10 @@ export interface ToolbarProps {
   onDeleteWorkflow?: () => void;
   /** If true, auto-open the workflow library modal on mount (driven by URL param) */
   initialLibraryOpen?: boolean;
+  /** Compact mode: hide execution result details on nodes */
+  compactMode?: boolean;
+  /** Toggle compact mode */
+  onToggleCompactMode?: () => void;
 }
 
 /* ─────────────────────────── component ─────────────────────────── */
@@ -162,6 +169,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onSwitchWorkflow,
   onDeleteWorkflow,
   initialLibraryOpen,
+  compactMode,
+  onToggleCompactMode,
 }) => {
   const reactFlowInstance = useReactFlow();
   const isRunning = !!runCancelFn;
@@ -554,6 +563,110 @@ const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
+  // ── Auto Layout ─────────────────────────────────────────────
+  const handleAutoLayout = useCallback(() => {
+    if (nodes.length === 0) return;
+
+    // 1. Build adjacency from edges
+    const inDegree: Record<string, number> = {};
+    const outEdges: Record<string, string[]> = {};  // nodeId → downstream nodeIds
+    const nodeMap: Record<string, Node> = {};
+    for (const n of nodes) { nodeMap[n.id] = n; inDegree[n.id] = 0; outEdges[n.id] = []; }
+    for (const e of edges) {
+      if (nodeMap[e.source] && nodeMap[e.target]) {
+        outEdges[e.source].push(e.target);
+        inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+      }
+    }
+
+    // 2. Topological sort → assign levels (BFS Kahn's algorithm)
+    const levels: Record<string, number> = {};
+    const queue: string[] = [];
+    for (const id of Object.keys(inDegree)) {
+      if (inDegree[id] === 0) queue.push(id);
+    }
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const parentLevel = levels[id] ?? 0;
+      for (const child of outEdges[id]) {
+        const childLevel = Math.max(levels[child] ?? 0, parentLevel + 1);
+        levels[child] = childLevel;
+        inDegree[child]--;
+        if (inDegree[child] === 0) queue.push(child);
+      }
+    }
+    // Handle cycles: unvisited nodes get level 0
+    for (const id of Object.keys(nodeMap)) {
+      if (levels[id] === undefined) levels[id] = 0;
+    }
+
+    // 3. Group nodes by level
+    const levelGroups: Record<number, string[]> = {};
+    for (const [id, lv] of Object.entries(levels)) {
+      if (!levelGroups[lv]) levelGroups[lv] = [];
+      levelGroups[lv].push(id);
+    }
+
+    // 4. Compute node sizes (use actual width/height if available, else defaults)
+    const DEFAULT_W = 220;
+    const DEFAULT_H = 180;
+    const getNodeSize = (node: Node): { w: number; h: number } => {
+      const measured_w = node.width || node.measured?.width || DEFAULT_W;
+      // For executed nodes, use measured height which includes output preview
+      const data = node.data as Record<string, any>;
+      const hasOutput = data?._runStatus && data._runStatus !== 'idle' && data?._runOutput;
+      const measured_h = node.height || node.measured?.height || DEFAULT_H;
+      const h = hasOutput ? Math.max(measured_h, 280) : Math.max(measured_h, DEFAULT_H);
+      return { w: Math.max(measured_w, DEFAULT_W), h };
+    };
+
+    // 5. Layout: left-to-right, each level is a column
+    const COL_GAP = 80;    // horizontal gap between columns
+    const ROW_GAP = 24;    // vertical gap between nodes in same column
+    const START_X = 50;
+    const START_Y = 50;
+
+    const newPositions: Record<string, { x: number; y: number }> = {};
+
+    const sortedLevels = Object.keys(levelGroups).map(Number).sort((a, b) => a - b);
+    let currentX = START_X;
+
+    for (const lv of sortedLevels) {
+      const ids = levelGroups[lv];
+      // Compute sizes for this level
+      const sizes: Record<string, { w: number; h: number }> = {};
+      let colWidth = 0;
+      for (const id of ids) {
+        sizes[id] = getNodeSize(nodeMap[id]);
+        colWidth = Math.max(colWidth, sizes[id].w);
+      }
+
+      // Stack nodes vertically in this column
+      let currentY = START_Y;
+      for (const id of ids) {
+        newPositions[id] = { x: currentX, y: currentY };
+        currentY += sizes[id].h + ROW_GAP;
+      }
+
+      currentX += colWidth + COL_GAP;
+    }
+
+    // 6. Apply new positions with smooth animation
+    setNodes((prev) =>
+      prev.map((n) => {
+        const pos = newPositions[n.id];
+        return pos ? { ...n, position: pos } : n;
+      })
+    );
+
+    // 7. Fit viewport to show all nodes
+    setTimeout(() => {
+      reactFlowInstance.fitView({ padding: 0.15, duration: 400 });
+    }, 50);
+
+    message.success('节点布局已自动整理');
+  }, [nodes, edges, setNodes, reactFlowInstance]);
+
   const handleSwitchTo = (targetId: string) => {
     if (targetId === workflowId) { setLibraryOpen(false); return; }
     const doSwitch = () => { setLibraryOpen(false); onSwitchWorkflow?.(targetId); };
@@ -704,11 +817,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
 
-      {/* ── 中左区：信息 + 运行/停止 ── */}
+      {/* ── 中左区：信息 + 简略/详细 + 运行/停止 ── */}
       <Space size={8}>
         <Popover content={metaContent} title="工作流信息" trigger="click">
           <Button icon={<InfoCircleOutlined />} size="small">信息</Button>
         </Popover>
+        <Tooltip title={compactMode ? '当前：简略模式（仅显示入参）' : '当前：详细模式（显示执行结果）'}>
+          <Button
+            icon={compactMode ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+            size="small"
+            type={compactMode ? 'primary' : 'default'}
+            onClick={onToggleCompactMode}
+          >
+            {compactMode ? '简略' : '详细'}
+          </Button>
+        </Tooltip>
         {isRunning ? (
           <Button
             icon={<StopOutlined />}
@@ -739,6 +862,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
         
       <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
 
+          <Tooltip title="自动整理节点布局">
+          <Button size="small" icon={<ApartmentOutlined />} onClick={handleAutoLayout}>整理</Button>
+        </Tooltip>
         {workflowId && (
           <Popconfirm
             title="确定删除当前工作流？"

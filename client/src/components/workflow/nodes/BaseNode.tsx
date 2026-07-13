@@ -82,6 +82,8 @@ const PORT_COLORS: Record<string, string> = {
   'string': '#fa8c16',
   'number': '#13c2c2',
   'json-path': '#722ed1',
+  'list': '#36cfc9',
+  'object': '#fa541c',
 };
 
 /* ── Uncontrolled text inputs: DOM is source of truth → cursor never jumps ── */
@@ -166,8 +168,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   extraContentAfterFields,
 }) => {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds } = useWorkflowContext();
-  const [detailOpen, setDetailOpen] = useState(false);
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId } = useWorkflowContext();
+  const detailOpen = detailNodeId === id;
+  // const [detailOpen, setDetailOpen] = useState(false);
 
   const runStatus = (data._runStatus as RunStatus) || 'idle';
   const runOutput = data._runOutput as any;
@@ -321,7 +324,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         <div style={{ display: 'flex', gap: 4 }}>
           {/* Expand button — opens NodeDetailModal */}
           <button
-            onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}
             title="查看详情"
             style={{
               width: 24, height: 24, borderRadius: 4, border: 'none',
@@ -595,6 +598,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
         {/* Run output — per output port */}
         {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+          compactMode ? (
+            /* Compact: only show status badge, no detail content */
+            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+              {runStatus === 'error' ? (
+                <span style={{ color: '#cf1322' }}>❌ 错误</span>
+              ) : (
+                <span style={{ color: '#389e0d' }}>✅ 已执行</span>
+              )}
+            </div>
+          ) : (
           <div style={{ marginTop: 6 }}>
             {runStatus === 'error' ? (
               <div style={{
@@ -686,6 +699,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               </div>
             )}
           </div>
+          ) /* end compactMode ternary */
         )}
       </div>
     </div>
@@ -693,7 +707,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       {/* NodeDetailModal */}
       <NodeDetailModal
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => setDetailNodeId(null)}
         nodeId={id}
         nodeType={nodeType}
         icon={icon}

@@ -99,8 +99,79 @@ function FlowEditorInner({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeIdRaw] = useState<string | null>(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('node') || null;
+  });
   const [runCancelFn, setRunCancelFn] = useState<(() => void) | null>(null);
+  const [detailNodeId, setDetailNodeIdRaw] = useState<string | null>(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('detail') || null;
+  });
+
+  // Panel collapse state (driven by URL)
+  const [toolboxCollapsed, setToolboxCollapsedRaw] = useState(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('toolbox') === '1';
+  });
+  const [propPanelCollapsed, setPropPanelCollapsedRaw] = useState(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('panel') === '1';
+  });
+  const [compactMode, setCompactModeRaw] = useState(() => {
+    const sp = new URLSearchParams(window.location.search);
+    return sp.get('compact') === '1';
+  });
+
+  // ── URL sync helper ──────────────────────────────────────────
+  const updateUrlParam = useCallback((key: string, value: string | null) => {
+    const sp = new URLSearchParams(window.location.search);
+    if (value) {
+      sp.set(key, value);
+    } else {
+      sp.delete(key);
+    }
+    const newSearch = sp.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (newSearch !== currentSearch) {
+      window.history.replaceState(null, '', `${window.location.pathname}${newSearch ? '?' + newSearch : ''}`);
+    }
+  }, []);
+
+  // Wrappers that sync state to URL
+  const setSelectedNodeId = useCallback((id: string | null) => {
+    setSelectedNodeIdRaw(id);
+    updateUrlParam('node', id);
+  }, [updateUrlParam]);
+
+  const setDetailNodeId = useCallback((id: string | null) => {
+    setDetailNodeIdRaw(id);
+    updateUrlParam('detail', id);
+  }, [updateUrlParam]);
+
+  const setToolboxCollapsed = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setToolboxCollapsedRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      updateUrlParam('toolbox', next ? '1' : null);
+      return next;
+    });
+  }, [updateUrlParam]);
+
+  const setPropPanelCollapsed = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setPropPanelCollapsedRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      updateUrlParam('panel', next ? '1' : null);
+      return next;
+    });
+  }, [updateUrlParam]);
+
+  const setCompactMode = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setCompactModeRaw(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      updateUrlParam('compact', next ? '1' : null);
+      return next;
+    });
+  }, [updateUrlParam]);
 
   // Track unsaved state
   const [isDirty, setIsDirty] = useState(false);
@@ -676,7 +747,7 @@ function FlowEditorInner({
   );
 
   return (
-    <WorkflowContext.Provider value={{ workflowId, workflowName: workflowName || '', onNodeUpdate: handleNodeUpdate, ensureSaved, multiSelectedIds }}>
+    <WorkflowContext.Provider value={{ workflowId, workflowName: workflowName || '', onNodeUpdate: handleNodeUpdate, ensureSaved, multiSelectedIds, compactMode, setCompactMode, selectedNodeId, setSelectedNodeId, detailNodeId, setDetailNodeId }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Toolbar
         nodes={nodes}
@@ -698,6 +769,8 @@ function FlowEditorInner({
         }}
         onRun={handleRun}
         runCancelFn={runCancelFn}
+        compactMode={compactMode}
+        onToggleCompactMode={() => setCompactMode(c => !c)}
         onSwitchWorkflow={onSwitchWorkflow}
         onDeleteWorkflow={onDeleteWorkflow}
         initialLibraryOpen={initialLibraryOpen}
@@ -707,7 +780,7 @@ function FlowEditorInner({
           setIsDirty(true);
           // Auto-save after React has committed the new node to ReactFlow state
           setTimeout(() => doSave(), 100);
-        }} />
+        }} collapsed={toolboxCollapsed} onToggleCollapse={() => setToolboxCollapsed(c => !c)} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
           <ReactFlow
             nodes={nodes}
@@ -742,6 +815,8 @@ function FlowEditorInner({
           edges={edges}
           nodes={nodes}
           onDuplicate={handleDuplicateNode}
+          collapsed={propPanelCollapsed}
+          onToggleCollapse={() => setPropPanelCollapsed(c => !c)}
         />
       </div>
     </div>

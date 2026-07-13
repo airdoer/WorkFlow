@@ -41,8 +41,8 @@ const PORT_COLORS: Record<string, string> = {
 
 function JsonNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, multiSelectedIds } = useWorkflowContext();
-  const [detailOpen, setDetailOpen] = useState(false);
+  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId } = useWorkflowContext();
+  const detailOpen = detailNodeId === id;
   const [overrideWarning, setOverrideWarning] = useState(false);
 
   const nodeData = data as Record<string, unknown>;
@@ -214,7 +214,7 @@ function JsonNode({ data, id, selected }: NodeProps) {
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
-              onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}
               title="查看详情"
               style={{
                 width: 24, height: 24, borderRadius: 4, border: 'none',
@@ -376,6 +376,15 @@ function JsonNode({ data, id, selected }: NodeProps) {
 
           {/* Run output */}
           {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+            compactMode ? (
+              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+                {runStatus === 'error' ? (
+                  <span style={{ color: '#cf1322' }}>❌ 错误</span>
+                ) : (
+                  <span style={{ color: '#389e0d' }}>✅ 已执行</span>
+                )}
+              </div>
+            ) : (
             <div style={{ marginTop: 6 }}>
               {runStatus === 'error' ? (
                 <div style={{ background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, overflow: 'hidden' }}>
@@ -416,13 +425,14 @@ function JsonNode({ data, id, selected }: NodeProps) {
                 })
               )}
             </div>
+            ) /* end compactMode ternary */
           )}
         </div>
       </div>
 
       <NodeDetailModal
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => setDetailNodeId(null)}
         nodeId={id}
         nodeType="json"
         icon="📋"

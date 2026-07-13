@@ -37,9 +37,11 @@ interface PropertyPanelProps {
   edges: Edge[];
   nodes: Node[];
   onDuplicate?: (nodeId: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes, onDuplicate }) => {
+const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes, onDuplicate, collapsed, onToggleCollapse }) => {
   // ALL hooks must be called before any conditional return
   const [outputModalOpen, setOutputModalOpen] = useState(false);
   const [inputModalOpen, setInputModalOpen] = useState(false);
@@ -215,18 +217,94 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
   }, []);
 
   // Now safe to do conditional rendering
+  // Collapsed state — show a narrow sidebar strip with expand button
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width: 36,
+          borderLeft: '1px solid #e8e8e8',
+          background: '#fafafa',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 8,
+          gap: 6,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onToggleCollapse}
+          title="展开属性面板"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 4,
+            border: '1px solid #d9d9d9',
+            background: '#fff',
+            cursor: 'pointer',
+            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#595959',
+          }}
+        >
+          ◀
+        </button>
+        <div style={{ writingMode: 'vertical-rl', fontSize: 11, color: '#999', letterSpacing: 2, marginTop: 8 }}>
+          属性
+        </div>
+      </div>
+    );
+  }
+
   if (!selectedNode) {
     return (
-      <div style={{ width: 320, borderLeft: '1px solid #e8e8e8', padding: 16, background: '#fafafa' }}>
-        <div style={{ color: '#999' }}>选择节点查看属性</div>
+      <div style={{ width: 320, borderLeft: '1px solid #e8e8e8', background: '#fafafa', position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 12px 0', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={onToggleCollapse}
+            title="折叠属性面板"
+            style={{
+              width: 20, height: 20, borderRadius: 3,
+              border: 'none', background: 'transparent',
+              cursor: 'pointer', fontSize: 12, color: '#999',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ▶
+          </button>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>属性面板</span>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+          <div style={{ color: '#999' }}>选择节点查看属性</div>
+        </div>
       </div>
     );
   }
 
   if (!entry) {
     return (
-      <div style={{ width: 320, borderLeft: '1px solid #e8e8e8', padding: 16, background: '#fafafa' }}>
-        <div style={{ color: '#999' }}>未知节点类型: {nodeType}</div>
+      <div style={{ width: 320, borderLeft: '1px solid #e8e8e8', background: '#fafafa', position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 12px 0', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={onToggleCollapse}
+            title="折叠属性面板"
+            style={{
+              width: 20, height: 20, borderRadius: 3,
+              border: 'none', background: 'transparent',
+              cursor: 'pointer', fontSize: 12, color: '#999',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ▶
+          </button>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>属性面板</span>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+          <div style={{ color: '#999' }}>未知节点类型: {nodeType}</div>
+        </div>
       </div>
     );
   }
@@ -236,20 +314,40 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       style={{
         width: 320,
         borderLeft: '1px solid #e8e8e8',
-        padding: 12,
         background: '#fff',
-        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
         height: '100%',
+        position: 'relative',
+        flexShrink: 0,
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        {entry.icon}
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{entry.label} 节点</span>
-        {entry.category && (
-          <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>{entry.category}</Tag>
-        )}
+      {/* Fixed header — always visible */}
+      <div style={{ padding: '10px 12px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+          <button
+            onClick={onToggleCollapse}
+            title="折叠属性面板"
+            style={{
+              width: 20, height: 20, borderRadius: 3,
+              border: 'none', background: 'transparent',
+              cursor: 'pointer', fontSize: 12, color: '#999',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            ▶
+          </button>
+          {entry.icon}
+          <span style={{ fontWeight: 600, fontSize: 14 }}>{entry.label} 节点</span>
+          {entry.category && (
+            <Tag color="blue" style={{ fontSize: 10, marginLeft: 4 }}>{entry.category}</Tag>
+          )}
+        </div>
       </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
 
       {/* === Section 1: Port Info === */}
       {ports.length > 0 && (
@@ -711,6 +809,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
           {modalContent}
         </pre>
       </Modal>
+      </div>{/* end scrollable body */}
     </div>
   );
 };
