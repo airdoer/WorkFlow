@@ -485,15 +485,19 @@ class WorkflowRuntime:
                     logger.warning("[WorkflowRuntime] task_id=%r, node=%r: executor error: %s",
                                    task_id, nid, output['error'])
                     cls._tasks[task_id]['nodes'][nid] = 'error'
+                    # Strip internal meta keys before sending to frontend
+                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS}
                     cls._emit('workflow:node_update', {
-                        'taskId': task_id, 'nodeId': nid, 'status': 'error', 'output': output
+                        'taskId': task_id, 'nodeId': nid, 'status': 'error', 'output': clean_output or output
                     }, room=task_id)
                 else:
                     logger.info("[WorkflowRuntime] task_id=%r, node=%r: success, output_keys=%s",
                                 task_id, nid, list(output.keys()) if isinstance(output, dict) else type(output).__name__)
                     cls._tasks[task_id]['nodes'][nid] = 'success'
+                    # Strip internal meta keys before sending to frontend
+                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS} if isinstance(output, dict) else output
                     cls._emit('workflow:node_update', {
-                        'taskId': task_id, 'nodeId': nid, 'status': 'success', 'output': output
+                        'taskId': task_id, 'nodeId': nid, 'status': 'success', 'output': clean_output
                     }, room=task_id)
 
             except Exception as exc:
