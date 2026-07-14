@@ -1,12 +1,18 @@
 import json
 import os
 import re
+import shutil
 import asyncio
 import logging
 from datetime import datetime, timezone
 
 WORKFLOW_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow')
 WORKFLOW_TRASH_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'workflow_trash')
+
+# Threshold: node _runOutput larger than this (bytes) gets archived to disk
+_ARCHIVE_THRESHOLD = 10240  # 10 KB
+# Keys within _runOutput that are always archived (large file content)
+_ARCHIVE_KEYS = frozenset({'fileContent'})
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +56,76 @@ def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
 
+def _archive_dir(name_id: str) -> str:
+    """Return the archive directory path for a workflow."""
+    return os.path.join(WORKFLOW_DATA_DIR, f"{name_id}_archive")
+
+
+def _archive_node_path(name_id: str, node_id: str) -> str:
+    """Return the archive file path for a specific node's _runOutput."""
+    d = _archive_dir(name_id)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, node_id)
+
+
+def _archive_strip_outputs(name_id: str, nodes: list) -> list:
+    """Strip large _runOutput from nodes, writing content to archive dir.
+    
+    Returns a new nodes list with large outputs replaced by _archiveRef markers.
+    """
+    for node in nodes:
+        data = node.get('data', {})
+        output = data.get('_runOutput')
+        if output is None:
+            continue
+        # Case 1: output is a dict containing fileContent or other huge keys
+        if isinstance(output, dict):
+            has_archive_key = bool(_ARCHIVE_KEYS & output.keys())
+            output_size = len(json.dumps(output, ensure_ascii=False))
+            if has_archive_key or output_size > _ARCHIVE_THRESHOLD:
+                # Write full output to archive
+                archive_path = _archive_node_path(name_id, node.get('id', 'unknown'))
+                with open(archive_path, 'w', encoding='utf-8') as f:
+                    json.dump(output, f, ensure_ascii=False)
+                # Replace with reference marker
+                data['_runOutput'] = {'_archiveRef': node.get('id', 'unknown')}
+                # Preserve status hint
+                if '_runStatus' in data and '_runStatusHint' not in data:
+                    data['_runStatusHint'] = data['_runStatus']
+                continue
+        # Case 2: output is a string/list larger than threshold
+        if isinstance(output, (str, list)):
+            output_size = len(json.dumps(output, ensure_ascii=False))
+            if output_size > _ARCHIVE_THRESHOLD:
+                archive_path = _archive_node_path(name_id, node.get('id', 'unknown'))
+                with open(archive_path, 'w', encoding='utf-8') as f:
+                    json.dump(output, f, ensure_ascii=False)
+                data['_runOutput'] = {'_archiveRef': node.get('id', 'unknown')}
+    return nodes
+
+
+def _archive_restore_outputs(name_id: str, nodes: list) -> list:
+    """Restore archived _runOutput from disk for nodes that have _archiveRef markers."""
+    archive_d = _archive_dir(name_id)
+    if not os.path.isdir(archive_d):
+        return nodes
+    for node in nodes:
+        data = node.get('data', {})
+        output = data.get('_runOutput')
+        if isinstance(output, dict) and '_archiveRef' in output:
+            ref_id = output['_archiveRef']
+            archive_path = os.path.join(archive_d, ref_id)
+            if os.path.exists(archive_path):
+                try:
+                    with open(archive_path, 'r', encoding='utf-8') as f:
+                        data['_runOutput'] = json.load(f)
+                except Exception:
+                    logger.warning("[archive_restore] Failed to read archive for node %r", ref_id)
+            else:
+                logger.warning("[archive_restore] Archive file not found for node %r", ref_id)
+    return nodes
+
+
 class WorkflowManager:
     @staticmethod
     def save(name, workflow_json, workflow_id=None, author=None, description=None):
@@ -82,8 +158,14 @@ class WorkflowManager:
             'createdAt': existing.get('createdAt', now) if existing else now,
             'updatedAt': now,
         }
+
+        # ── Archive large _runOutput from node data ──────────────────
+        wf_json = record.get('json', {})
+        if isinstance(wf_json, dict) and 'nodes' in wf_json:
+            record['json']['nodes'] = _archive_strip_outputs(name_id, wf_json['nodes'])
+
         with open(_workflow_path(name_id), 'w') as f:
-            json.dump(record, f, ensure_ascii=False, indent=2)
+            json.dump(record, f, ensure_ascii=False)
         return {'id': name_id, 'name': name}
 
     @staticmethod
@@ -93,7 +175,12 @@ class WorkflowManager:
         path = _workflow_path(workflow_id)
         if os.path.exists(path):
             with open(path) as f:
-                return json.load(f)
+                data = json.load(f)
+            # ── Restore archived _runOutput from disk ───────────────
+            wf_json = data.get('json', {})
+            if isinstance(wf_json, dict) and 'nodes' in wf_json:
+                data['json']['nodes'] = _archive_restore_outputs(workflow_id, wf_json['nodes'])
+            return data
         # Fallback: scan by name field (handles legacy UUID-based IDs in URLs)
         _ensure_dir()
         for fname in os.listdir(WORKFLOW_DATA_DIR):
@@ -104,6 +191,10 @@ class WorkflowManager:
                 with open(fp) as f:
                     data = json.load(f)
                 if data.get('id') == workflow_id or data.get('name') == workflow_id:
+                    # Restore archived _runOutput
+                    wf_json = data.get('json', {})
+                    if isinstance(wf_json, dict) and 'nodes' in wf_json:
+                        data['json']['nodes'] = _archive_restore_outputs(data.get('id', workflow_id), wf_json['nodes'])
                     return data
             except Exception:
                 pass
@@ -147,12 +238,17 @@ class WorkflowManager:
         record['deletedAt'] = _now_utc()
         trash_file = _trash_path(record['id'])
         with open(trash_file, 'w') as f:
-            json.dump(record, f, ensure_ascii=False, indent=2)
+            json.dump(record, f, ensure_ascii=False)
 
         # Remove from active directory
         src = _workflow_path(record['id'])
         if os.path.exists(src):
             os.remove(src)
+            # Also remove the archive directory if it exists
+            archive_d = _archive_dir(record['id'])
+            if os.path.isdir(archive_d):
+                shutil.rmtree(archive_d, ignore_errors=True)
+                logger.info("[WorkflowManager.delete] Removed archive dir: %r", archive_d)
             logger.info("[WorkflowManager.delete] Moved to trash: %r", record['id'])
             return True
 
@@ -197,7 +293,7 @@ class WorkflowManager:
         record.pop('deletedAt', None)
         active_file = _workflow_path(record['id'])
         with open(active_file, 'w') as f:
-            json.dump(record, f, ensure_ascii=False, indent=2)
+            json.dump(record, f, ensure_ascii=False)
 
         os.remove(trash_file)
         logger.info("[WorkflowManager.restore] Restored from trash: %r", workflow_id)

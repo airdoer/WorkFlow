@@ -40,7 +40,7 @@ class P4FileExecutor(BaseNodeExecutor):
                 "filePath": p4_path,
                 "localPath": local_path,
                 "fileType": file_type,
-                "fileContent": content,
+                # fileContent removed — downstream nodes read from localPath directly
                 "size": os.path.getsize(local_path),
             }
         except Exception as e:

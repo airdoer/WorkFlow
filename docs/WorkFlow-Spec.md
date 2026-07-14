@@ -257,6 +257,8 @@ interface P4FileConfig {
 |------|-----|-------|------|
 | output | fileContent | 文件内容 | file-content |
 
+> ⚠️ **注意：** `fileContent` 端口定义保留（用于端口类型兼容），但 P4File 执行器不再输出 `fileContent` 字段。下游节点通过 `localPath` 直接读取文件。`fileContent` 仅在旧数据 fallback 时存在。
+
 **执行流程:**
 
 ```
@@ -264,10 +266,10 @@ interface P4FileConfig {
 2. 调用 p4Utils.update_file 下载文件到 P4_WORKSPACE_DIRECTORY
 3. 读取文件内容
 4. 检测文件类型（json → "json", .xlsx → "excel", .lua → "lua" 等）
-5. 返回 { filePath, localPath, fileType, fileContent, size }
+5. 返回 { filePath, localPath, fileType, size }
 ```
 
-**输出:** `{ filePath: string, localPath: string, fileType: string, fileContent: string, size: number }`
+**输出:** `{ filePath: string, localPath: string, fileType: string, size: number }`
 
 ### 3.3 Excel 节点（渲染器）
 
@@ -932,7 +934,17 @@ export const nodeRegistryList: NodeRegistryEntry[] = [
 ```typescript
 node.data._runStatus: 'idle' | 'running' | 'success' | 'error'
 node.data._runOutput: any  // 运行结果或错误信息
+node.data._runStatusHint: string  // 轻量状态提示，触发 ReactFlow 重渲染
+node.data._seq: number  // 拓扑排序编号，用于快速定位节点（增删/连线变更时自动重编）
 ```
+
+**节点编号（_seq）：**
+
+- 基于拓扑排序（Kahn 算法）分配，上游编号小，下游编号大
+- 增删节点、连线变更时自动重新编号
+- 复制/粘贴节点时清理 `_seq`（新节点由重编逻辑重新分配）
+- 持久化到服务端，刷新后保留
+- 前端显示：节点卡片图标左侧显示蓝色圆角矩形编号徽章（`SeqBadge` 组件，sm/lg 两种尺寸）
 
 **运行按钮禁用逻辑：**
 
@@ -1409,7 +1421,7 @@ class P4FileExecutor(BaseNodeExecutor):
             "filePath": p4_path,
             "localPath": local_path,
             "fileType": file_type,
-            "fileContent": content,
+            # fileContent removed — downstream reads from localPath directly
             "size": os.path.getsize(local_path),
         }
 ```
@@ -1605,6 +1617,76 @@ class WorkflowRuntime:
 | `WARNING` | 参数缺失、资源未找到、执行器返回 error 字段、上游节点失败导致跳过 |
 | `DEBUG` | 状态查询（高频轮询接口）、节点 Event set 等细粒度事件 |
 | `ERROR` / `EXCEPTION` | 未预期异常（含完整 traceback）|
+
+---
+
+### 12.3 存储优化（归档机制）
+
+#### 12.3.1 设计背景
+
+工作流 JSON 文件保存时，节点的 `_runOutput` 可能包含大量数据（如 P4 文件的完整内容 ~850KB，Excel 表格数据 ~1.9MB），导致单个 JSON 文件达 2.2MB+，加载/保存慢，网络传输开销大。
+
+#### 12.3.2 归档目录结构
+
+```
+server/data/workflow/
+  testStall.json              # 工作流元数据（紧凑格式，不含大字段）
+  testStall_archive/          # 归档目录（与工作流同名 + _archive 后缀）
+    p4file_1783923881885       # P4File 节点的大输出
+    excel_1783923961621        # Excel 节点的大输出
+```
+
+#### 12.3.3 归档策略
+
+| 条件 | 行为 |
+|------|------|
+| `_runOutput` 包含 `fileContent` 键 | 整体写入归档目录 |
+| `_runOutput` 整体 JSON > 10KB | 整体写入归档目录 |
+| `_runOutput` ≤ 10KB | 保留在 JSON 中 |
+
+归档后，`_runOutput` 替换为引用标记：`{"_archiveRef": "<nodeId>"}`
+
+#### 12.3.4 保存/加载流程
+
+**保存（`WorkflowManager.save`）：**
+
+```
+1. 遍历 workflow_json.nodes，检查每个节点的 data._runOutput
+2. 符合归档条件的 _runOutput 写入 {name_id}_archive/{nodeId}
+3. 在 JSON 中替换为 {"_archiveRef": nodeId}
+4. 以紧凑格式（无缩进）写入 JSON 文件
+```
+
+**加载（`WorkflowManager.get`）：**
+
+```
+1. 从磁盘读取 JSON 文件
+2. 遍历节点，如果 _runOutput 包含 _archiveRef → 从归档目录读取还原
+3. 返回完整数据（前端无感知）
+```
+
+**删除（`WorkflowManager.delete`）：**
+
+```
+1. 移动 JSON 到回收站
+2. 同时删除 {name_id}_archive/ 归档目录
+```
+
+#### 12.3.5 运行时数据传递
+
+源节点（P4File、ExcelSearch）不再输出 `fileContent`，只输出 `localPath`/`filePath`/`fileType` 等轻量元数据。下游节点（Excel、JSON、Lua）优先从 `localPath` 读取文件，`fileContent` 仅作为旧数据 fallback 保留。
+
+#### 12.3.6 存储格式
+
+JSON 以紧凑格式存储（`json.dump` 不带 `indent` 参数），进一步减小文件体积。
+
+#### 12.3.7 优化效果
+
+| 指标 | 优化前 | 优化后 | 缩减比例 |
+|------|--------|--------|----------|
+| testStall.json 文件大小 | 2.2MB | 21KB | 99% |
+| P4File 输出 | 内嵌 ~850KB | 归档到磁盘 | — |
+| Excel 输出 | 内嵌 ~1.9MB | 归档到磁盘 | — |
 
 ---
 
@@ -1936,7 +2018,7 @@ interface ExcelSearchConfig {
 
 | 方向 | key | label | type | 说明 |
 |------|-----|-------|------|------|
-| output | fileContent | 文件内容 | file-content | Excel 文件的原始内容（base64 或 bytes） |
+| output | fileContent | 文件内容 | file-content | Excel 文件的原始内容（⚠️ 已弃用，不再输出，下游用 localPath 读取） |
 | output | localPath | 本地路径 | string | 文件的本地绝对路径（供 Excel 节点直接读取） |
 | output | fileName | 文件名 | string | 文件名（不含路径） |
 | output | sheetNames | Sheet列表 | any | 工作表名称列表 |
@@ -1971,10 +2053,10 @@ interface ExcelSearchConfig {
 3. 优先使用 local_path（文件已存在）
 4. 若 local_path 不存在或为空 → 使用 p4_path 同步下载（p4Utils.update_file）
 5. 读取文件，获取 sheetNames（openpyxl）
-6. 返回 { fileContent, localPath, fileName, sheetNames }
+6. 返回 { localPath, fileName, sheetNames }
 ```
 
-**输出:** `{ fileContent: str, localPath: str, fileName: str, sheetNames: str[] }`
+**输出:** `{ localPath: str, fileName: str, sheetNames: str[] }`
 
 **目录结构新增文件：**
 

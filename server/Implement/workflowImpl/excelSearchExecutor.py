@@ -83,19 +83,14 @@ class ExcelSearchExecutor(BaseNodeExecutor):
         else:
             return {'error': f"文件 '{file_key}' 既无可用的 local_path，也无 p4_path，请更新 excelFiles.json。"}
 
-        # --- 3. 读取文件 + 获取 sheetNames ---
+        # --- 3. 获取 sheetNames ---
         try:
             wb = openpyxl.load_workbook(resolved_path, data_only=True, read_only=True)
             sheet_names = wb.sheetnames
             wb.close()
 
-            with open(resolved_path, 'rb') as f:
-                raw_bytes = f.read()
-            # 用 latin-1 编码，保证字节透明传输（excelExecutor 用 latin-1 解码还原）
-            file_content = raw_bytes.decode('latin-1')
-
             return {
-                'fileContent': file_content,
+                # fileContent removed — downstream nodes read from localPath directly
                 'localPath': resolved_path,
                 'fileName': os.path.basename(resolved_path),
                 'sheetNames': sheet_names,
