@@ -157,8 +157,8 @@ function MiniTable({ table, maxRows = 50, compact = false }: { table: TableData;
 /* ─── TableNode ─────────────────────────────────────────────────────────── */
 function TableNode({ data, id, selected }: NodeProps) {
   const { setNodes, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, getRunStatus, getRunOutput } = useWorkflowContext();
-  const [detailOpen, setDetailOpen] = useState(false);
+  const { workflowId, onNodeUpdate, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
+  const detailOpen = detailNodeId === id;
 
   const nodeData = data as Record<string, unknown>;
   const runStatus = (getRunStatus(id) as RunStatus) || (nodeData._runStatusHint as RunStatus) || 'idle';
@@ -246,7 +246,7 @@ function TableNode({ data, id, selected }: NodeProps) {
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
-              onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}
               title="查看详情"
               style={{
                 width: 24, height: 24, borderRadius: 4, border: 'none',
@@ -372,7 +372,7 @@ function TableNode({ data, id, selected }: NodeProps) {
 
       <NodeDetailModal
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => setDetailNodeId(null)}
         nodeId={id}
         nodeType="table"
         icon="📊"

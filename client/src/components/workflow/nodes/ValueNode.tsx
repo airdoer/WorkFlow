@@ -75,8 +75,8 @@ const ValueNode: React.FC<ValueNodeProps> = ({
   inputPortLabel = '输入值',
 }) => {
   const { setNodes, getEdges, getNode, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, getRunStatus, getRunOutput } = useWorkflowContext();
-  const [detailOpen, setDetailOpen] = useState(false);
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
+  const detailOpen = detailNodeId === id;
   const [overrideWarning, setOverrideWarning] = useState(false);
 
   const runStatus = (getRunStatus(id) as RunStatus) || (data._runStatusHint as RunStatus) || 'idle';
@@ -289,7 +289,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             <button
-              onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}
               title="查看详情"
               style={{
                 width: 24, height: 24, borderRadius: 4, border: 'none',
@@ -478,7 +478,7 @@ const ValueNode: React.FC<ValueNodeProps> = ({
 
       <NodeDetailModal
         open={detailOpen}
-        onClose={() => setDetailOpen(false)}
+        onClose={() => setDetailNodeId(null)}
         nodeId={id}
         nodeType={nodeType}
         icon={icon}
