@@ -1,6 +1,15 @@
 import React, { memo } from 'react';
 import { NodeProps } from 'reactflow';
-import BaseNode, { NodeField } from './BaseNode';
+import BaseNode, { NodeField } from '../BaseNode';
+import { StyledSelect, TypedOption } from '../SharedStyledSelect';
+
+const KDIP_CMD_OPTIONS: TypedOption[] = [
+  { label: 'kdip_game_get_config_for_qa', value: 'kdip_game_get_config_for_qa' },
+  { label: 'kdip_game_get_service_switch_state', value: 'kdip_game_get_service_switch_state' },
+  { label: 'kdip_game_get_hotfix_info', value: 'kdip_game_get_hotfix_info' },
+  { label: 'kdip_game_get_server_run_info', value: 'kdip_game_get_server_run_info' },
+  { label: 'kdip_game_get_stall_metric_info', value: 'kdip_game_get_stall_metric_info' },
+];
 
 const KDIP_FIELDS: NodeField[] = [
   {
@@ -14,15 +23,17 @@ const KDIP_FIELDS: NodeField[] = [
   {
     key: 'cmdKey',
     label: '任务名',
-    type: 'select',
     required: true,
-    options: [
-      { label: 'kdip_game_get_config_for_qa', value: 'kdip_game_get_config_for_qa' },
-      { label: 'kdip_game_get_service_switch_state', value: 'kdip_game_get_service_switch_state' },
-      { label: 'kdip_game_get_hotfix_info', value: 'kdip_game_get_hotfix_info' },
-      { label: 'kdip_game_get_server_run_info', value: 'kdip_game_get_server_run_info' },
-      { label: 'kdip_game_get_stall_metric_info', value: 'kdip_game_get_stall_metric_info' },
-    ],
+    renderCustomField: (val, onChange, locked) => (
+      <StyledSelect
+        value={val || ''}
+        options={KDIP_CMD_OPTIONS}
+        onChange={onChange}
+        locked={locked}
+        required
+        placeholder="请选择任务"
+      />
+    ),
   },
   {
     key: 'username',

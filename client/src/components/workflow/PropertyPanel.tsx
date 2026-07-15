@@ -892,6 +892,8 @@ function FieldSelect({ label, value, onChange, options, placeholder }: {
         placeholder={placeholder || (options.length === 0 ? '运行节点后加载选项' : '选择...')}
         style={{ width: '100%', fontSize: 11 }}
         allowClear
+        showSearch
+        optionFilterProp="label"
         getPopupContainer={(node) => node.parentElement || document.body}
         styles={{ popup: { root: { fontSize: 11 } } }}
       />
@@ -920,6 +922,8 @@ function FieldMultiSelect({ label, value, onChange, options }: {
         placeholder={options.length === 0 ? '运行节点后加载选项' : '选择...'}
         style={{ width: '100%', fontSize: 11 }}
         allowClear
+        showSearch
+        optionFilterProp="label"
         maxTagCount={3}
         maxTagTextLength={10}
         getPopupContainer={(node) => node.parentElement || document.body}

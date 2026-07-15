@@ -445,6 +445,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                       style={{ width: '100%', fontSize: 13 }}
                       allowClear
+                      showSearch
+                      optionFilterProp="label"
                       getPopupContainer={(node) => node.parentElement || document.body}
                     />
                   </div>
@@ -465,6 +467,8 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                       style={{ width: '100%', fontSize: 13 }}
                       allowClear
+                      showSearch
+                      optionFilterProp="label"
                       getPopupContainer={(node) => node.parentElement || document.body}
                     />
                   </div>

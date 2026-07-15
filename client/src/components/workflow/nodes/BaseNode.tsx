@@ -569,6 +569,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     placeholder={resolvedOptions.length === 0 ? '运行后加载选项' : (f.placeholder || '选择...')}
                     style={{ width: '100%', fontSize: 11 }}
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     getPopupContainer={(node) => node.parentElement || document.body}
                     styles={{ popup: { root: { fontSize: 11 } } }}
                   />
@@ -598,6 +600,8 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     maxTagCount={2}
                     maxTagTextLength={8}
                     allowClear
+                    showSearch
+                    optionFilterProp="label"
                     getPopupContainer={(node) => node.parentElement || document.body}
                     styles={{ popup: { root: { fontSize: 11 } } }}
                   />

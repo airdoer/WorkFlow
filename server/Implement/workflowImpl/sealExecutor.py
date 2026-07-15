@@ -84,6 +84,7 @@ def load_seal_operation_options() -> list:
     返回 Seal 操作选项列表，供前端下拉框使用。
     格式: [{ label, value, template_id, description }]
     """
+    global _seal_cache, _seal_cache_time
     now = time.time()
     if _seal_cache and (now - _seal_cache_time) < _CACHE_TTL:
         return _seal_cache.get('options', [])

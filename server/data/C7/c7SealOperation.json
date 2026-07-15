@@ -1,37 +1,107 @@
 {
     "Deploy": {
-        "label": "部署服务器",
+        "label": "【测试环境】c7服务器更新",
         "template_id": 902,
         "source": "/c7-server/c7_server/${Package_name}",
         "args": "",
-        "description": "打包并部署服务器到目标环境（从 teamcity 构建后部署）"
+        "description": "测试环境：打包并部署服务器（从 teamcity 构建后部署）"
     },
-    "UpdateScript": {
-        "label": "更新脚本",
-        "template_id": 902,
-        "source": "/c7-server/c7_server/script_update.tar.gz",
+    "DeployProd": {
+        "label": "【正式环境】更新代码或引擎（新）",
+        "template_id": 1042,
+        "source": "/c7-server/c7_server/${Package_name}",
         "args": "",
-        "description": "只更新脚本文件（不部署二进制）"
+        "description": "正式环境：更新代码或引擎"
     },
-    "RestartServer": {
-        "label": "重启服务器",
-        "template_id": 902,
-        "source": "",
-        "args": "restart",
-        "description": "重启目标环境的游戏服务器进程"
-    },
-    "UpdateConfig": {
-        "label": "更新配置",
-        "template_id": 902,
-        "source": "/c7-server/c7_server/config_update.tar.gz",
+    "DeployTest": {
+        "label": "【测试环境】更新代码或引擎（新）",
+        "template_id": 1036,
+        "source": "/c7-server/c7_server/${Package_name}",
         "args": "",
-        "description": "只更新配置文件"
+        "description": "测试环境：更新代码或引擎"
     },
-    "Hotfix": {
-        "label": "热更新",
-        "template_id": 902,
+    "HotfixTest": {
+        "label": "【测试环境】c7 hotfix（新）",
+        "template_id": 1035,
         "source": "/c7-server/c7_server/hotfix.tar.gz",
         "args": "hotfix",
-        "description": "执行热更新脚本"
+        "description": "测试环境：执行热更新脚本"
+    },
+    "HotfixProd": {
+        "label": "【正式环境】c7 hotfix（新）",
+        "template_id": 1034,
+        "source": "/c7-server/c7_server/hotfix.tar.gz",
+        "args": "hotfix",
+        "description": "正式环境：执行热更新脚本"
+    },
+    "ModifyEnvTest": {
+        "label": "【测试环境】修改进程环境变量",
+        "template_id": 1039,
+        "source": "",
+        "args": "",
+        "description": "测试环境：修改服务器进程的环境变量"
+    },
+    "ModifyEnvProd": {
+        "label": "【正式环境】修改进程环境变量",
+        "template_id": 1038,
+        "source": "",
+        "args": "",
+        "description": "正式环境：修改服务器进程的环境变量"
+    },
+    "ForceStopTest": {
+        "label": "【测试环境】强制停服（关服）",
+        "template_id": 1028,
+        "source": "",
+        "args": "stop",
+        "description": "测试环境：强制停止服务器（关服）"
+    },
+    "StopProd": {
+        "label": "【正式环境】停服（关服）",
+        "template_id": 906,
+        "source": "",
+        "args": "stop",
+        "description": "正式环境：停止服务器（关服）"
+    },
+    "StartProd": {
+        "label": "【正式环境】开服",
+        "template_id": 915,
+        "source": "",
+        "args": "start",
+        "description": "正式环境：开启服务器"
+    },
+    "StartTest": {
+        "label": "【测试环境】开服（带索引检查）",
+        "template_id": 914,
+        "source": "",
+        "args": "start",
+        "description": "测试环境：开启服务器（带索引检查）"
+    },
+    "ClearDataProd": {
+        "label": "【正式环境】清档(mongodb/redis)",
+        "template_id": 916,
+        "source": "",
+        "args": "cleardata",
+        "description": "正式环境：清档 mongodb 和 redis 数据"
+    },
+    "ClearDataTest": {
+        "label": "【测试环境】清档 mongodb redis（停服+清档）",
+        "template_id": 917,
+        "source": "",
+        "args": "cleardata",
+        "description": "测试环境：停服后清档 mongodb 和 redis"
+    },
+    "FirewallProd": {
+        "label": "【正式环境】开关外网",
+        "template_id": 920,
+        "source": "",
+        "args": "firewall",
+        "description": "正式环境：操作防火墙开关外网"
+    },
+    "FirewallTest": {
+        "label": "【测试环境】操作防火墙（开关外网）",
+        "template_id": 921,
+        "source": "",
+        "args": "firewall",
+        "description": "测试环境：操作防火墙开关外网"
     }
 }
