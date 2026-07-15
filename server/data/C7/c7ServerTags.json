@@ -1,10 +1,12 @@
 {
     "preonline": {
-        "namespaces": ["c7_preonline", "c7_preonline_cross"],
-        "name": "线上预发布服"
+        "namespaces": ["c7_online_mirror", "c7_online_mirror_cross"],
+        "name": "线上预发布服",
+        "tree_id": 99523
     },
     "online": {
-        "namespaces": ["c7_paid_test_1", "c7_paid_test_2", "c7_publish_center_service", "c7_publish_cross_battle_1", "c7_publish_cross_battle_2"],
-        "name": "线上正式服"
+        "namespaces": ["c7_online_1101", "c7_online_1102", "c7_online_1103", "c7_online_cross_battle_1801", "c7_online_cross_service_1700", "c7_online_cross_world_1901", "c7_online_cross_world_1902", "c7_online_cross_world_1903", "c7_online_cross_world_1904"],
+        "name": "线上正式服",
+        "tree_id": 99522
     }
 }

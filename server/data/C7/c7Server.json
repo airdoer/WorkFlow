@@ -4,216 +4,295 @@
         "name": "czx私服",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 90001
+        "server_id": 90001,
+        "tree_id": null
     },
     "c7_dev_cross_weekly": {
         "namespace": "c7_dev_cross_weekly",
         "name": "内部周版本一区",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 11001
+        "server_id": 11001,
+        "tree_id": null
     },
     "c7_dev_cross_weekly2": {
         "namespace": "c7_dev_cross_weekly2",
         "name": "内部周版本二区",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 11002
+        "server_id": 11002,
+        "tree_id": null
     },
     "c7_weekly_cross_18001": {
         "namespace": "c7_weekly_cross_18001",
         "name": "内部周版本跨服18001",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 18001
+        "server_id": 18001,
+        "tree_id": null
     },
     "c7_weekly_cross_19001": {
         "namespace": "c7_weekly_cross_19001",
         "name": "内部周版本跨服19001",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 19001
+        "server_id": 19001,
+        "tree_id": null
     },
     "c7_dev": {
         "namespace": "c7_dev",
         "name": "内部dev服",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 10001
+        "server_id": 10001,
+        "tree_id": null
     },
     "c7_qa1": {
         "namespace": "c7_qa1",
         "name": "内部qa1服",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 10002
+        "server_id": 10002,
+        "tree_id": null
     },
     "c7_qa3": {
         "namespace": "c7_qa3",
         "name": "内部qa3服",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 10004
+        "server_id": 10004,
+        "tree_id": null
     },
     "c7_qa4": {
         "namespace": "c7_qa4",
         "name": "内部qa4服",
         "env": "staging",
         "zone_id": 144,
-        "server_id": 10005
+        "server_id": 10005,
+        "tree_id": null
     },
     "c7_acceptance": {
         "namespace": "c7_acceptance",
         "name": "线上运营验收服",
         "env": "idc",
         "zone_id": 144,
-        "server_id": 50007
+        "server_id": 50007,
+        "tree_id": 81392
     },
     "c7_ai_training": {
         "namespace": "c7_ai_training",
         "name": "内部ai训练服",
         "env": "idc",
         "zone_id": 250,
-        "server_id": 50005
+        "server_id": 50005,
+        "tree_id": null
     },
     "c7_daily": {
         "namespace": "c7_daily",
         "name": "线上daily服",
         "env": "idc",
         "zone_id": 144,
-        "server_id": 50006
+        "server_id": 50006,
+        "tree_id": 81391
+    },
+    "c7_massive_stress_aliyun": {
+        "namespace": "c7_massive_stress_aliyun",
+        "name": "线上阿里云压测服",
+        "env": "cloud",
+        "zone_id": null,
+        "server_id": null,
+        "tree_id": 94005
+    },
+    "c7_qa_stress_aliyun": {
+        "namespace": "c7_qa_stress_aliyun",
+        "name": "线上阿里云QA压测服",
+        "env": "cloud",
+        "zone_id": null,
+        "server_id": null,
+        "tree_id": 93700
     },
     "c7_massive_stress_txyun_1": {
         "namespace": "c7_massive_stress_txyun_1",
         "name": "线上腾讯云压测服1",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 50011
+        "server_id": 50011,
+        "tree_id": 94583
     },
     "c7_massive_stress_txyun_2": {
         "namespace": "c7_massive_stress_txyun_2",
         "name": "线上腾讯云压测服2",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 50012
+        "server_id": 50012,
+        "tree_id": 94584
     },
     "c7_massive_stress_txyun_3": {
         "namespace": "c7_massive_stress_txyun_3",
         "name": "线上腾讯云压测服3",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 50013
+        "server_id": 50013,
+        "tree_id": 94585
     },
     "c7_massive_stress_txyun_4": {
         "namespace": "c7_massive_stress_txyun_4",
         "name": "线上腾讯云压测服4",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 50014
+        "server_id": 50014,
+        "tree_id": 97382
     },
     "c7_massive_stress_cross_1": {
         "namespace": "c7_massive_stress_cross_1",
         "name": "线上压测服跨服1",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 58001
+        "server_id": 58001,
+        "tree_id": 97823
     },
     "c7_massive_stress_cross_2": {
         "namespace": "c7_massive_stress_cross_2",
         "name": "线上压测服跨服2",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 59001
+        "server_id": 59001,
+        "tree_id": 97824
     },
     "c7_nvidia_test": {
         "namespace": "c7_nvidia_test",
         "name": "线上nvidia测试服",
         "env": "idc",
         "zone_id": 266,
-        "server_id": 10020
+        "server_id": 10020,
+        "tree_id": 95447
     },
-    "c7_preonline": {
-        "namespace": "c7-preonline",
-        "name": "线上预发布服",
+    "c7_online_mirror": {
+        "namespace": "c7_online_mirror",
+        "name": "线上镜像服",
         "env": "idc",
         "zone_id": 268,
-        "server_id": 1002
+        "server_id": 2001,
+        "tree_id": 84703
     },
     "c7_preonline_cross": {
-        "namespace": "c7_preonline_cross",
-        "name": "线上预发布跨服",
+        "namespace": "c7_online_mirror_cross",
+        "name": "线上镜像服跨服",
         "env": "idc",
         "zone_id": 268,
-        "server_id": 1701
-    },
-    "c7_ios_review": {
-        "namespace": "c7_ios_review",
-        "name": "iOS审核服",
-        "env": "idc",
-        "zone_id": 269,
-        "server_id": 1004
-    },
-    "c7_paid_test_1": {
-        "namespace": "c7_paid_test_1",
-        "name": "线上付费测试服一区",
-        "env": "idc",
-        "zone_id": 271,
-        "server_id": 1001
-    },
-    "c7_paid_test_2": {
-        "namespace": "c7_paid_test_2",
-        "name": "线上付费测试服一区",
-        "env": "idc",
-        "zone_id": 271,
-        "server_id": 1005
-    },
-    "c7_publish_center_service": {
-        "namespace": "c7_publish_center_service",
-        "name": "线上付费测试服中心服",
-        "env": "idc",
-        "zone_id": 271,
-        "server_id": 1800
-    },
-    "c7_publish_cross_battle_1": {
-        "namespace": "c7_publish_cross_battle_1",
-        "name": "线上付费测试服跨服1",
-        "env": "idc",
-        "zone_id": 271,
-        "server_id": 1801
-    },
-    "c7_publish_cross_world_1": {
-        "namespace": "c7_publish_cross_world_1",
-        "name": "线上付费测试服跨服1",
-        "env": "idc",
-        "zone_id": 271,
-        "server_id": 1901
-    },
-    "c7_taptap_review": {
-        "namespace": "c7_taptap_review",
-        "name": "taptap审核服",
-        "env": "idc",
-        "zone_id": 270,
-        "server_id": 1003
+        "server_id": 2800,
+        "tree_id": 98118
     },
     "c7_partner": {
         "namespace": "c7_partner",
         "name": "中台验收服",
         "env": "idc",
         "zone_id": 276,
-        "server_id": 50066
+        "server_id": 50066,
+        "tree_id": 98385
+    },
+    "c7_ios_review": {
+        "namespace": "c7_ios_review",
+        "name": "iOS审核服",
+        "env": "idc",
+        "zone_id": 269,
+        "server_id": 2101,
+        "tree_id": 97026
     },
     "c7_ios_recommend": {
         "namespace": "c7_ios_recommend",
         "name": "iOS推荐服",
         "env": "idc",
         "zone_id": 269,
-        "server_id": 2100
+        "server_id": 2100,
+        "tree_id": 98384
     },
     "c7_video": {
         "namespace": "c7_video",
         "name": "视频制作服",
         "env": "idc",
         "zone_id": 266,
-        "server_id": 50068
+        "server_id": 50068,
+        "tree_id": 98567
+    },
+    "c7_taptap_review": {
+        "namespace": "c7_taptap_review",
+        "name": "taptap审核服",
+        "env": "idc",
+        "zone_id": 270,
+        "server_id": 2102,
+        "tree_id": 95881
+    },
+    "c7_online_1101": {
+        "namespace": "c7_online_1101",
+        "name": "正式服本服-1101",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1101,
+        "tree_id": 99460
+    },
+    "c7_online_1102": {
+        "namespace": "c7_online_1102",
+        "name": "正式服本服-1102",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1102,
+        "tree_id": 99503
+    },
+    "c7_online_1103": {
+        "namespace": "c7_online_1103",
+        "name": "正式服本服-1103",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1103,
+        "tree_id": 99504
+    },
+    "c7_online_cross_battle_1801": {
+        "namespace": "c7_online_cross_battle_1801",
+        "name": "正式服跨服Battle-1801",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1801,
+        "tree_id": 99462
+    },
+    "c7_online_cross_service_1700": {
+        "namespace": "c7_online_cross_service_1700",
+        "name": "正式服跨服Service-1700",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1700,
+        "tree_id": 99461
+    },
+    "c7_online_cross_world_1901": {
+        "namespace": "c7_online_cross_world_1901",
+        "name": "正式服跨服World-1901",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1901,
+        "tree_id": 99463
+    },
+    "c7_online_cross_world_1902": {
+        "namespace": "c7_online_cross_world_1902",
+        "name": "正式服跨服World-1902",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1902,
+        "tree_id": 99499
+    },
+    "c7_online_cross_world_1903": {
+        "namespace": "c7_online_cross_world_1903",
+        "name": "正式服跨服World-1903",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1903,
+        "tree_id": 99500
+    },
+    "c7_online_cross_world_1904": {
+        "namespace": "c7_online_cross_world_1904",
+        "name": "正式服跨服World-1904",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1904,
+        "tree_id": 99501
     }
 }
