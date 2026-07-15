@@ -1130,7 +1130,7 @@ function FlowEditorInner({
             onEdgeUpdate={onEdgeUpdate as any}
             onEdgeUpdateStart={onEdgeUpdateStart as any}
             onEdgeUpdateEnd={onEdgeUpdateEnd as any}
-            edgesUpdatable={true}
+            edgesUpdatable="target"
             connectionMode={ConnectionMode.Loose}
             onNodeClick={onNodeClick}
             onNodeDragStart={onNodeDragStart}

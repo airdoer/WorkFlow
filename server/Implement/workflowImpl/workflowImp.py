@@ -542,17 +542,18 @@ class WorkflowRuntime:
                         # from executor output key (e.g. 'value', 'rows', etc.)
                         if '__value__' in src_output:
                             input_data[target_handle] = src_output['__value__']
-                        else:
-                            # The port key doesn't exist in the source output and
-                            # there's no __value__ either. This typically happens when
-                            # a node's output port key (e.g. P4File's 'fileContent') was
-                            # removed from the executor output for storage optimization.
-                            # Instead of flattening all keys into input_data (which loses
-                            # the port mapping and causes key collisions when multiple
-                            # edges point to the same target), assign the ENTIRE output
-                            # dict to the target handle so downstream nodes receive it
-                            # as a single value under the correct port key.
+                        elif 'localPath' in src_output:
+                            # File-reference node (P4File, etc.) whose port key was removed
+                            # from output for storage optimization. Pass the entire output
+                            # dict so downstream nodes (Diff, etc.) can read the file via
+                            # localPath. For Excel and other nodes expecting a string path,
+                            # their executors should extract localPath from the dict.
                             input_data[target_handle] = src_output
+                        else:
+                            # Last resort: merge all business keys by name
+                            for k, v in src_output.items():
+                                if k not in _META_KEYS:
+                                    input_data[k] = v
                     elif target_handle:
                         # No source_handle: assign entire output dict to target handle
                         # This preserves the value as a single object rather than

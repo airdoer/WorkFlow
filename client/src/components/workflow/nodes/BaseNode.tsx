@@ -239,30 +239,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     ),
   );
 
-  // Reactively track which output ports are connected via edges
-  const prevOutputPortsRef = useRef<Record<string, boolean>>({});
-  const connectedOutputPorts = useStore(
-    useCallback(
-      (s) => {
-        const result: Record<string, boolean> = {};
-        for (const e of s.edges) {
-          if (e.source === id && e.sourceHandle) {
-            result[e.sourceHandle] = true;
-          }
-        }
-        const prev = prevOutputPortsRef.current;
-        const prevKeys = Object.keys(prev);
-        const nextKeys = Object.keys(result);
-        if (prevKeys.length === nextKeys.length && prevKeys.every(k => result[k] === prev[k])) {
-          return prev;
-        }
-        prevOutputPortsRef.current = result;
-        return result;
-      },
-      [id],
-    ),
-  );
-
   const ports = getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
@@ -452,7 +428,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   type="target"
                   position={Position.Left}
                   id={p.key}
-                  isConnectable={!connectedInputPorts[p.key]}
                   style={{
                     position: 'absolute',
                     left: -15,
@@ -489,7 +464,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   type="source"
                   position={Position.Right}
                   id={p.key}
-                  isConnectable={!connectedOutputPorts[p.key]}
                   style={{
                     position: 'absolute',
                     right: -15,

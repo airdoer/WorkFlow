@@ -61,6 +61,13 @@ class ExcelExecutor(BaseNodeExecutor):
         local_path = input_data.get('localPath', '')
         file_content = input_data.get('fileContent', '')
 
+        # If fileContent is a dict (e.g. P4File output with localPath/filePath metadata),
+        # extract the localPath from it for direct file access
+        if isinstance(file_content, dict):
+            if 'localPath' in file_content and not local_path:
+                local_path = file_content['localPath']
+            # Don't try to use the dict as file content bytes — it will be handled via localPath
+
         # sheetName: 连线输入优先于 config
         sheet_name = input_data.get('sheetName') or config.get('sheetName', '') or config.get('sheet', '')
 
