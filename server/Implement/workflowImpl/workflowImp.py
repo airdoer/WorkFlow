@@ -543,17 +543,23 @@ class WorkflowRuntime:
                         if '__value__' in src_output:
                             input_data[target_handle] = src_output['__value__']
                         else:
-                            # Last resort: merge all business keys, strip meta
-                            for k, v in src_output.items():
-                                if k not in _META_KEYS:
-                                    input_data[k] = v
+                            # The port key doesn't exist in the source output and
+                            # there's no __value__ either. This typically happens when
+                            # a node's output port key (e.g. P4File's 'fileContent') was
+                            # removed from the executor output for storage optimization.
+                            # Instead of flattening all keys into input_data (which loses
+                            # the port mapping and causes key collisions when multiple
+                            # edges point to the same target), assign the ENTIRE output
+                            # dict to the target handle so downstream nodes receive it
+                            # as a single value under the correct port key.
+                            input_data[target_handle] = src_output
                     elif target_handle:
-                        # No source_handle: merge all business keys, strip internal meta
-                        for k, v in src_output.items():
-                            if k not in _META_KEYS:
-                                input_data[k] = v
+                        # No source_handle: assign entire output dict to target handle
+                        # This preserves the value as a single object rather than
+                        # flattening keys (which can cause collisions).
+                        input_data[target_handle] = src_output
                     else:
-                        # No handle info: merge all business keys, strip internal meta
+                        # No handle info at all: fall back to key-level merge
                         for k, v in src_output.items():
                             if k not in _META_KEYS:
                                 input_data[k] = v

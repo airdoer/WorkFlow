@@ -6,6 +6,7 @@ import ReactFlow, {
   OnEdgesChange,
   OnConnect,
   addEdge,
+  updateEdge,
   Background,
   Controls,
   MiniMap,
@@ -16,6 +17,7 @@ import ReactFlow, {
   NodeMouseHandler,
   Connection,
   OnSelectionChangeFunc,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { message, Modal } from 'antd';
@@ -25,6 +27,7 @@ import Toolbar from './Toolbar';
 import { nodeTypes } from './NodeRegistry';
 import FlowingEdge from './nodes/FlowingEdge';
 import { isPortTypeCompatible, getNodePorts } from './PortTypes';
+import QuickAddMenu from './QuickAddMenu';
 import { FlowApi } from './services/FlowApi';
 import { WorkflowContext } from './WorkflowContext';
 import type { WorkflowJSON } from './types';
@@ -396,8 +399,129 @@ function FlowEditorInner({
     return workflowId;
   }, [workflowId, isDirty, doSave]);
 
+  // ── Quick Add Menu (drag connection to empty space) ───────────────────
+  const [quickAdd, setQuickAdd] = useState<{
+    canvasX: number;
+    canvasY: number;
+    screenX: number;
+    screenY: number;
+    sourceId: string;
+    sourceHandle: string;
+    sourcePortType: string;
+  } | null>(null);
+  const connectStartRef = useRef<{ nodeId: string; handleId: string; type: 'source' | 'target'; portType: string } | null>(null);
+  const connectSucceededRef = useRef(false);
+  const connectMouseStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onConnectStart = useCallback((_: any, { nodeId, handleId, type }: Connection) => {
+    // Determine the port type for compatibility filtering
+    let portType = 'any';
+    if (nodeId) {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node) {
+        const port = getNodePorts(node.type || '').find(
+          (p) => p.key === handleId && (type === 'source' ? p.direction === 'output' : p.direction === 'input'),
+        );
+        if (port) portType = port.type;
+      }
+    }
+    connectStartRef.current = { nodeId: nodeId || '', handleId: handleId || '', type: type || 'source', portType };
+    connectSucceededRef.current = false;
+    // Record mouse start position for drag distance check
+    const evt = _ as MouseEvent;
+    if (evt?.clientX !== undefined) {
+      connectMouseStartRef.current = { x: evt.clientX, y: evt.clientY };
+    }
+  }, [nodes]);
+
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
+    const start = connectStartRef.current;
+    if (!start || start.type !== 'source') {
+      connectStartRef.current = null;
+      return;
+    }
+    connectStartRef.current = null;
+    // Check if the connection actually landed on a Handle element.
+    // ReactFlow Handles have the class 'react-flow__handle'.
+    // If released over a handle, the connection succeeded — don't show menu.
+    const target = (event as MouseEvent).target as HTMLElement;
+    const landedOnHandle = target?.closest?.('.react-flow__handle');
+    if (connectSucceededRef.current || landedOnHandle) {
+      connectSucceededRef.current = false;
+      return;
+    }
+    // Check minimum drag distance — if user barely moved, don't show menu
+    // (prevents accidental clicks on Handles from triggering quick-add)
+    const MIN_DRAG_DISTANCE = 10;
+    const clientX = 'clientX' in event ? event.clientX : 0;
+    const clientY = 'clientY' in event ? event.clientY : 0;
+    const mouseStart = connectMouseStartRef.current;
+    if (mouseStart) {
+      const dx = clientX - mouseStart.x;
+      const dy = clientY - mouseStart.y;
+      if (Math.sqrt(dx * dx + dy * dy) < MIN_DRAG_DISTANCE) {
+        return; // Barely moved — just a click, don't show menu
+      }
+    }
+    // Connection did NOT land on a target handle → show quick-add menu
+    const canvasPos = screenToFlowPosition({ x: clientX, y: clientY });
+    setQuickAdd({
+      canvasX: canvasPos.x,
+      canvasY: canvasPos.y,
+      screenX: clientX,
+      screenY: clientY,
+      sourceId: start.nodeId,
+      sourceHandle: start.handleId,
+      sourcePortType: start.portType,
+    });
+  }, [screenToFlowPosition]);
+
+  const handleQuickAddSelect = useCallback((nodeType: string, targetHandle: string) => {
+    if (!quickAdd) return;
+    const id = `${nodeType}_${Date.now()}`;
+    const newNode: Node = {
+      id,
+      type: nodeType,
+      position: { x: quickAdd.canvasX, y: quickAdd.canvasY },
+      data: {},
+    };
+    setNodes((nds) => [...nds, newNode]);
+
+    // Build edge data with type compatibility
+    const sourcePort = getNodePorts(nodes.find((n) => n.id === quickAdd.sourceId)?.type || '').find(
+      (p) => p.key === quickAdd.sourceHandle && p.direction === 'output',
+    );
+    const targetPort = getNodePorts(nodeType).find((p) => p.key === targetHandle && p.direction === 'input');
+    const compatible = sourcePort && targetPort ? isPortTypeCompatible(sourcePort.type, targetPort.type) : true;
+    const edgeData: any = {
+      sourcePortType: sourcePort?.type || 'any',
+      targetPortType: targetPort?.type || 'any',
+      matchStatus: compatible ? 'matched' : 'mismatched',
+      activated: false,
+    };
+    if (!compatible) {
+      message.warning(`端口类型不兼容: ${sourcePort?.type || '?'} → ${targetPort?.type || '?'}，请检查连线`);
+    }
+    const newEdge: Edge = {
+      id: `e_${Date.now()}`,
+      source: quickAdd.sourceId,
+      sourceHandle: quickAdd.sourceHandle,
+      target: id,
+      targetHandle,
+      type: 'flowing',
+      data: edgeData,
+    };
+    setEdges((eds) => [...eds, newEdge]);
+    setQuickAdd(null);
+    setIsDirty(true);
+    pushUndo();
+    setTimeout(() => doSave(), 150);
+  }, [quickAdd, nodes, setNodes, setEdges, pushUndo, doSave]);
+
   const onConnect: OnConnect = useCallback(
     (params: Connection) => {
+      // Mark as succeeded so onConnectEnd doesn't show the quick-add menu
+      connectSucceededRef.current = true;
       if (!params.target || !params.targetHandle) {
         // No target handle info — fall through to default
         pushUndo();
@@ -512,6 +636,120 @@ function FlowEditorInner({
     [edges, setEdges, setNodes, getNode, pushUndo, doSave],
   );
 
+  // ── Edge reconnect (drag from connected target Handle) ────────────────
+  const edgeUpdateStartRef = useRef<Edge | null>(null);
+  const edgeUpdateSucceededRef = useRef(false);
+  const edgeUpdateMouseStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onEdgeUpdateStart = useCallback((_: any, edge: Edge) => {
+    edgeUpdateStartRef.current = edge;
+    edgeUpdateSucceededRef.current = false;
+    // Record mouse position to detect if user actually dragged
+    const evt = _ as MouseEvent;
+    if (evt?.clientX !== undefined) {
+      edgeUpdateMouseStartRef.current = { x: evt.clientX, y: evt.clientY };
+    }
+  }, []);
+
+  const onEdgeUpdate = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      edgeUpdateSucceededRef.current = true;
+      // Also mark connectSucceeded so onConnectEnd won't show quick-add menu
+      connectSucceededRef.current = true;
+      if (!newConnection.target || !newConnection.targetHandle) {
+        // Dropped on empty or invalid target → delete the edge
+        pushUndo();
+        setEdges((eds) => eds.filter((e) => e.id !== oldEdge.id));
+        setIsDirty(true);
+        setTimeout(() => doSave(), 100);
+        return;
+      }
+
+      // Check port type compatibility
+      const sourceNode = getNode(newConnection.source!);
+      const targetNode = getNode(newConnection.target!);
+      if (sourceNode && targetNode && newConnection.sourceHandle && newConnection.targetHandle) {
+        const sourcePort = getNodePorts(sourceNode.type || '').find(
+          (p) => p.key === newConnection.sourceHandle && p.direction === 'output',
+        );
+        const targetPort = getNodePorts(targetNode.type || '').find(
+          (p) => p.key === newConnection.targetHandle && p.direction === 'input',
+        );
+        if (sourcePort && targetPort) {
+          const compatible = isPortTypeCompatible(sourcePort.type, targetPort.type);
+          const updatedEdge = updateEdge(oldEdge, newConnection, edges);
+          // Apply matchStatus to the updated edge
+          const finalEdge = updatedEdge.map((e) =>
+            e.id === oldEdge.id
+              ? {
+                  ...e,
+                  source: newConnection.source!,
+                  sourceHandle: newConnection.sourceHandle,
+                  target: newConnection.target!,
+                  targetHandle: newConnection.targetHandle,
+                  data: {
+                    ...e.data,
+                    sourcePortType: sourcePort.type,
+                    targetPortType: targetPort.type,
+                    matchStatus: compatible ? 'matched' : 'mismatched',
+                    activated: false,
+                  },
+                }
+              : e,
+          );
+          if (!compatible) {
+            message.warning(`端口类型不兼容: ${sourcePort.type} → ${targetPort.type}，请检查连线`);
+          }
+          pushUndo();
+          setEdges(finalEdge);
+          setIsDirty(true);
+          setTimeout(() => doSave(), 100);
+          return;
+        }
+      }
+      // Fallback: just update edge without port type check
+      pushUndo();
+      setEdges(updateEdge(oldEdge, newConnection, edges));
+      setIsDirty(true);
+      setTimeout(() => doSave(), 100);
+    },
+    [edges, setEdges, getNode, pushUndo, doSave],
+  );
+
+  const onEdgeUpdateEnd = useCallback(
+    (_: any, edge: Edge) => {
+      // Mark connect as succeeded so onConnectEnd doesn't show quick-add menu
+      connectSucceededRef.current = true;
+
+      // Check if user actually dragged (minimum distance threshold)
+      // If they just clicked or barely moved, don't delete the edge
+      const MIN_DRAG_DISTANCE = 10; // pixels
+      const evt = _ as MouseEvent;
+      const startMouse = edgeUpdateMouseStartRef.current;
+      let actuallyDragged = true;
+      if (startMouse && evt?.clientX !== undefined) {
+        const dx = evt.clientX - startMouse.x;
+        const dy = evt.clientY - startMouse.y;
+        actuallyDragged = Math.sqrt(dx * dx + dy * dy) >= MIN_DRAG_DISTANCE;
+      }
+
+      // If the edge update didn't succeed AND the user actually dragged,
+      // delete the edge (they deliberately dropped on empty space).
+      // If they barely moved, keep the edge intact (accidental click).
+      if (!edgeUpdateSucceededRef.current && edgeUpdateStartRef.current && actuallyDragged) {
+        const oldEdge = edgeUpdateStartRef.current;
+        pushUndo();
+        setEdges((eds) => eds.filter((e) => e.id !== oldEdge.id));
+        setIsDirty(true);
+        setTimeout(() => doSave(), 100);
+      }
+      edgeUpdateStartRef.current = null;
+      edgeUpdateSucceededRef.current = false;
+      edgeUpdateMouseStartRef.current = null;
+    },
+    [setEdges, pushUndo, doSave],
+  );
+
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
     setSelectedNodeId(node.id);
   }, []);
@@ -533,6 +771,7 @@ function FlowEditorInner({
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
     setMultiSelectedIds(new Set());
+    setQuickAdd(null);  // Close quick-add menu when clicking on canvas
   }, []);
 
   const onNodesDelete = useCallback(
@@ -886,6 +1125,13 @@ function FlowEditorInner({
             onNodesChange={wrappedOnNodesChange}
             onEdgesChange={wrappedOnEdgesChange}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd as any}
+            onEdgeUpdate={onEdgeUpdate as any}
+            onEdgeUpdateStart={onEdgeUpdateStart as any}
+            onEdgeUpdateEnd={onEdgeUpdateEnd as any}
+            edgesUpdatable={true}
+            connectionMode={ConnectionMode.Loose}
             onNodeClick={onNodeClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
@@ -906,6 +1152,19 @@ function FlowEditorInner({
             <Controls />
             <MiniMap />
           </ReactFlow>
+          {/* Quick Add Menu — shows when connection dragged to empty space */}
+          {quickAdd && (
+            <QuickAddMenu
+              canvasPosition={{ x: quickAdd.canvasX, y: quickAdd.canvasY }}
+              sourceId={quickAdd.sourceId}
+              sourceHandle={quickAdd.sourceHandle}
+              sourcePortType={quickAdd.sourcePortType}
+              onSelect={handleQuickAddSelect}
+              onClose={() => setQuickAdd(null)}
+              // Position the menu near the mouse release point
+              style={{ left: quickAdd.screenX, top: quickAdd.screenY }}
+            />
+          )}
         </div>
         <PropertyPanel
           selectedNode={selectedNode}

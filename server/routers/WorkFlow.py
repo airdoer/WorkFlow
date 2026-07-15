@@ -34,6 +34,7 @@ from Implement.workflowImpl.excelSearchExecutor import ExcelSearchExecutor, load
 from Implement.workflowImpl.cronExecutor import CronExecutor, CronRegistry
 from Implement.workflowImpl.setGlobalValueExecutor import SetGlobalValueExecutor
 from Implement.workflowImpl.getGlobalValueExecutor import GetGlobalValueExecutor
+from Implement.workflowImpl.mergeObjectExecutor import MergeObjectExecutor
 
 # Shared Redis key constants for global variable management
 from Implement.workflowImpl.setGlobalValueExecutor import WF_GVAR_PREFIX, WF_GVAR_REGISTRY
@@ -61,6 +62,7 @@ ExecutorManager.register(ExcelSearchExecutor())
 ExecutorManager.register(CronExecutor())
 ExecutorManager.register(SetGlobalValueExecutor())
 ExecutorManager.register(GetGlobalValueExecutor())
+ExecutorManager.register(MergeObjectExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 

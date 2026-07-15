@@ -31,6 +31,7 @@ import SplitNode from './nodes/Split';
 import DistinctNode from './nodes/Distinct';
 import FlattenNode from './nodes/Flatten';
 import GroupByNode from './nodes/GroupBy';
+import MergeObjectNode from './nodes/MergeObject';
 import ListBuilderNode from './nodes/ListBuilder';
 import ObjectBuilderNode from './nodes/ObjectBuilder';
 import DictBuilderNode from './nodes/DictBuilder';
@@ -80,6 +81,7 @@ export const nodeTypes = {
   distinct: DistinctNode,
   flatten: FlattenNode,
   groupby: GroupByNode,
+  mergeobject: MergeObjectNode,
   // Builders
   listbuilder: ListBuilderNode,
   objectbuilder: ObjectBuilderNode,
@@ -153,6 +155,7 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   { type: 'distinct', name: 'Distinct 去重', category: 'collection', description: '去除重复元素' },
   { type: 'flatten', name: 'Flatten 展平', category: 'collection', description: '展平嵌套列表' },
   { type: 'groupby', name: 'GroupBy 分组', category: 'collection', description: '按字段分组' },
+  { type: 'mergeobject', name: 'Merge 对象合并', category: 'collection', description: '合并/覆盖对象键值' },
 
   // ===== 3. Builders =====
   { type: 'listbuilder', name: '列表构建', category: 'builder', description: '从多个输入端口构建列表' },
@@ -288,7 +291,7 @@ function getNodeIcon(nodeType: string): string {
   const iconMap: Record<string, string> = {
     p4file: '📁', http: '🌐', redis: '🗄️', file: '📄', excelsearch: '🔍',
     map: '🔄', filter: '🔍', reduce: '📊', sort: '🔢', join: '🔗',
-    lookup: '🔎', split: '✂️', distinct: '🎯', flatten: '📐', groupby: '📂',
+    lookup: '🔎', split: '✂️', distinct: '🎯', flatten: '📐', groupby: '📂', mergeobject: '🔧',
     listbuilder: '📦', objectbuilder: '🏗️', dictbuilder: '📖',
     calculate: '🧮', template: '📝', condition: '❓',
     prompt: '🤖', llm: '🤖',

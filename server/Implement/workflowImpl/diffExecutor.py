@@ -1,6 +1,7 @@
 from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 import json
 import difflib
+import os
 
 
 class DiffExecutor(BaseNodeExecutor):
@@ -12,8 +13,8 @@ class DiffExecutor(BaseNodeExecutor):
         identical plus the data needed for the front-end Monaco DiffEditor.
 
         Input ports:
-          - contentA  (string)  内容1 — original text
-          - contentB  (string)  内容2 — modified text
+          - contentA  (any)  内容1 — original text / file reference / object
+          - contentB  (any)  内容2 — modified text / file reference / object
 
         Output ports:
           - isSame    (boolean) 是否相同 — True if contentA == contentB byte-for-byte
@@ -27,9 +28,51 @@ class DiffExecutor(BaseNodeExecutor):
         content_a = input_data.get("contentA", "")
         content_b = input_data.get("contentB", "")
 
-        # Coerce to string
-        content_a = str(content_a) if content_a is not None else ""
-        content_b = str(content_b) if content_b is not None else ""
+        # Coerce to string — if input is a JSON object/list, pretty-print it
+        # so the diff shows meaningful multi-line differences.
+        # For JSON strings (str), try to parse and re-format for multi-line diff.
+        # For file references (dict with localPath), read actual file content.
+        def _to_string(val):
+            if val is None:
+                return ""
+            # File reference (P4File/ExcelSearch output): read from disk
+            if isinstance(val, dict) and 'localPath' in val:
+                lp = val['localPath']
+                if os.path.isfile(lp):
+                    try:
+                        raw = open(lp, 'r', encoding='utf-8', errors='replace').read()
+                        # If it looks like JSON, pretty-print for readable diff
+                        stripped = raw.strip()
+                        if (stripped.startswith('{') and stripped.endswith('}')) or \
+                           (stripped.startswith('[') and stripped.endswith(']')):
+                            try:
+                                parsed = json.loads(stripped)
+                                return json.dumps(parsed, indent=2, ensure_ascii=False, sort_keys=True)
+                            except (json.JSONDecodeError, ValueError):
+                                pass
+                        return raw
+                    except (IOError, OSError):
+                        pass
+                # localPath doesn't exist as file — fall through to dict serialization
+            if isinstance(val, (dict, list)):
+                try:
+                    return json.dumps(val, indent=2, ensure_ascii=False, sort_keys=True)
+                except (TypeError, ValueError):
+                    return str(val)
+            if isinstance(val, str):
+                stripped = val.strip()
+                # Heuristic: try to parse as JSON for pretty-printing
+                if (stripped.startswith('{') and stripped.endswith('}')) or \
+                   (stripped.startswith('[') and stripped.endswith(']')):
+                    try:
+                        parsed = json.loads(stripped)
+                        return json.dumps(parsed, indent=2, ensure_ascii=False, sort_keys=True)
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+            return str(val)
+
+        content_a = _to_string(content_a)
+        content_b = _to_string(content_b)
 
         is_same = content_a == content_b
 

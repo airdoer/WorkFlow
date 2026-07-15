@@ -103,9 +103,9 @@ class ExcelExecutor(BaseNodeExecutor):
             else:
                 ws = wb.active
 
-            # 提取原始数据（处理 None 列头）
+            # 提取原始数据（处理 None 列头，规范化列名去除首尾空白/换行符）
             raw_columns = [cell.value for cell in ws[1]]
-            columns = [str(c) if c is not None else f'Col{i+1}' for i, c in enumerate(raw_columns)]
+            columns = [str(c).strip() if c is not None else f'Col{i+1}' for i, c in enumerate(raw_columns)]
             all_rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
                 all_rows.append(list(row))
@@ -125,7 +125,7 @@ class ExcelExecutor(BaseNodeExecutor):
             for sn in wb.sheetnames:
                 sws = wb[sn]
                 s_raw_cols = [cell.value for cell in sws[1]]
-                s_cols = [str(c) if c is not None else f'Col{i+1}' for i, c in enumerate(s_raw_cols)]
+                s_cols = [str(c).strip() if c is not None else f'Col{i+1}' for i, c in enumerate(s_raw_cols)]
                 s_all_rows = []
                 for row in sws.iter_rows(min_row=2, values_only=True):
                     s_all_rows.append(list(row))
@@ -158,7 +158,7 @@ class ExcelExecutor(BaseNodeExecutor):
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _parse_list(self, value) -> list:
-        """将列表或换行符/逗号分隔字符串转为列表。"""
+        """将列表或换行符/逗号分隔字符串转为列表。结果已 strip。"""
         if isinstance(value, list):
             return [str(v).strip() for v in value if str(v).strip()]
         if isinstance(value, str) and value.strip():
@@ -195,11 +195,11 @@ class ExcelExecutor(BaseNodeExecutor):
         return [rows[i] for i in sorted(indices)]
 
     def _apply_column_filter_indexed(self, columns: list, rows: list, filter_columns: list):
-        """根据列名过滤列（保留列顺序）。"""
+        """根据列名过滤列（保留列顺序）。匹配时忽略首尾空白和换行符。"""
         if not filter_columns:
             return columns, rows
-        col_set = set(filter_columns)
-        kept_indices = [i for i, c in enumerate(columns) if c in col_set]
+        col_set = set(c.strip() for c in filter_columns)
+        kept_indices = [i for i, c in enumerate(columns) if c.strip() in col_set]
         new_columns = [columns[i] for i in kept_indices]
         new_rows = [[row[i] if i < len(row) else None for i in kept_indices] for row in rows]
         return new_columns, new_rows
@@ -208,8 +208,8 @@ class ExcelExecutor(BaseNodeExecutor):
         filter_columns = self._parse_list(config.get('filterColumns', ''))
         if not filter_columns:
             return columns
-        col_set = set(filter_columns)
-        return [c for c in columns if c in col_set]
+        col_set = set(c.strip() for c in filter_columns)
+        return [c for c in columns if c.strip() in col_set]
 
     def _apply_filters_raw(self, rows: list, columns: list, config: dict) -> list:
         """对 raw rows（列表格式）应用行/列过滤。"""

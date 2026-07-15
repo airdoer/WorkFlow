@@ -21,7 +21,7 @@ export interface PortDefinition {
 
 /** Registry of all known port types and their compatibility */
 export const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
-  'file-content': ['file-content', 'string', 'text', 'any'],
+  'file-content': ['file-content', 'string', 'text', 'any', 'object'],
   'file-path': ['file-path', 'string', 'any'],
   'any': ['file-content', 'file-path', 'any', 'text', 'table-data', 'json-data', 'boolean', 'string', 'number', 'json-path', 'list', 'object'],
   'text': ['text', 'any', 'string', 'file-content'],
@@ -33,7 +33,7 @@ export const PORT_TYPE_COMPATIBILITY: Record<string, string[]> = {
   'json-path': ['json-path', 'string', 'any'],
   // New types for abstract data nodes
   'list': ['list', 'any', 'table-data', 'json-data', 'object'],
-  'object': ['object', 'any', 'json-data', 'list', 'string'],
+  'object': ['object', 'any', 'json-data', 'list', 'string', 'file-content'],
 };
 
 /**
@@ -120,8 +120,8 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'tables',     label: '表格数据', type: 'table-data', direction: 'output' },
   ],
   diff: [
-    { key: 'contentA', label: '内容1', type: 'string', direction: 'input' },
-    { key: 'contentB', label: '内容2', type: 'string', direction: 'input' },
+    { key: 'contentA', label: '内容1', type: 'any', direction: 'input' },
+    { key: 'contentB', label: '内容2', type: 'any', direction: 'input' },
     { key: 'isSame', label: '是否相同', type: 'boolean', direction: 'output' },
   ],
 
@@ -167,6 +167,11 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
   groupby: [
     { key: 'list', label: '列表', type: 'list', direction: 'input', maxConnections: 1 },
     { key: 'result', label: '分组结果', type: 'object', direction: 'output' },
+  ],
+  mergeobject: [
+    { key: 'source', label: '源对象', type: 'object', direction: 'input', maxConnections: 1 },
+    { key: 'overrides', label: '覆盖对象', type: 'object', direction: 'input', maxConnections: 1 },
+    { key: 'result', label: '合并结果', type: 'object', direction: 'output' },
   ],
 
   // ===== Builders =====

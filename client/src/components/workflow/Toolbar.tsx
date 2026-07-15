@@ -197,6 +197,40 @@ const Toolbar: React.FC<ToolbarProps> = ({
   useEffect(() => { setAuthor(initialAuthor || ''); }, [initialAuthor]);
   useEffect(() => { setDescription(initialDesc || ''); }, [initialDesc]);
 
+  // ── Auto-save meta info (author / description) on change ─────
+  const autoSaveTimerRef = useRef<any>(null);
+  const prevMetaRef = useRef({ author: initialAuthor || '', description: initialDesc || '' });
+
+  const doAutoSaveMeta = useCallback(async (authorVal: string, descVal: string) => {
+    if (!workflowId) return; // no workflow yet — nothing to save
+    setSaving(true);
+    try {
+      const json = reactFlowInstance.toObject();
+      const result = await FlowApi.save(name, json, workflowId, { author: authorVal, description: descVal });
+      const now = new Date().toISOString();
+      setLastSavedAt(now);
+      onSave?.(result.id, name);
+    } catch (err: any) {
+      message.error(`自动保存失败: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [workflowId, name, reactFlowInstance, onSave]);
+
+  useEffect(() => {
+    // Skip auto-save during initial sync from parent
+    const prev = prevMetaRef.current;
+    const changed = (author !== prev.author) || (description !== prev.description);
+    prevMetaRef.current = { author, description };
+    if (!changed || !workflowId) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      doAutoSaveMeta(author, description);
+    }, 800);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [author, description, workflowId, doAutoSaveMeta]);
+
   // ── Cron management ──────────────────────────────────────────
   const [cronModalOpen, setCronModalOpen] = useState(false);
   const [cronList, setCronList] = useState<any[]>([]);
@@ -684,10 +718,18 @@ const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
+  /** Format workflow label: name(desc) with max desc length */
+  const formatWorkflowLabel = (name: string, desc?: string, maxDesc = 20) => {
+    if (!desc || !desc.trim()) return name;
+    const d = desc.trim().length > maxDesc ? desc.trim().slice(0, maxDesc) + '…' : desc.trim();
+    return `${name}(${d})`;
+  };
+
   const libraryColumns = [
     {
       title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
       render: (v: string, r: WorkflowRecord) => {
+        const label = formatWorkflowLabel(v, r.description);
         const base = window.location.pathname.includes('fullscreen')
           ? '/workflow/fullscreen'
           : '/workflow/editor';
@@ -708,7 +750,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
               handleSwitchTo(r.id);
             }}
           >
-            {v}{r.id === workflowId ? ' （当前）' : ''}
+            {label}{r.id === workflowId ? ' （当前）' : ''}
           </a>
         );
       },

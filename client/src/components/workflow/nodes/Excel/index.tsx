@@ -28,7 +28,7 @@ function ExcelNode({ data, id, selected }: NodeProps) {
     const ro = d._runOutput as any;
     const cols = (ro?.allColumns ?? ro?.columns) as string[] | undefined;
     if (!cols) return [];
-    return cols.map((c: string) => ({ label: c, value: c }));
+    return cols.map((c: string) => ({ label: c, value: c.replace(/[\r\n]/g, ' ').trim() }));
   };
 
   const makeSheetOptions = (d: Record<string, any>) => {
