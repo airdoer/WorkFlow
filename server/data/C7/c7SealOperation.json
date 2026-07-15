@@ -1,0 +1,37 @@
+{
+    "Deploy": {
+        "label": "部署服务器",
+        "template_id": 902,
+        "source": "/c7-server/c7_server/${Package_name}",
+        "args": "",
+        "description": "打包并部署服务器到目标环境（从 teamcity 构建后部署）"
+    },
+    "UpdateScript": {
+        "label": "更新脚本",
+        "template_id": 902,
+        "source": "/c7-server/c7_server/script_update.tar.gz",
+        "args": "",
+        "description": "只更新脚本文件（不部署二进制）"
+    },
+    "RestartServer": {
+        "label": "重启服务器",
+        "template_id": 902,
+        "source": "",
+        "args": "restart",
+        "description": "重启目标环境的游戏服务器进程"
+    },
+    "UpdateConfig": {
+        "label": "更新配置",
+        "template_id": 902,
+        "source": "/c7-server/c7_server/config_update.tar.gz",
+        "args": "",
+        "description": "只更新配置文件"
+    },
+    "Hotfix": {
+        "label": "热更新",
+        "template_id": 902,
+        "source": "/c7-server/c7_server/hotfix.tar.gz",
+        "args": "hotfix",
+        "description": "执行热更新脚本"
+    }
+}

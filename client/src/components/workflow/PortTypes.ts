@@ -291,6 +291,12 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'success', label: '成功与否', type: 'boolean', direction: 'output' },
     { key: 'value', label: '值', type: 'string', direction: 'output' },
   ],
+  seal: [
+    { key: 'serverName', label: '服务器名', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'success', label: '执行结果', type: 'boolean', direction: 'output' },
+    { key: 'taskUrl', label: '任务链接', type: 'string', direction: 'output' },
+    { key: 'taskId', label: '任务ID', type: 'string', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {

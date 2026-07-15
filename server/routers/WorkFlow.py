@@ -35,6 +35,7 @@ from Implement.workflowImpl.cronExecutor import CronExecutor, CronRegistry
 from Implement.workflowImpl.setGlobalValueExecutor import SetGlobalValueExecutor
 from Implement.workflowImpl.getGlobalValueExecutor import GetGlobalValueExecutor
 from Implement.workflowImpl.mergeObjectExecutor import MergeObjectExecutor
+from Implement.workflowImpl.sealExecutor import SealExecutor, load_seal_operation_options
 
 # Shared Redis key constants for global variable management
 from Implement.workflowImpl.setGlobalValueExecutor import WF_GVAR_PREFIX, WF_GVAR_REGISTRY
@@ -63,6 +64,7 @@ ExecutorManager.register(CronExecutor())
 ExecutorManager.register(SetGlobalValueExecutor())
 ExecutorManager.register(GetGlobalValueExecutor())
 ExecutorManager.register(MergeObjectExecutor())
+ExecutorManager.register(SealExecutor())
 
 logger.info("[WorkFlow] All node executors registered: %s", ExecutorManager.list_executors())
 
@@ -577,6 +579,17 @@ def workflow_excelsearch_list():
         return jsonify({'options': options})
     except Exception as e:
         logger.exception("[workflow_excelsearch_list] Error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/seal/list', methods=['GET'])
+def workflow_seal_list():
+    """Get Seal operation list for Seal node dropdown"""
+    try:
+        options = load_seal_operation_options()
+        return jsonify({'options': options})
+    except Exception as e:
+        logger.exception("[workflow_seal_list] Error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 # endregion

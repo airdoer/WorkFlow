@@ -131,6 +131,13 @@ export const FlowApi = {
     return data.options || [];
   },
 
+  // Seal operation list for dropdown
+  async getSealOperationOptions(): Promise<{ label: string; value: string; template_id?: number; description: string }[]> {
+    const res = await fetch(`${API_BASE}/api/workflow/seal/list`);
+    const data = await handleResponse<{ options: { label: string; value: string; template_id?: number; description: string }[] }>(res);
+    return data.options || [];
+  },
+
   // Single-node run (REST, for node-level ▶ button)
   async runNode(type: string, config: any, input: any) {
     const res = await fetch(`${API_BASE}/api/workflow/node/run`, {

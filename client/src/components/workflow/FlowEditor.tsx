@@ -412,6 +412,7 @@ function FlowEditorInner({
   const connectStartRef = useRef<{ nodeId: string; handleId: string; type: 'source' | 'target'; portType: string } | null>(null);
   const connectSucceededRef = useRef(false);
   const connectMouseStartRef = useRef<{ x: number; y: number } | null>(null);
+  const quickAddJustOpenedRef = useRef(false); // prevent onPaneClick from closing immediately
 
   const onConnectStart = useCallback((_: any, { nodeId, handleId, type }: Connection) => {
     // Determine the port type for compatibility filtering
@@ -464,6 +465,9 @@ function FlowEditorInner({
       }
     }
     // Connection did NOT land on a target handle → show quick-add menu
+    // Set flag to prevent onPaneClick from closing the menu immediately
+    // (ReactFlow fires onPaneClick in the same mouseup event)
+    quickAddJustOpenedRef.current = true;
     const canvasPos = screenToFlowPosition({ x: clientX, y: clientY });
     setQuickAdd({
       canvasX: canvasPos.x,
@@ -474,6 +478,9 @@ function FlowEditorInner({
       sourceHandle: start.handleId,
       sourcePortType: start.portType,
     });
+    // Clear the flag after the current event loop tick,
+    // so the next onPaneClick won't be blocked
+    setTimeout(() => { quickAddJustOpenedRef.current = false; }, 0);
   }, [screenToFlowPosition]);
 
   const handleQuickAddSelect = useCallback((nodeType: string, targetHandle: string) => {
@@ -769,6 +776,12 @@ function FlowEditorInner({
   }, [setNodes]);
 
   const onPaneClick = useCallback(() => {
+    // If QuickAdd menu just opened (from onConnectEnd), don't close it immediately.
+    // ReactFlow fires onPaneClick in the same mouseup event as onConnectEnd.
+    if (quickAddJustOpenedRef.current) {
+      quickAddJustOpenedRef.current = false;
+      return;
+    }
     setSelectedNodeId(null);
     setMultiSelectedIds(new Set());
     setQuickAdd(null);  // Close quick-add menu when clicking on canvas
