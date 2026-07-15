@@ -301,7 +301,7 @@ function getNodeIcon(nodeType: string): string {
     if: '🔀', loop: '🔁', switch: '🎛️', boolgate: '🚦',
     bool: '🔘', string: '📝', number: '🔢',
     excel: '📊', json: '📋', lua: '🌙', table: '📊', diff: '🔄',
-    c7server: '🖥️', seal: '🦭', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
+    c7server: '🖥️', seal: '🐾', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
     setglobalvalue: '💾', getglobalvalue: '📖',
   };
   return iconMap[nodeType] || '🔹';

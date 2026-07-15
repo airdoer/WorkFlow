@@ -360,7 +360,7 @@ function SealNode({ data, id, selected }: NodeProps) {
       data={data as Record<string, unknown>}
       id={id}
       selected={!!selected}
-      icon="🦭"
+      icon="🐾"
       label="Seal 海豹"
       nodeType="seal"
       fields={SEAL_FIELDS}
