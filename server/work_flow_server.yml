@@ -17,6 +17,8 @@ services:
     environment:
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - P4PASSWD=${P4PASSWD}
+      - SOPS_PROJECT=${SOPS_PROJECT}
+      - SOPS_TOKEN=${SOPS_TOKEN}
     volumes:
       - .:/app
     command: /bin/bash -c "python app.py > /app/log/work_flow_server.log 2>&1"
