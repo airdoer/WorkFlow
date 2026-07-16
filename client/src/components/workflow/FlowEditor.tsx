@@ -1192,6 +1192,7 @@ function FlowEditorInner({
             deleteKeyCode={['Delete', 'Backspace']}
             multiSelectionKeyCode="Control"
             selectNodesOnDrag={true}
+            proOptions={{ hideAttribution: true }}
           >
             <Background />
             <Controls />
@@ -1216,7 +1217,6 @@ function FlowEditorInner({
           setNodes={setNodes}
           edges={edges}
           nodes={nodes}
-          onDuplicate={handleDuplicateNode}
           collapsed={propPanelCollapsed}
           onToggleCollapse={() => setPropPanelCollapsed(c => !c)}
         />

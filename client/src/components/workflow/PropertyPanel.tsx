@@ -37,12 +37,11 @@ interface PropertyPanelProps {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   edges: Edge[];
   nodes: Node[];
-  onDuplicate?: (nodeId: string) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
-const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes, onDuplicate, collapsed, onToggleCollapse }) => {
+const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, edges, nodes, collapsed, onToggleCollapse }) => {
   // ALL hooks must be called before any conditional return
   const [outputModalOpen, setOutputModalOpen] = useState(false);
   const [inputModalOpen, setInputModalOpen] = useState(false);
@@ -592,15 +591,6 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
         <Button type="primary" loading={running} onClick={handleRunNode} style={{ flex: 1 }}>
           运行节点
         </Button>
-        {onDuplicate && selectedNode && (
-          <Button
-            icon={<CopyOutlined />}
-            onClick={() => onDuplicate(selectedNode.id)}
-            title="复制节点 (Ctrl+D)"
-          >
-            复制
-          </Button>
-        )}
       </div>
 
       {/* === Section 4: Run Info === */}

@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useMemo } from 'react';
-import { NodeProps, useReactFlow } from 'reactflow';
+import { NodeProps, useReactFlow, useStore } from 'reactflow';
 import BaseNode, { NodeField } from '../BaseNode';
 import { PortDefinition } from '../PortTypes';
 
@@ -31,28 +31,27 @@ function nextVarName(existing: VarItem[]): string {
   return `str${maxN + 1}`;
 }
 
-/**
- * Build a template string from variable names.
- * Each variable gets a {{varName}} placeholder.
- * Preserves any non-{{strN}} text already in the template.
- */
-function rebuildTemplate(vars: VarItem[], oldTemplate: string): string {
-  // Extract all {{...}} placeholders that match strN pattern
-  const strVars = vars.filter((v) => v.name.trim());
-  // Replace the old strN placeholders with the new set
-  // Strategy: remove all {{strN}} from old template, then append new ones
-  let cleaned = oldTemplate.replace(/\{\{str\d+\}\}/g, '');
-  // Append new placeholders
-  const placeholders = strVars.map((v) => `{{${v.name}}}`).join('');
-  return cleaned + placeholders;
-}
-
 /* ─── FormatNode ───────────────────────────────────────────────────── */
 function FormatNode({ data, id, selected }: NodeProps) {
-  const { setNodes } = useReactFlow();
+  const { setNodes, getEdges } = useReactFlow();
   const nodeData = data as Record<string, any>;
   const rawVariables: VarItem[] = nodeData.variables || [];
   const variables = effectiveVariables(rawVariables);
+
+  // Subscribe to edge count so the component re-renders when edges change
+  const edgeCount = useStore((s) => s.edges.length);
+
+  // Check which variable ports have incoming edges (re-derives when edgeCount changes)
+  const connectedVarKeys = useMemo(() => {
+    const edges = getEdges();
+    const connected = new Set<string>();
+    for (const e of edges) {
+      if (e.target === id && e.targetHandle) {
+        connected.add(e.targetHandle);
+      }
+    }
+    return connected;
+  }, [id, getEdges, edgeCount]);
 
   /* --- helpers that directly mutate nodeData via setNodes ---------- */
   const updateNodeData = useCallback(
@@ -186,6 +185,7 @@ function FormatNode({ data, id, selected }: NodeProps) {
       {variables.map((v, idx) => {
         const isDefault = rawVariables.length === 0 && idx === 0;
         const varKey = v.name.trim() ? v.name : (isDefault ? 'str1' : `__var_val_${idx}`);
+        const isConnected = connectedVarKeys.has(varKey);
         return (
           <div
             key={`var-row-${idx}`}
@@ -215,23 +215,39 @@ function FormatNode({ data, id, selected }: NodeProps) {
                 outline: 'none',
               }}
             />
-            {/* Value input — stored under variable name key in nodeData */}
-            <input
-              className="nodrag"
-              type="text"
-              defaultValue={nodeData[varKey] ?? ''}
-              placeholder="连线或手动输入"
-              onBlur={(e) => updateVarValue(varKey, e.target.value)}
-              style={{
+            {/* Value input — connected vs manual */}
+            {isConnected ? (
+              <div style={{
                 flex: 1,
-                fontSize: 11,
-                padding: '3px 5px',
-                border: '1px solid #d9d9d9',
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '3px 6px',
+                background: '#f0f5ff',
+                border: '1px solid #adc6ff',
                 borderRadius: 3,
-                outline: 'none',
+                fontSize: 10,
+                color: '#2f54eb',
                 minWidth: 0,
-              }}
-            />
+              }}>
+                <span>🔗 已连线，使用上游输入</span>
+              </div>
+            ) : (
+              <input
+                className="nodrag"
+                type="text"
+                defaultValue={nodeData[varKey] ?? ''}
+                placeholder="连线或手动输入"
+                onBlur={(e) => updateVarValue(varKey, e.target.value)}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  padding: '3px 5px',
+                  border: '1px solid #d9d9d9',
+                  borderRadius: 3,
+                  outline: 'none',
+                  minWidth: 0,
+                }}
+              />
+            )}
             {/* Delete button — not shown for the last remaining variable */}
             {variables.length > 1 && (
               <button

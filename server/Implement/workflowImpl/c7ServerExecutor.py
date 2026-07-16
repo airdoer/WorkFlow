@@ -22,7 +22,8 @@ def _set_cached(key: str, value):
 
 
 def _load_c7_server_list():
-    """加载 C7 服务器列表（服务器 + 服务器分组），带缓存"""
+    """加载 C7 服务器列表（服务器 + 服务器分组），带缓存。
+    返回完整列表，包含 tree_id 和 seal_env，前端按需过滤。"""
     cached = _get_cached('c7_server_options')
     if cached is not None:
         return cached
@@ -30,7 +31,7 @@ def _load_c7_server_list():
     data_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'C7')
     options = []
 
-    # 加载单个服务器
+    # 加载单个服务器（全部返回，tree_id 字段标识是否支持 Seal 部署）
     server_path = os.path.join(data_dir, 'c7Server.json')
     try:
         with open(server_path, 'r', encoding='utf-8') as f:
@@ -42,11 +43,13 @@ def _load_c7_server_list():
                 'type': 'server',
                 'namespace': namespace,
                 'server_id': info.get('server_id'),
+                'tree_id': info.get('tree_id'),
+                'seal_env': info.get('seal_env', ''),
             })
     except Exception as e:
         pass
 
-    # 加载服务器分组
+    # 加载服务器分组（全部返回，tree_id 字段标识是否支持 Seal 部署）
     tags_path = os.path.join(data_dir, 'c7ServerTags.json')
     try:
         with open(tags_path, 'r', encoding='utf-8') as f:
@@ -56,6 +59,8 @@ def _load_c7_server_list():
                 'label': f"[分组] {tag_info.get('name', tag_key)}",
                 'value': tag_key,
                 'type': 'group',
+                'tree_id': tag_info.get('tree_id'),
+                'seal_env': tag_info.get('seal_env', ''),
             })
     except Exception as e:
         pass

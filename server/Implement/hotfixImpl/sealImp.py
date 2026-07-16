@@ -79,6 +79,7 @@ class SealClient:
                 'template_id': info.get('template_id'),
                 'description': info.get('description', ''),
                 'args_def': info.get('args_def', []),
+                'seal_env': info.get('seal_env', ''),
             })
 
         self._cache['options'] = options

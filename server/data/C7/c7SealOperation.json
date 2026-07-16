@@ -1,6 +1,7 @@
 {
     "DeployProd": {
-        "label": "【正式环境】更新代码或引擎（新）",
+        "label": "【正式环境】更新代码或引擎",
+        "seal_env": "prod",
         "template_id": 1042,
         "source": "",
         "args": "",
@@ -27,7 +28,8 @@
         ]
     },
     "DeployTest": {
-        "label": "【测试环境】更新代码或引擎（新）",
+        "label": "【测试环境】更新代码或引擎",
+        "seal_env": "test",
         "template_id": 1036,
         "source": "",
         "args": "",
@@ -54,69 +56,158 @@
         ]
     },
     "HotfixTest": {
-        "label": "【测试环境】c7 hotfix（新）",
+        "label": "【测试环境】c7 hotfix",
+        "seal_env": "test",
         "template_id": 1035,
-        "source": "/c7-server/c7_server/hotfix.tar.gz",
+        "source": "hotfix.tar.gz",
         "args": "hotfix",
         "description": "测试环境：执行热更新脚本",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "source_file",
+                "label": "包文件名",
+                "type": "text",
+                "required": true,
+                "placeholder": "如 c7_Preonline_1867391_hotfix_14cf2ee3ad48302cc960a6517a545e09.tar.gz"
+            },
+            {
+                "key": "script_args",
+                "label": "脚本参数",
+                "type": "multiselect",
+                "required": true,
+                "options": [
+                    {"label": "client", "value": "client"},
+                    {"label": "server", "value": "server"},
+                    {"label": "crates", "value": "crates"}
+                ]
+            }
+        ]
     },
     "HotfixProd": {
-        "label": "【正式环境】c7 hotfix（新）",
+        "label": "【正式环境】c7 hotfix",
+        "seal_env": "prod",
         "template_id": 1034,
-        "source": "/c7-server/c7_server/hotfix.tar.gz",
+        "source": "hotfix.tar.gz",
         "args": "hotfix",
         "description": "正式环境：执行热更新脚本",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "source_file",
+                "label": "包文件名",
+                "type": "text",
+                "required": true,
+                "placeholder": "如 c7_Preonline_1867391_hotfix_14cf2ee3ad48302cc960a6517a545e09.tar.gz"
+            },
+            {
+                "key": "script_args",
+                "label": "脚本参数",
+                "type": "multiselect",
+                "required": true,
+                "options": [
+                    {"label": "client", "value": "client"},
+                    {"label": "server", "value": "server"},
+                    {"label": "crates", "value": "crates"}
+                ]
+            }
+        ]
     },
     "ModifyEnvTest": {
         "label": "【测试环境】修改进程环境变量",
+        "seal_env": "test",
         "template_id": 1039,
         "source": "",
         "args": "",
-        "description": "测试环境：修改服务器进程的环境变量",
+        "description": "测试环境：修改/增加/删除服务器进程的环境变量",
         "args_def": [
             {
-                "key": "env_key",
+                "key": "mode_type",
+                "label": "操作类型",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "增加(add)", "value": "add"},
+                    {"label": "修改(upt)", "value": "upt"},
+                    {"label": "删除(del)", "value": "del"}
+                ]
+            },
+            {
+                "key": "key",
                 "label": "环境变量名",
                 "type": "text",
                 "required": true,
                 "placeholder": "如 GAME_MODE"
             },
             {
-                "key": "env_value",
+                "key": "value",
                 "label": "环境变量值",
                 "type": "text",
                 "required": true,
                 "placeholder": "如 1"
+            },
+            {
+                "key": "value_type",
+                "label": "环境变量值类型",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "整数(int)", "value": "int"},
+                    {"label": "布尔(bool)", "value": "bool"},
+                    {"label": "字符串(str)", "value": "str"},
+                    {"label": "浮点数(float)", "value": "float"}
+                ]
             }
         ]
     },
     "ModifyEnvProd": {
         "label": "【正式环境】修改进程环境变量",
+        "seal_env": "prod",
         "template_id": 1038,
         "source": "",
         "args": "",
-        "description": "正式环境：修改服务器进程的环境变量",
+        "description": "正式环境：修改/增加/删除服务器进程的环境变量",
         "args_def": [
             {
-                "key": "env_key",
+                "key": "mode_type",
+                "label": "操作类型",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "增加(add)", "value": "add"},
+                    {"label": "修改(upt)", "value": "upt"},
+                    {"label": "删除(del)", "value": "del"}
+                ]
+            },
+            {
+                "key": "key",
                 "label": "环境变量名",
                 "type": "text",
                 "required": true,
                 "placeholder": "如 GAME_MODE"
             },
             {
-                "key": "env_value",
+                "key": "value",
                 "label": "环境变量值",
                 "type": "text",
                 "required": true,
                 "placeholder": "如 1"
+            },
+            {
+                "key": "value_type",
+                "label": "环境变量值类型",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "整数(int)", "value": "int"},
+                    {"label": "布尔(bool)", "value": "bool"},
+                    {"label": "字符串(str)", "value": "str"},
+                    {"label": "浮点数(float)", "value": "float"}
+                ]
             }
         ]
     },
     "ForceStopTest": {
         "label": "【测试环境】强制停服（关服）",
+        "seal_env": "test",
         "template_id": 1028,
         "source": "",
         "args": "stop",
@@ -125,6 +216,7 @@
     },
     "StopProd": {
         "label": "【正式环境】停服（关服）",
+        "seal_env": "prod",
         "template_id": 906,
         "source": "",
         "args": "stop",
@@ -133,6 +225,7 @@
     },
     "StartProd": {
         "label": "【正式环境】开服",
+        "seal_env": "prod",
         "template_id": 915,
         "source": "",
         "args": "start",
@@ -141,6 +234,7 @@
     },
     "StartTest": {
         "label": "【测试环境】开服（带索引检查）",
+        "seal_env": "test",
         "template_id": 914,
         "source": "",
         "args": "start",
@@ -149,34 +243,84 @@
     },
     "ClearDataProd": {
         "label": "【正式环境】清档(mongodb/redis)",
+        "seal_env": "prod",
         "template_id": 916,
         "source": "",
         "args": "cleardata",
         "description": "正式环境：清档 mongodb 和 redis 数据",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "bak_type",
+                "label": "备份类型",
+                "type": "multiselect",
+                "required": true,
+                "options": [
+                    {"label": "mongodb", "value": "mongodb"},
+                    {"label": "redis", "value": "redis"}
+                ]
+            }
+        ]
     },
     "ClearDataTest": {
         "label": "【测试环境】清档 mongodb redis（停服+清档）",
+        "seal_env": "test",
         "template_id": 917,
         "source": "",
         "args": "cleardata",
         "description": "测试环境：停服后清档 mongodb 和 redis",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "bak_type",
+                "label": "备份类型",
+                "type": "multiselect",
+                "required": true,
+                "options": [
+                    {"label": "mongodb", "value": "mongodb"},
+                    {"label": "redis", "value": "redis"}
+                ]
+            }
+        ]
     },
     "FirewallProd": {
         "label": "【正式环境】开关外网",
+        "seal_env": "prod",
         "template_id": 920,
         "source": "",
         "args": "firewall",
         "description": "正式环境：操作防火墙开关外网",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "iptables_policy",
+                "label": "防火墙策略",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "限流(limit)", "value": "limit"},
+                    {"label": "开放(open)", "value": "open"},
+                    {"label": "关闭(close)", "value": "close"}
+                ]
+            }
+        ]
     },
     "FirewallTest": {
         "label": "【测试环境】操作防火墙（开关外网）",
+        "seal_env": "test",
         "template_id": 921,
         "source": "",
         "args": "firewall",
         "description": "测试环境：操作防火墙开关外网",
-        "args_def": []
+        "args_def": [
+            {
+                "key": "iptables_policy",
+                "label": "防火墙策略",
+                "type": "select",
+                "required": true,
+                "options": [
+                    {"label": "限流(limit)", "value": "limit"},
+                    {"label": "开放(open)", "value": "open"},
+                    {"label": "关闭(close)", "value": "close"}
+                ]
+            }
+        ]
     }
 }

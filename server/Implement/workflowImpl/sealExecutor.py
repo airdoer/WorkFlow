@@ -87,7 +87,7 @@ class SealExecutor(BaseNodeExecutor):
 
         # 特殊处理：source_file 用于替换 SOPS constants 中的 ${source_file}
         if extra_args.get('source_file'):
-            source_file = f"/c7-server/c7_server/{extra_args['source_file']}"
+            source_file = extra_args['source_file']
 
         if not template_id:
             return {"success": False, "error": f"流程 '{operation}' 缺少 template_id"}
