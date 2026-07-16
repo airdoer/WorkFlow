@@ -75,6 +75,19 @@ class SealExecutor(BaseNodeExecutor):
         template_id = op_info.get('template_id')
         source_file = op_info.get('source', '')
         script_args = op_info.get('args', '')
+        args_def = op_info.get('args_def', [])
+
+        # 从 config 中收集 args_def 定义的动态参数
+        extra_args = {}
+        for arg_def in args_def:
+            arg_key = arg_def.get('key', '')
+            arg_val = config.get(arg_key, '')
+            if arg_val:
+                extra_args[arg_key] = arg_val
+
+        # 特殊处理：source_file 用于替换 SOPS constants 中的 ${source_file}
+        if extra_args.get('source_file'):
+            source_file = f"/c7-server/c7_server/{extra_args['source_file']}"
 
         if not template_id:
             return {"success": False, "error": f"流程 '{operation}' 缺少 template_id"}
@@ -82,10 +95,14 @@ class SealExecutor(BaseNodeExecutor):
         # 构建任务名
         task_name_prefix = f"C7_{operation}_" + "+".join(target_envs)
 
+        # 构建额外 constants（去掉已用于 source_file 替换的参数）
+        sops_extra_args = {k: v for k, v in extra_args.items() if k != 'source_file'}
+
         # 创建任务
         try:
             create_resp = client.create_task(template_id, host_ids, source_file,
-                                             script_args, task_name_prefix)
+                                             script_args, task_name_prefix,
+                                             extra_args=sops_extra_args)
         except requests.exceptions.RequestException as e:
             client._log_exception("[Seal] Create task request failed: %s", e)
             return {"success": False, "error": f"创建任务请求失败: {e}"}

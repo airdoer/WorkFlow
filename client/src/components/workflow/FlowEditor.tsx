@@ -25,6 +25,7 @@ import Toolbox from './Toolbox';
 import PropertyPanel from './PropertyPanel';
 import Toolbar from './Toolbar';
 import { nodeTypes } from './NodeRegistry';
+import { getFormatInitialData } from './nodes/Format';
 import FlowingEdge from './nodes/FlowingEdge';
 import { isPortTypeCompatible, getNodePorts } from './PortTypes';
 import QuickAddMenu from './QuickAddMenu';
@@ -84,11 +85,21 @@ function FlowEditorInner({
         const srcPort = getNodePorts(srcNode.type || '').find(
           (p: any) => p.key === e.sourceHandle && p.direction === 'output',
         );
-        const tgtPort = getNodePorts(tgtNode.type || '').find(
+        let tgtPort = getNodePorts(tgtNode.type || '').find(
           (p: any) => p.key === e.targetHandle && p.direction === 'input',
         );
+        // Fallback: for nodes with dynamic ports (like Format), check node.data.variables
+        if (!tgtPort && tgtNode.type === 'format') {
+          const vars = tgtNode.data?.variables || [];
+          const targetVar = vars.find((v: any) => v.name === e.targetHandle);
+          if (targetVar) {
+            tgtPort = { key: targetVar.name, type: 'string', direction: 'input' as const };
+          }
+        }
         if (srcPort && tgtPort) {
           const compatible = isPortTypeCompatible(srcPort.type, tgtPort.type);
+          // Restore activated state from saved data: if source node was successful, edge was activated
+          const srcSuccess = srcNode.data?._runStatus === 'success';
           return {
             ...e,
             type: 'flowing',
@@ -97,6 +108,7 @@ function FlowEditorInner({
               sourcePortType: srcPort.type,
               targetPortType: tgtPort.type,
               matchStatus: compatible ? 'matched' : 'mismatched',
+              activated: srcSuccess ? true : (e.data?.activated || false),
             },
           };
         }
@@ -347,7 +359,9 @@ function FlowEditorInner({
       if (nodeStatus === 'success') {
         setEdges((eds) => {
           return eds.map((e) => {
-            if (e.source === nodeId && e.data?.matchStatus === 'matched') {
+            // Activate edge if source node succeeded AND edge is compatible (matched or unknown)
+            // 'unknown' happens when dynamic ports (like Format variables) aren't in static definitions
+            if (e.source === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
               return { ...e, data: { ...e.data, activated: true } };
             }
             return e;
@@ -486,11 +500,13 @@ function FlowEditorInner({
   const handleQuickAddSelect = useCallback((nodeType: string, targetHandle: string) => {
     if (!quickAdd) return;
     const id = `${nodeType}_${Date.now()}`;
+    // Provide initial data for nodes that need it (e.g. Format with default str1)
+    const initialData = nodeType === 'format' ? getFormatInitialData() : {};
     const newNode: Node = {
       id,
       type: nodeType,
       position: { x: quickAdd.canvasX, y: quickAdd.canvasY },
-      data: {},
+      data: initialData,
     };
     setNodes((nds) => [...nds, newNode]);
 
@@ -498,8 +514,12 @@ function FlowEditorInner({
     const sourcePort = getNodePorts(nodes.find((n) => n.id === quickAdd.sourceId)?.type || '').find(
       (p) => p.key === quickAdd.sourceHandle && p.direction === 'output',
     );
-    const targetPort = getNodePorts(nodeType).find((p) => p.key === targetHandle && p.direction === 'input');
-    const compatible = sourcePort && targetPort ? isPortTypeCompatible(sourcePort.type, targetPort.type) : true;
+    let targetPort = getNodePorts(nodeType).find((p) => p.key === targetHandle && p.direction === 'input');
+    // Fallback for dynamic ports: check Format variables
+    if (!targetPort && nodeType === 'format') {
+      targetPort = { key: targetHandle, type: 'string', direction: 'input' as const };
+    }
+    const compatible = sourcePort && targetPort ? isPortTypeCompatible(sourcePort?.type || 'any', targetPort.type) : true;
     const edgeData: any = {
       sourcePortType: sourcePort?.type || 'any',
       targetPortType: targetPort?.type || 'any',
@@ -592,9 +612,20 @@ function FlowEditorInner({
           const sourcePort = getNodePorts(sourceNode.type || '').find(
             (p) => p.key === params.sourceHandle && p.direction === 'output',
           );
-          const targetPort = getNodePorts(targetNode.type || '').find(
+          let targetPort = getNodePorts(targetNode.type || '').find(
             (p) => p.key === params.targetHandle && p.direction === 'input',
           );
+
+          // Fallback: for nodes with dynamic ports (like Format), check node.data.variables
+          // This handles cases where the targetHandle is a user-defined variable name (e.g. 'str2', 'ip')
+          // that doesn't exist in the static PortTypes definition.
+          if (!targetPort && targetNode.type === 'format') {
+            const vars = (targetNode.data as Record<string, any>)?.variables || [];
+            const targetVar = vars.find((v: any) => v.name === params.targetHandle);
+            if (targetVar) {
+              targetPort = { key: targetVar.name, type: 'string', direction: 'input' as const };
+            }
+          }
 
           if (sourcePort && targetPort) {
             const compatible = isPortTypeCompatible(sourcePort.type, targetPort.type);
@@ -930,11 +961,12 @@ function FlowEditorInner({
       });
 
       const id = `${nodeType}_${Date.now()}`;
+      const initialData = nodeType === 'format' ? getFormatInitialData() : {};
       const newNode: Node = {
         id,
         type: nodeType,
         position,
-        data: {},
+        data: initialData,
       };
 
       setNodes((nds) => [...nds, newNode]);

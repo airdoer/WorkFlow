@@ -105,7 +105,10 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
     [sourcePortType],
   );
 
-  // Only show node types that have at least one input port
+  // Only show node types that have at least one input port (static or dynamic)
+  // This uses getNodePorts which reads the static port definitions.
+  // Nodes with dynamic ports (like 'format') declare a default input port
+  // in PortTypes.ts so they are included here automatically.
   const connectable = filtered.filter((e) => getNodePorts(e.type).some((p) => p.direction === 'input'));
 
   // Keyboard navigation

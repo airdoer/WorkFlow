@@ -33,6 +33,7 @@ import FlattenNode from './nodes/Flatten';
 import GroupByNode from './nodes/GroupBy';
 import MergeObjectNode from './nodes/MergeObject';
 import SealNode from './nodes/Seal';
+import FormatNode from './nodes/Format';
 import ListBuilderNode from './nodes/ListBuilder';
 import ObjectBuilderNode from './nodes/ObjectBuilder';
 import DictBuilderNode from './nodes/DictBuilder';
@@ -84,6 +85,7 @@ export const nodeTypes = {
   groupby: GroupByNode,
   mergeobject: MergeObjectNode,
   seal: SealNode,
+  format: FormatNode,
   // Builders
   listbuilder: ListBuilderNode,
   objectbuilder: ObjectBuilderNode,
@@ -167,6 +169,7 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   // ===== 4. Expression =====
   { type: 'calculate', name: '计算', category: 'expression', description: '数学计算表达式' },
   { type: 'template', name: '模板', category: 'expression', description: '模板字符串插值' },
+  { type: 'format', name: 'Format 格式化', category: 'expression', description: '字符串格式化拼接（如URL）' },
   { type: 'condition', name: '条件', category: 'expression', description: '条件表达式' },
 
   // ===== 5. AI =====
@@ -180,9 +183,9 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   { type: 'boolgate', name: 'BoolGate 门控', category: 'controlflow', description: '布尔门控（False 时中断）' },
 
   // ===== 7. Basic Types =====
-  { type: 'string', name: '字符串', category: 'basic', description: '字符串值' },
-  { type: 'bool', name: '布尔', category: 'basic', description: '布尔值' },
-  { type: 'number', name: '数值', category: 'basic', description: '数值' },
+  { type: 'string', name: 'String 字符串', category: 'basic', description: '字符串值' },
+  { type: 'bool', name: 'Bool 布尔', category: 'basic', description: '布尔值' },
+  { type: 'number', name: 'Number 数值', category: 'basic', description: '数值' },
 
   // ===== 8. Renderers =====
   { type: 'excel', name: 'Excel', category: 'renderer', description: 'Excel 表格渲染' },
@@ -301,7 +304,7 @@ function getNodeIcon(nodeType: string): string {
     if: '🔀', loop: '🔁', switch: '🎛️', boolgate: '🚦',
     bool: '🔘', string: '📝', number: '🔢',
     excel: '📊', json: '📋', lua: '🌙', table: '📊', diff: '🔄',
-    c7server: '🖥️', seal: '🐾', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
+    c7server: '🖥️', seal: '🐾', format: '🔤', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
     setglobalvalue: '💾', getglobalvalue: '📖',
   };
   return iconMap[nodeType] || '🔹';

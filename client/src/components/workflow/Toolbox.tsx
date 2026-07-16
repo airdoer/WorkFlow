@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState, type DragEvent } from 'react';
 import type { Node } from 'reactflow';
 import { nodeRegistryList } from './NodeRegistry';
+import { getFormatInitialData } from './nodes/Format';
 
 interface ToolboxProps {
   nodes: Node[];
@@ -17,6 +18,7 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode, collapsed
   const handleNodeClick = useCallback(
     (nodeType: string) => {
       const id = `${nodeType}_${Date.now()}`;
+      const initialData = nodeType === 'format' ? getFormatInitialData() : {};
       const newNode: Node = {
         id,
         type: nodeType,
@@ -24,7 +26,7 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode, collapsed
           x: Math.random() * 300 + 100,
           y: Math.random() * 200 + 100,
         },
-        data: {},
+        data: initialData,
       };
       setNodes((nds) => [...nds, newNode]);
       onAddNode?.();

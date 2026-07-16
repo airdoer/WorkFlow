@@ -297,6 +297,12 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'taskUrl', label: '任务链接', type: 'string', direction: 'output' },
     { key: 'taskId', label: '任务ID', type: 'string', direction: 'output' },
   ],
+  format: [
+    // Static: default str1 input + result output.
+    // Dynamic input ports are generated from variables[] via overridePorts.
+    { key: 'str1', label: 'str1', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'result', label: '结果', type: 'string', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {

@@ -132,9 +132,9 @@ export const FlowApi = {
   },
 
   // Seal operation list for dropdown
-  async getSealOperationOptions(): Promise<{ label: string; value: string; template_id?: number; description: string }[]> {
+  async getSealOperationOptions(): Promise<{ label: string; value: string; template_id?: number; description: string; args_def: any[] }[]> {
     const res = await fetch(`${API_BASE}/api/workflow/seal/list`);
-    const data = await handleResponse<{ options: { label: string; value: string; template_id?: number; description: string }[] }>(res);
+    const data = await handleResponse<{ options: { label: string; value: string; template_id?: number; description: string; args_def: any[] }[] }>(res);
     return data.options || [];
   },
 

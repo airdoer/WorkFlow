@@ -36,6 +36,7 @@ from Implement.workflowImpl.dictBuilderExecutor import DictBuilderExecutor
 from Implement.workflowImpl.calculateExecutor import CalculateExecutor
 from Implement.workflowImpl.templateExecutor import TemplateExecutor
 from Implement.workflowImpl.conditionExecutor import ConditionExecutor
+from Implement.workflowImpl.formatExecutor import FormatExecutor
 
 # New: AI executors
 from Implement.workflowImpl.llmExecutor import LLMExecutor
@@ -90,6 +91,7 @@ ExecutorManager.register(DictBuilderExecutor())
 ExecutorManager.register(CalculateExecutor())
 ExecutorManager.register(TemplateExecutor())
 ExecutorManager.register(ConditionExecutor())
+ExecutorManager.register(FormatExecutor())
 
 # AI executors
 ExecutorManager.register(LLMExecutor())

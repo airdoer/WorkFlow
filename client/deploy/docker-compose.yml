@@ -14,7 +14,7 @@ services:
       - workflow_node_modules:/app/node_modules
     networks:
       - redis-network
-    command: /bin/sh -c "npm install @utoo/pack-linux-x64-gnu --registry=https://registry.npmmirror.com && npm run dev"
+    command: /bin/sh -c "cp /app/deploy/bundle-status.html /app/node_modules/@umijs/preset-umi/assets/bundle-status.html && npm install @utoo/pack-linux-x64-gnu --registry=https://registry.npmmirror.com && npm run dev"
     restart: unless-stopped
 
 networks:

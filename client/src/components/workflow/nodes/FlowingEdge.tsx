@@ -36,9 +36,11 @@ const FlowingEdge: React.FC<EdgeProps> = ({
   // mismatched → always red dashed
   // matched + NOT activated → gray (neutral, types match but no data flow)
   // matched + activated → green with flow
+  // unknown + activated → green with flow (dynamic ports like Format variables)
+  // unknown + NOT activated → gray (neutral)
   const visualState = useMemo(() => {
     if (matchStatus === 'mismatched') return 'mismatched' as const;
-    if (matchStatus === 'matched' && activated) return 'activated' as const;
+    if ((matchStatus === 'matched' || matchStatus === 'unknown') && activated) return 'activated' as const;
     if (matchStatus === 'matched') return 'matched_idle' as const;
     return 'unknown' as const;
   }, [matchStatus, activated]);

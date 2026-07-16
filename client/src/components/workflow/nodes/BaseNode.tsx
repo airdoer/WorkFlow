@@ -3,7 +3,7 @@ import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { Select } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
-import { getNodePorts } from '../PortTypes';
+import { getNodePorts, type PortDefinition } from '../PortTypes';
 import { useWorkflowContext } from '../WorkflowContext';
 import NodeDetailModal from './NodeDetailModal';
 
@@ -91,8 +91,12 @@ interface BaseNodeProps {
   label: string;
   nodeType: string;
   fields: NodeField[];
+  /** Optional React node rendered before the fields area (e.g. variable list) */
+  extraContentBeforeFields?: React.ReactNode;
   /** Optional React node rendered after the fields area (e.g. table preview) */
   extraContentAfterFields?: React.ReactNode;
+  /** Optional override for port definitions; takes priority over static getNodePorts(nodeType) */
+  overridePorts?: PortDefinition[];
 }
 
 const STATUS_CONFIG = {
@@ -196,7 +200,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   label,
   nodeType,
   fields,
+  extraContentBeforeFields,
   extraContentAfterFields,
+  overridePorts,
 }) => {
   const { setNodes, getNodes } = useReactFlow();
   const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
@@ -239,7 +245,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     ),
   );
 
-  const ports = getNodePorts(nodeType);
+  const ports = overridePorts || getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
 
@@ -484,6 +490,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
       {/* ===== Section 3: Content — fields + output ===== */}
       <div style={{ padding: '8px 10px' }}>
+        {extraContentBeforeFields && (
+          <div style={{ marginBottom: 6 }}>{extraContentBeforeFields}</div>
+        )}
         {fields.map((f) => {
           const locked = !!(f.linkedPortKey && connectedInputPorts[f.linkedPortKey]);
           const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
