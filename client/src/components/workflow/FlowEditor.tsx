@@ -351,7 +351,7 @@ function FlowEditorInner({
       setNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId
-            ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output, _runStatusHint: frontendStatus } }
+            ? { ...n, data: { ...n.data, _runStatus: frontendStatus, _runOutput: output, _runStatusHint: frontendStatus, _lastRunTime: new Date().toISOString() } }
             : n,
         ),
       );

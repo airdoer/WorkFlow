@@ -22,6 +22,27 @@ export function stripRuntimeMeta<T>(obj: T): T {
 
 // ── Node sequence badge ──────────────────────────────────────────────
 // Blue rounded-rect badge for the node's topological sequence number.
+
+/** Format an ISO timestamp into a compact relative time string. */
+export function formatLastRunTime(isoStr: string): string {
+  try {
+    const d = new Date(isoStr);
+    const now = Date.now();
+    const diffMs = now - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return '刚刚';
+    if (diffMin < 60) return `${diffMin}分钟前`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}小时前`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 30) return `${diffDay}天前`;
+    // Beyond 30 days, show the date
+    return d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
 type SeqBadgeSize = 'sm' | 'lg';
 export const SeqBadge: React.FC<{ seq: number; size?: SeqBadgeSize }> = ({ seq, size = 'sm' }) => {
   const isLg = size === 'lg';
@@ -56,7 +77,7 @@ function isBinaryContent(str: string): boolean {
 }
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 
-export type RunStatus = 'idle' | 'running' | 'success' | 'error';
+export type RunStatus = 'idle' | 'running' | 'success' | 'error' | 'stale';
 export { FieldTextInput, FieldTextarea };
 export interface NodeField {
   key: string;
@@ -104,6 +125,7 @@ const STATUS_CONFIG = {
   running: { color: '#1890ff', bg: '#e6f7ff', icon: LoadingOutlined, title: '运行中...' },
   success: { color: '#52c41a', bg: '#f6ffed', icon: CheckCircleOutlined, title: '运行成功' },
   error: { color: '#ff4d4f', bg: '#fff2f0', icon: CloseCircleOutlined, title: '运行失败' },
+  stale: { color: '#8c8c8c', bg: '#fafafa', icon: PlayCircleOutlined, title: '参数已修改，需重新运行' },
 };
 
 const PORT_COLORS: Record<string, string> = {
@@ -153,6 +175,15 @@ const FieldTextInput: React.FC<FieldInputProps> = ({ value, disabled, placeholde
       defaultValue={value ?? ''}
       disabled={disabled}
       placeholder={placeholder}
+      onInput={() => {
+        // Immediately mark as changed (stale) on first keystroke
+        // Full value sync still happens on onBlur
+        const v = inputRef.current?.value ?? '';
+        if (v !== prevExternal.current) {
+          prevExternal.current = v;
+          onChange(v);
+        }
+      }}
       onBlur={() => {
         const v = inputRef.current?.value ?? '';
         prevExternal.current = v;
@@ -182,6 +213,14 @@ const FieldTextarea: React.FC<FieldInputProps & { rows?: number }> = ({ value, d
       disabled={disabled}
       placeholder={placeholder}
       rows={rows || 3}
+      onInput={() => {
+        // Immediately mark as changed (stale) on first keystroke
+        const v = textareaRef.current?.value ?? '';
+        if (v !== prevExternal.current) {
+          prevExternal.current = v;
+          onChange(v);
+        }
+      }}
       onBlur={() => {
         const v = textareaRef.current?.value ?? '';
         prevExternal.current = v;
@@ -213,6 +252,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const runStatus = (getRunStatus(id) as RunStatus) || (data._runStatusHint as RunStatus) || 'idle';
   const runOutput = getRunOutput(id);
   const statusCfg = STATUS_CONFIG[runStatus];
+
+  // Last run result: when stale, _runStatus still holds the original success/error
+  const lastRunResult = (data._runStatus as RunStatus) || (runStatus !== 'stale' ? runStatus : 'idle');
 
   // Whether this node is part of a multi-selection
   const isMultiSelected = selected && multiSelectedIds.size > 0 && multiSelectedIds.has(id);
@@ -271,9 +313,13 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   const handleFieldChange = useCallback(
     (key: string, value: any) => {
       setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, [key]: value } } : n,
-        ),
+        nds.map((n) => {
+          if (n.id !== id) return n;
+          const prevStatus = (n.data as any)._runStatusHint || (n.data as any)._runStatus || 'idle';
+          // If node was success/error, mark as stale (parameter changed after run)
+          const newHint = (prevStatus === 'success' || prevStatus === 'error') ? 'stale' : prevStatus;
+          return { ...n, data: { ...n.data, [key]: value, _runStatusHint: newHint } };
+        }),
       );
     },
     [id, setNodes],
@@ -339,9 +385,20 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         ? '#ff4d4f'
         : runStatus === 'running'
           ? '#1890ff'
-          : selected
-            ? '#1890ff'
-            : '#d9d9d9';
+          : runStatus === 'stale'
+            ? '#bfbfbf'
+            : selected
+              ? '#1890ff'
+              : '#d9d9d9';
+
+  const headerBg =
+    runStatus === 'success'
+      ? '#f6ffed'
+      : runStatus === 'error'
+        ? '#fff2f0'
+        : runStatus === 'stale'
+          ? '#f5f5f5'
+          : 'transparent';
 
   return (
     <>
@@ -354,6 +411,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         borderRadius: 8,
         minWidth: 220,
         maxWidth: 300,
+        width: 280,
         fontSize: 12,
         position: 'relative',
       }}
@@ -366,6 +424,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           justifyContent: 'space-between',
           padding: '8px 10px 6px',
           borderBottom: '1px solid #f0f0f0',
+          background: headerBg,
         }}
       >
         <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -373,7 +432,25 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           <span style={{ fontSize: 16 }}>{icon}</span>
           <span>{label}</span>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {/* Last run time badge */}
+          {(data as any)._lastRunTime && (runStatus === 'success' || runStatus === 'error' || runStatus === 'stale') && (
+            <span
+              title={`最后运行: ${new Date((data as any)._lastRunTime).toLocaleString('zh-CN')}`}
+              style={{
+                fontSize: 9,
+                color: lastRunResult === 'success' ? '#52c41a' : lastRunResult === 'error' ? '#cf1322' : '#999',
+                background: lastRunResult === 'success' ? '#f6ffed' : lastRunResult === 'error' ? '#fff2f0' : '#f5f5f5',
+                border: `1px solid ${lastRunResult === 'success' ? '#b7eb8f' : lastRunResult === 'error' ? '#ffccc7' : '#e8e8e8'}`,
+                borderRadius: 3,
+                padding: '1px 4px',
+                lineHeight: '14px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {formatLastRunTime((data as any)._lastRunTime)}
+            </span>
+          )}
           {/* Expand button — opens NodeDetailModal */}
           <button
             onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}

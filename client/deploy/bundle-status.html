@@ -96,7 +96,7 @@
         box-shadow: 0 0 8px var(--sat-color, #4fc3f7), 0 0 20px var(--sat-glow, rgba(79,195,247,0.4));
       }
 
-      /* Trail behind each satellite */
+      /* Trail behind each satellite — now rotated via JS */
       .satellite::before {
         content: '';
         position: absolute;
@@ -106,48 +106,50 @@
         height: 6px;
         border-radius: 3px;
         background: linear-gradient(90deg, var(--sat-color, #4fc3f7), transparent);
-        opacity: 0.4;
-        transform-origin: left center;
+        opacity: 0.5;
+        transform-origin: -10px center;
+        /* rotation set by JS: --trail-angle */
+        transform: rotate(var(--trail-angle, 0deg));
       }
 
       /* Satellite 1 — blue, orbit-1 */
       .sat-1 {
         --sat-color: #4fc3f7;
         --sat-glow: rgba(79,195,247,0.5);
-        animation: orbit1 3s linear infinite;
+        animation: orbit1 5s linear infinite;
       }
 
       /* Satellite 2 — cyan, orbit-2 */
       .sat-2 {
         --sat-color: #00e5ff;
         --sat-glow: rgba(0,229,255,0.4);
-        animation: orbit2 5s linear infinite;
+        animation: orbit2 8s linear infinite;
       }
 
       /* Satellite 3 — purple, orbit-2 opposite */
       .sat-3 {
         --sat-color: #b388ff;
         --sat-glow: rgba(179,136,255,0.4);
-        animation: orbit2 5s linear infinite;
-        animation-delay: -2.5s;
+        animation: orbit2 8s linear infinite;
+        animation-delay: -4s;
       }
 
       /* Satellite 4 — orange, orbit-3 */
       .sat-4 {
         --sat-color: #ffab40;
         --sat-glow: rgba(255,171,64,0.4);
-        animation: orbit3 8s linear infinite;
+        animation: orbit3 12s linear infinite;
       }
 
       /* Satellite 5 — green, orbit-1 opposite */
       .sat-5 {
         --sat-color: #69f0ae;
         --sat-glow: rgba(105,240,174,0.4);
-        animation: orbit1 3s linear infinite;
-        animation-delay: -1.5s;
+        animation: orbit1 5s linear infinite;
+        animation-delay: -2.5s;
       }
 
-      /* Orbit animation keyframes */
+      /* Orbit animation keyframes — satellite body stays upright via counter-rotation */
       @keyframes orbit1 {
         from { transform: rotate(0deg) translateX(100px) rotate(0deg); }
         to   { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
@@ -298,6 +300,43 @@
           star.style.width = star.style.height = (1 + Math.random() * 2) + 'px';
           container.appendChild(star);
         }
+      })();
+
+      // Satellite trail angle tracking — make trail point away from center
+      (function() {
+        var sats = document.querySelectorAll('.satellite');
+        var orbits = [
+          { radius: 100, duration: 5 },   // sat-1, sat-5
+          { radius: 130, duration: 8 },   // sat-2, sat-3
+          { radius: 155, duration: 12 },  // sat-4
+        ];
+        var satConfigs = [
+          { orbit: 0, delay: 0 },
+          { orbit: 1, delay: 0 },
+          { orbit: 1, delay: -4000 },
+          { orbit: 2, delay: 0 },
+          { orbit: 0, delay: -2500 },
+        ];
+        var startTime = performance.now();
+
+        function updateTrails() {
+          var now = performance.now();
+          var elapsed = (now - startTime) / 1000; // seconds
+
+          sats.forEach(function(sat, i) {
+            var cfg = satConfigs[i];
+            var orb = orbits[cfg.orbit];
+            var effectiveTime = elapsed + cfg.delay / 1000;
+            var angle = ((effectiveTime / orb.duration) * 360) % 360; // degrees
+            // Trail should point outward (radially away from center)
+            // When satellite is at angle θ, trail points at θ (away from center)
+            sat.style.setProperty('--trail-angle', angle + 'deg');
+          });
+
+          requestAnimationFrame(updateTrails);
+        }
+
+        requestAnimationFrame(updateTrails);
       })();
 
       // Bundle status polling

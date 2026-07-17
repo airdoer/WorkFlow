@@ -241,7 +241,7 @@
         "description": "测试环境：开启服务器（带索引检查）",
         "args_def": []
     },
-    "ClearDataProd": {
+    "ClearDbProd": {
         "label": "【正式环境】清档(mongodb/redis)",
         "seal_env": "prod",
         "template_id": 916,
@@ -261,25 +261,14 @@
             }
         ]
     },
-    "ClearDataTest": {
+    "ClearDbTest": {
         "label": "【测试环境】清档 mongodb redis（停服+清档）",
         "seal_env": "test",
         "template_id": 917,
         "source": "",
         "args": "cleardata",
         "description": "测试环境：停服后清档 mongodb 和 redis",
-        "args_def": [
-            {
-                "key": "bak_type",
-                "label": "备份类型",
-                "type": "multiselect",
-                "required": true,
-                "options": [
-                    {"label": "mongodb", "value": "mongodb"},
-                    {"label": "redis", "value": "redis"}
-                ]
-            }
-        ]
+        "args_def": []
     },
     "FirewallProd": {
         "label": "【正式环境】开关外网",

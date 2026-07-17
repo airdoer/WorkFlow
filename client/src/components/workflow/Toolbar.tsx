@@ -1160,6 +1160,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
               (r.author || '').toLowerCase().includes(q) ||
               (r.description || '').toLowerCase().includes(q)
             );
+          }).sort((a, b) => {
+            // Current workflow always first
+            if (a.id === workflowId) return -1;
+            if (b.id === workflowId) return 1;
+            return 0;
           })}
           rowKey="id"
           loading={libraryLoading}

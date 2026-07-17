@@ -303,6 +303,10 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'str1', label: 'str1', type: 'string', direction: 'input', maxConnections: 1 },
     { key: 'result', label: '结果', type: 'string', direction: 'output' },
   ],
+  servercommand: [
+    { key: 'command', label: '指令', type: 'string', direction: 'input', maxConnections: 1 },
+    { key: 'result', label: '结果', type: 'string', direction: 'output' },
+  ],
 };
 
 export function getNodePorts(nodeType: string): PortDefinition[] {

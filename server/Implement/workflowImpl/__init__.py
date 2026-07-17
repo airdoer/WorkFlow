@@ -50,6 +50,7 @@ from Implement.workflowImpl.switchExecutor import SwitchExecutor
 from Implement.workflowImpl.httpExecutor import HTTPExecutor
 from Implement.workflowImpl.redisExecutor import RedisExecutor
 from Implement.workflowImpl.fileExecutor import FileExecutor
+from Implement.workflowImpl.serverCommandExecutor import ServerCommandExecutor
 
 # --- Register all executors ---
 
@@ -105,3 +106,4 @@ ExecutorManager.register(SwitchExecutor())
 ExecutorManager.register(HTTPExecutor())
 ExecutorManager.register(RedisExecutor())
 ExecutorManager.register(FileExecutor())
+ExecutorManager.register(ServerCommandExecutor())

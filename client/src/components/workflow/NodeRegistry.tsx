@@ -34,6 +34,7 @@ import GroupByNode from './nodes/GroupBy';
 import MergeObjectNode from './nodes/MergeObject';
 import SealNode from './nodes/Seal';
 import FormatNode from './nodes/Format';
+import ServerCommandNode from './nodes/ServerCommand';
 import ListBuilderNode from './nodes/ListBuilder';
 import ObjectBuilderNode from './nodes/ObjectBuilder';
 import DictBuilderNode from './nodes/DictBuilder';
@@ -86,6 +87,7 @@ export const nodeTypes = {
   mergeobject: MergeObjectNode,
   seal: SealNode,
   format: FormatNode,
+  servercommand: ServerCommandNode,
   // Builders
   listbuilder: ListBuilderNode,
   objectbuilder: ObjectBuilderNode,
@@ -170,6 +172,7 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   { type: 'calculate', name: '计算', category: 'expression', description: '数学计算表达式' },
   { type: 'template', name: '模板', category: 'expression', description: '模板字符串插值' },
   { type: 'format', name: 'Format 格式化', category: 'expression', description: '字符串格式化拼接（如URL）' },
+  { type: 'servercommand', name: 'ServerCommand 指令', category: 'tool', description: '服务端 Lua 指令生成' },
   { type: 'condition', name: '条件', category: 'expression', description: '条件表达式' },
 
   // ===== 5. AI =====
