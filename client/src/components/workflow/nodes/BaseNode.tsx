@@ -516,6 +516,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           padding: '8px 10px 6px',
           borderBottom: '1px solid #f0f0f0',
           background: headerBg,
+          borderRadius: '6px 6px 0 0',
         }}
       >
         <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
