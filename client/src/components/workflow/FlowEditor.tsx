@@ -6,7 +6,6 @@ import ReactFlow, {
   OnEdgesChange,
   OnConnect,
   addEdge,
-  updateEdge,
   Background,
   Controls,
   MiniMap,
@@ -716,6 +715,20 @@ function FlowEditorInner({
         return;
       }
 
+      // Clear stale run state for the new target node (incoming edge changed)
+      const clearTargetRunState = (targetId: string) => {
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id !== targetId) return n;
+            const s = (n.data as any)._runStatusHint || (n.data as any)._runStatus || 'idle';
+            if (s === 'success' || s === 'error') {
+              return { ...n, data: { ...n.data, _runStatusHint: 'stale' } };
+            }
+            return n;
+          }),
+        );
+      };
+
       // Check port type compatibility
       const sourceNode = getNode(newConnection.source!);
       const targetNode = getNode(newConnection.target!);
@@ -728,43 +741,62 @@ function FlowEditorInner({
         );
         if (sourcePort && targetPort) {
           const compatible = isPortTypeCompatible(sourcePort.type, targetPort.type);
-          const updatedEdge = updateEdge(oldEdge, newConnection, edges);
-          // Apply matchStatus to the updated edge
-          const finalEdge = updatedEdge.map((e) =>
-            e.id === oldEdge.id
-              ? {
-                  ...e,
-                  source: newConnection.source!,
-                  sourceHandle: newConnection.sourceHandle,
-                  target: newConnection.target!,
-                  targetHandle: newConnection.targetHandle,
-                  data: {
-                    ...e.data,
-                    sourcePortType: sourcePort.type,
-                    targetPortType: targetPort.type,
-                    matchStatus: compatible ? 'matched' : 'mismatched',
-                    activated: false,
-                  },
-                }
-              : e,
-          );
+          // Build the new edge directly (don't rely on updateEdge which may preserve stale data)
+          const newEdge: Edge = {
+            id: oldEdge.id,
+            type: 'flowing',
+            source: newConnection.source!,
+            sourceHandle: newConnection.sourceHandle,
+            target: newConnection.target!,
+            targetHandle: newConnection.targetHandle,
+            data: {
+              sourcePortType: sourcePort.type,
+              targetPortType: targetPort.type,
+              matchStatus: compatible ? 'matched' : 'mismatched',
+              activated: false,
+            },
+          };
+          // Replace old edge with new edge (reset to initial gray style)
+          pushUndo();
+          setEdges((eds) => eds.map((e) => (e.id === oldEdge.id ? newEdge : e)));
+          // Mark target as stale (its input source changed)
+          clearTargetRunState(newConnection.target!);
+          if (oldEdge.target !== newConnection.target) {
+            clearTargetRunState(oldEdge.target);
+          }
           if (!compatible) {
             message.warning(`端口类型不兼容: ${sourcePort.type} → ${targetPort.type}，请检查连线`);
           }
-          pushUndo();
-          setEdges(finalEdge);
           setIsDirty(true);
           setTimeout(() => doSave(), 100);
           return;
         }
       }
-      // Fallback: just update edge without port type check
+      // Fallback: build new edge directly — reset to initial gray style
       pushUndo();
-      setEdges(updateEdge(oldEdge, newConnection, edges));
+      setEdges((eds) =>
+        eds.map((e) =>
+          e.id === oldEdge.id
+            ? {
+                id: oldEdge.id,
+                type: 'flowing',
+                source: newConnection.source!,
+                sourceHandle: newConnection.sourceHandle,
+                target: newConnection.target!,
+                targetHandle: newConnection.targetHandle,
+                data: { matchStatus: 'unknown', activated: false },
+              }
+            : e,
+        ),
+      );
+      clearTargetRunState(newConnection.target!);
+      if (oldEdge.target !== newConnection.target) {
+        clearTargetRunState(oldEdge.target);
+      }
       setIsDirty(true);
       setTimeout(() => doSave(), 100);
     },
-    [edges, setEdges, getNode, pushUndo, doSave],
+    [edges, setEdges, setNodes, getNode, pushUndo, doSave],
   );
 
   const onEdgeUpdateEnd = useCallback(
@@ -1177,6 +1209,20 @@ function FlowEditorInner({
           setTimeout(() => doSave(), 100);
         }} collapsed={toolboxCollapsed} onToggleCollapse={() => setToolboxCollapsed(c => !c)} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
+          {/* Override ReactFlow's "not-allowed" cursor during edge drag — show crosshair instead */}
+          <style>{`
+            .react-flow.is-connecting,
+            .react-flow.is-connecting *,
+            .react-flow.is-connecting .react-flow__pane {
+              cursor: crosshair !important;
+            }
+            .react-flow__edgeupdater {
+              cursor: grab !important;
+            }
+            .react-flow__connectionline {
+              cursor: crosshair !important;
+            }
+          `}</style>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -1190,6 +1236,7 @@ function FlowEditorInner({
             onEdgeUpdateEnd={onEdgeUpdateEnd as any}
             edgesUpdatable="target"
             connectionMode={ConnectionMode.Loose}
+            isValidConnection={() => true}
             onNodeClick={onNodeClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
