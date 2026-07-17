@@ -45,8 +45,8 @@ class SealExecutor(BaseNodeExecutor):
         """
         client = _seal_client
 
-        # 获取参数：config 优先，input_data 次之
-        server_name = config.get('serverName', '') or input_data.get('serverName', '')
+        # 获取参数：连线传入的值（input_data）优先，config 手动值作为 fallback
+        server_name = input_data.get('serverName', '') or config.get('serverName', '')
         operation = config.get('operation', '')
         executor = config.get('executor', 'chenzhixu') or 'chenzhixu'
 
@@ -77,11 +77,12 @@ class SealExecutor(BaseNodeExecutor):
         script_args = op_info.get('args', '')
         args_def = op_info.get('args_def', [])
 
-        # 从 config 中收集 args_def 定义的动态参数
+        # 从 config 和 input_data 中收集 args_def 定义的动态参数
+        # 连线传入的值（input_data）优先；config 是手动填写值作为 fallback
         extra_args = {}
         for arg_def in args_def:
             arg_key = arg_def.get('key', '')
-            arg_val = config.get(arg_key, '')
+            arg_val = input_data.get(arg_key, '') or config.get(arg_key, '')
             if arg_val:
                 extra_args[arg_key] = arg_val
 

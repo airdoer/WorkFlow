@@ -287,6 +287,31 @@ const BaseNode: React.FC<BaseNodeProps> = ({
     ),
   );
 
+  // Resolve upstream values for locked (connected) fields
+  const upstreamEdges = useStore(
+    useCallback((s) => s.edges.filter((e) => e.target === id && e.targetHandle), [id]),
+  );
+  const upstreamValues = useMemo<Record<string, any>>(() => {
+    const result: Record<string, any> = {};
+    for (const e of upstreamEdges) {
+      const srcOutput = getRunOutput(e.source);
+      if (!srcOutput) continue;
+      if (e.sourceHandle && srcOutput[e.sourceHandle] !== undefined) {
+        result[e.targetHandle!] = srcOutput[e.sourceHandle];
+      } else if (srcOutput.__value__ !== undefined) {
+        result[e.targetHandle!] = srcOutput.__value__;
+      } else {
+        for (const [k, v] of Object.entries(srcOutput)) {
+          if (!k.startsWith('__') && k !== 'success' && k !== 'error') {
+            result[e.targetHandle!] = v;
+            break;
+          }
+        }
+      }
+    }
+    return result;
+  }, [upstreamEdges, getRunOutput]);
+
   const ports = overridePorts || getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
@@ -572,7 +597,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         )}
         {fields.map((f) => {
           const locked = !!(f.linkedPortKey && connectedInputPorts[f.linkedPortKey]);
-          const val = (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
+          // When locked (connected), show upstream value instead of stale local data
+          const upstreamVal = f.linkedPortKey ? upstreamValues[f.linkedPortKey] : undefined;
+          const val = locked && upstreamVal !== undefined
+            ? upstreamVal
+            : (data[f.key] as any) ?? (f.type === 'multiselect' ? [] : '');
           // Resolve options: dynamic fn takes priority over static array
           // Merge _runOutput from external store so optionsFn can read it
           const enrichedData = { ...(data as Record<string, any>), _runOutput: runOutput };
@@ -800,9 +829,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                             <LuaRenderer content={displayValue.content} functionName={displayValue.functionName} functionContent={displayValue.functionContent} />
                           </Suspense>
                         ) : typeof displayValue === 'string' ? (
-                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                            {isBinaryContent(displayValue) ? '📦 二进制文件' : displayValue}
-                          </pre>
+                          isBinaryContent(displayValue) ? (
+                            <pre style={{ margin: 0 }}>📦 二进制文件</pre>
+                          ) : /^https?:\/\//i.test(displayValue) ? (
+                            <a href={displayValue} target="_blank" rel="noopener noreferrer"
+                               style={{ color: '#1890ff', textDecoration: 'underline', fontSize: 10, wordBreak: 'break-all' }}>
+                              {p.key === 'taskUrl' || p.label === '任务链接' ? `🔗 查看任务` : displayValue}
+                            </a>
+                          ) : (
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{displayValue}</pre>
+                          )
                         ) : (
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                             {(() => {

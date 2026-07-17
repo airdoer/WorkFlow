@@ -716,6 +716,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                     height={160}
                   />
                 ) : hasDisplay && previewText ? (
+                  /^https?:\/\//i.test(previewText) ? (
+                    <a href={previewText} target="_blank" rel="noopener noreferrer"
+                       style={{ color: '#1890ff', textDecoration: 'underline', fontSize: 10, wordBreak: 'break-all' }}>
+                      {p.key === 'taskUrl' || p.label === '任务链接' ? '🔗 查看任务' : previewText}
+                    </a>
+                  ) : (
                   <pre
                     style={{
                       margin: 0,
@@ -733,6 +739,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                   >
                     {previewText}
                   </pre>
+                  )
                 ) : null}
               </div>
             );
