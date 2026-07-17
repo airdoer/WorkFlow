@@ -51,6 +51,8 @@ from Implement.workflowImpl.httpExecutor import HTTPExecutor
 from Implement.workflowImpl.redisExecutor import RedisExecutor
 from Implement.workflowImpl.fileExecutor import FileExecutor
 from Implement.workflowImpl.serverCommandExecutor import ServerCommandExecutor
+from Implement.workflowImpl.sealExecutor import SealExecutor
+from Implement.workflowImpl.jenkinsDeployExecutor import JenkinsDeployExecutor
 
 # --- Register all executors ---
 
@@ -107,3 +109,5 @@ ExecutorManager.register(HTTPExecutor())
 ExecutorManager.register(RedisExecutor())
 ExecutorManager.register(FileExecutor())
 ExecutorManager.register(ServerCommandExecutor())
+ExecutorManager.register(SealExecutor())
+ExecutorManager.register(JenkinsDeployExecutor())

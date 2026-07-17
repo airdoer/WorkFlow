@@ -35,6 +35,7 @@ import MergeObjectNode from './nodes/MergeObject';
 import SealNode from './nodes/Seal';
 import FormatNode from './nodes/Format';
 import ServerCommandNode from './nodes/ServerCommand';
+import JenkinsDeployNode from './nodes/JenkinsDeploy';
 import ListBuilderNode from './nodes/ListBuilder';
 import ObjectBuilderNode from './nodes/ObjectBuilder';
 import DictBuilderNode from './nodes/DictBuilder';
@@ -88,6 +89,7 @@ export const nodeTypes = {
   seal: SealNode,
   format: FormatNode,
   servercommand: ServerCommandNode,
+  jenkinsdeploy: JenkinsDeployNode,
   // Builders
   listbuilder: ListBuilderNode,
   objectbuilder: ObjectBuilderNode,
@@ -200,6 +202,7 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   // ===== 9. Tool =====
   { type: 'c7server', name: 'C7 服务器', category: 'tool', description: '服务器选择器' },
   { type: 'seal', name: 'Seal 海豹', category: 'tool', description: 'SOPS 海豹部署任务' },
+  { type: 'jenkinsdeploy', name: 'Jenkins 部署', category: 'tool', description: '触发 Jenkins 打包/热更任务' },
   { type: 'kdip', name: 'KDIP', category: 'tool', description: 'KDIP 部署' },
   { type: 'kimnotify', name: 'Kim 通知', category: 'tool', description: 'Kim 消息通知' },
   { type: 'cron', name: 'Cron 定时', category: 'tool', description: '定时触发器' },
@@ -307,7 +310,7 @@ function getNodeIcon(nodeType: string): string {
     if: '🔀', loop: '🔁', switch: '🎛️', boolgate: '🚦',
     bool: '🔘', string: '📝', number: '🔢',
     excel: '📊', json: '📋', lua: '🌙', table: '📊', diff: '🔄',
-    c7server: '🖥️', seal: '🐾', format: '🔤', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
+    c7server: '🖥️', seal: '🐾', jenkinsdeploy: '🚀', format: '🔤', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',
     setglobalvalue: '💾', getglobalvalue: '📖',
   };
   return iconMap[nodeType] || '🔹';

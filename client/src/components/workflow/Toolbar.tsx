@@ -525,6 +525,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const [newNameDraft, setNewNameDraft] = useState('');
   const [newNameLoading, setNewNameLoading] = useState(false);
   const [newNameError, setNewNameError] = useState('');
+  const newNameInputRef = useRef<Input>(null);
 
   const openNewWorkflow = () => {
     setNewNameDraft('');
@@ -1253,14 +1254,23 @@ const Toolbar: React.FC<ToolbarProps> = ({
         confirmLoading={newNameLoading}
         width={400}
         destroyOnHidden
+        afterOpenChange={(visible) => {
+          if (visible) {
+            // destroyOnHidden makes autoFocus unreliable;
+            // use ref to explicitly focus after modal animation completes
+            setTimeout(() => {
+              newNameInputRef.current?.focus({ cursor: 'all' });
+            }, 100);
+          }
+        }}
       >
         <div style={{ marginBottom: 6, fontSize: 13, color: '#595959' }}>工作流名称</div>
         <Input
+          ref={newNameInputRef}
           value={newNameDraft}
           onChange={(e) => { setNewNameDraft(e.target.value); setNewNameError(''); }}
           onPressEnter={handleCreateNew}
           placeholder="请输入新工作流名称"
-          autoFocus
           maxLength={80}
           showCount
           status={newNameError ? 'error' : undefined}

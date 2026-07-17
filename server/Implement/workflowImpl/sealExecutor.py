@@ -123,7 +123,7 @@ class SealExecutor(BaseNodeExecutor):
             return {
                 "success": False,
                 "error": f"启动任务请求失败: {e}",
-                "task_id": task_id,
+                "taskId": task_id,
             }
 
         if not start_resp.get("result"):
@@ -132,7 +132,7 @@ class SealExecutor(BaseNodeExecutor):
             return {
                 "success": False,
                 "error": f"启动任务失败: {error_msg}",
-                "task_id": task_id,
+                "taskId": task_id,
             }
 
         task_url = start_resp.get("data", {}).get("task_url", "")
@@ -140,6 +140,8 @@ class SealExecutor(BaseNodeExecutor):
 
         return {
             "success": True,
+            "taskId": task_id,
+            "taskUrl": task_url,
             "task_id": task_id,
             "task_url": task_url,
             "operation": operation,

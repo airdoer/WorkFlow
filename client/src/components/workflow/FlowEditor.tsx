@@ -359,10 +359,23 @@ function FlowEditorInner({
       if (nodeStatus === 'success') {
         setEdges((eds) => {
           return eds.map((e) => {
-            // Activate edge if source node succeeded AND edge is compatible (matched or unknown)
-            // 'unknown' happens when dynamic ports (like Format variables) aren't in static definitions
+            // Activate outgoing edges from the succeeded node (data flows out)
             if (e.source === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
               return { ...e, data: { ...e.data, activated: true } };
+            }
+            // Also activate incoming edges to the succeeded node (data reached target)
+            if (e.target === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
+              return { ...e, data: { ...e.data, activated: true } };
+            }
+            return e;
+          });
+        });
+      } else if (nodeStatus === 'error' || nodeStatus === 'idle') {
+        // Deactivate outgoing edges from the failed/reset node
+        setEdges((eds) => {
+          return eds.map((e) => {
+            if (e.source === nodeId) {
+              return { ...e, data: { ...e.data, activated: false } };
             }
             return e;
           });

@@ -243,7 +243,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   extraContentAfterFields,
   overridePorts,
 }) => {
-  const { setNodes, getNodes } = useReactFlow();
+  const { setNodes, setEdges, getNodes } = useReactFlow();
   const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
   const detailOpen = detailNodeId === id;
 
@@ -288,29 +288,57 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   );
 
   // Resolve upstream values for locked (connected) fields
-  const upstreamEdges = useStore(
-    useCallback((s) => s.edges.filter((e) => e.target === id && e.targetHandle), [id]),
-  );
-  const upstreamValues = useMemo<Record<string, any>>(() => {
-    const result: Record<string, any> = {};
-    for (const e of upstreamEdges) {
-      const srcOutput = getRunOutput(e.source);
-      if (!srcOutput) continue;
-      if (e.sourceHandle && srcOutput[e.sourceHandle] !== undefined) {
-        result[e.targetHandle!] = srcOutput[e.sourceHandle];
-      } else if (srcOutput.__value__ !== undefined) {
-        result[e.targetHandle!] = srcOutput.__value__;
-      } else {
-        for (const [k, v] of Object.entries(srcOutput)) {
-          if (!k.startsWith('__') && k !== 'success' && k !== 'error') {
-            result[e.targetHandle!] = v;
-            break;
+  // Reads from upstream node's CURRENT data (not stale runOutput).
+  // Uses useStore selector to stay reactive; caches result to avoid unnecessary re-renders.
+  const upstreamValuesCacheRef = useRef<Record<string, any>>({});
+  const upstreamValues = useStore(
+    useCallback(
+      (s) => {
+        const result: Record<string, any> = {};
+        for (const e of s.edges) {
+          if (e.target !== id || !e.targetHandle) continue;
+          const srcNode = s.nodeInternals.get(e.source);
+          if (!srcNode) continue;
+          const srcData = srcNode.data as Record<string, any> | undefined;
+          if (!srcData) continue;
+
+          // Priority 1: read current field value from source node data
+          // (matches what the upstream node's UI shows right now, even if stale)
+          const srcHandle = e.sourceHandle;
+          if (srcHandle && srcData[srcHandle] !== undefined && String(srcData[srcHandle]).trim() !== '') {
+            result[e.targetHandle] = srcData[srcHandle];
+            continue;
+          }
+
+          // Priority 2: read from _runOutput (if node hasn't been modified since last run)
+          const srcOutput = srcData._runOutput as Record<string, any> | undefined;
+          if (!srcOutput) continue;
+          if (srcHandle && srcOutput[srcHandle] !== undefined) {
+            result[e.targetHandle] = srcOutput[srcHandle];
+          } else if (srcOutput.__value__ !== undefined) {
+            result[e.targetHandle] = srcOutput.__value__;
+          } else {
+            for (const [k, v] of Object.entries(srcOutput)) {
+              if (!k.startsWith('__') && k !== 'success' && k !== 'error') {
+                result[e.targetHandle] = v;
+                break;
+              }
+            }
           }
         }
-      }
-    }
-    return result;
-  }, [upstreamEdges, getRunOutput]);
+        // Shallow-equal cache check to return stable reference
+        const prev = upstreamValuesCacheRef.current;
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(result);
+        if (prevKeys.length === nextKeys.length && prevKeys.every(k => result[k] === prev[k])) {
+          return prev;
+        }
+        upstreamValuesCacheRef.current = result;
+        return result;
+      },
+      [id],
+    ),
+  );
 
   const ports = overridePorts || getNodePorts(nodeType);
   const inputPorts = ports.filter((p) => p.direction === 'input');
@@ -337,17 +365,55 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
   const handleFieldChange = useCallback(
     (key: string, value: any) => {
-      setNodes((nds) =>
-        nds.map((n) => {
+      setNodes((nds) => {
+        const updated = nds.map((n) => {
           if (n.id !== id) return n;
           const prevStatus = (n.data as any)._runStatusHint || (n.data as any)._runStatus || 'idle';
           // If node was success/error, mark as stale (parameter changed after run)
           const newHint = (prevStatus === 'success' || prevStatus === 'error') ? 'stale' : prevStatus;
           return { ...n, data: { ...n.data, [key]: value, _runStatusHint: newHint } };
-        }),
-      );
+        });
+
+        // If this node became stale, propagate stale to all downstream nodes via edges
+        const prevStatus = (nds.find((n) => n.id === id)?.data as any)?._runStatusHint || (nds.find((n) => n.id === id)?.data as any)?._runStatus || 'idle';
+        const becameStale = (prevStatus === 'success' || prevStatus === 'error') && value !== (nds.find((n) => n.id === id)?.data as any)?.[key];
+        if (becameStale) {
+          // BFS to find all downstream nodes
+          const edges = useStore.getState?.()?.edges || [];
+          const visited = new Set<string>([id]);
+          const queue = [id];
+          while (queue.length) {
+            const nid = queue.shift()!;
+            for (const e of edges) {
+              if (e.source === nid && !visited.has(e.target)) {
+                visited.add(e.target);
+                queue.push(e.target);
+              }
+            }
+          }
+          // Mark all downstream nodes as stale
+          return updated.map((n) => {
+            if (!visited.has(n.id) || n.id === id) return n; // id already handled above
+            const s = (n.data as any)._runStatusHint || (n.data as any)._runStatus || 'idle';
+            if (s === 'success' || s === 'error') {
+              return { ...n, data: { ...n.data, _runStatusHint: 'stale' } };
+            }
+            return n;
+          });
+        }
+        return updated;
+      });
+
+      // Deactivate outgoing edges from the stale node (they may carry old data)
+      if (setEdges) {
+        setEdges((eds) =>
+          eds.map((e) =>
+            e.source === id ? { ...e, data: { ...e.data, activated: false } } : e,
+          ),
+        );
+      }
     },
-    [id, setNodes],
+    [id, setNodes, setEdges],
   );
 
   const handleRun = useCallback(
