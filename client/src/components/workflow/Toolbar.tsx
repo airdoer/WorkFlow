@@ -763,8 +763,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
     {
       title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 155,
       render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
-      defaultSortOrder: 'descend' as const,
-      sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
+      // No defaultSortOrder — we control order via dataSource preprocessing
+      // to ensure current workflow is always on the first page
+      sorter: (a: WorkflowRecord, b: WorkflowRecord) => {
+        if (a.id === workflowId) return -1;
+        if (b.id === workflowId) return 1;
+        return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+      },
     },
     {
       title: '操作', key: 'action', width: 90,
@@ -1152,20 +1157,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
         />
         <Table
           columns={libraryColumns}
-          dataSource={libraryData.filter((r) => {
-            if (!librarySearch.trim()) return true;
-            const q = librarySearch.toLowerCase();
-            return (
-              (r.name || '').toLowerCase().includes(q) ||
-              (r.author || '').toLowerCase().includes(q) ||
-              (r.description || '').toLowerCase().includes(q)
-            );
-          }).sort((a, b) => {
-            // Current workflow always first
-            if (a.id === workflowId) return -1;
-            if (b.id === workflowId) return 1;
-            return 0;
-          })}
+          dataSource={(() => {
+            const filtered = libraryData.filter((r) => {
+              if (!librarySearch.trim()) return true;
+              const q = librarySearch.toLowerCase();
+              return (
+                (r.name || '').toLowerCase().includes(q) ||
+                (r.author || '').toLowerCase().includes(q) ||
+                (r.description || '').toLowerCase().includes(q)
+              );
+            });
+            // Split: current workflow first, then rest sorted by updatedAt desc
+            const current = filtered.find((r) => r.id === workflowId);
+            const rest = filtered.filter((r) => r.id !== workflowId)
+              .sort((a, b) => ((b.updatedAt || '') as string).localeCompare((a.updatedAt || '') as string));
+            return current ? [current, ...rest] : rest;
+          })()}
           rowKey="id"
           loading={libraryLoading}
           size="small"

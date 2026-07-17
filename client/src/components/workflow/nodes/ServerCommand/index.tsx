@@ -83,12 +83,18 @@ function ServerCommandNode({ data, id, selected }: NodeProps) {
     (key: string) => {
       const ex = EXAMPLES[key];
       if (!ex) return;
-      updateNodeData((d) => ({
-        ...d,
-        command: ex.code,
-        broadcast: ex.broadcast,
-        exampleKey: key,
-      }));
+      // Single setNodes call: update exampleKey + command + broadcast + stale hint
+      updateNodeData((d) => {
+        const prevStatus = (d._runStatusHint as string) || (d._runStatus as string) || 'idle';
+        const newHint = (prevStatus === 'success' || prevStatus === 'error') ? 'stale' : prevStatus;
+        return {
+          ...d,
+          command: ex.code,
+          broadcast: ex.broadcast,
+          exampleKey: key,
+          _runStatusHint: newHint,
+        };
+      });
     },
     [updateNodeData],
   );
@@ -103,8 +109,10 @@ function ServerCommandNode({ data, id, selected }: NodeProps) {
           value={val || ''}
           options={EXAMPLE_OPTIONS}
           onChange={(v: string) => {
+            // loadExample handles all field updates (exampleKey + command + broadcast + stale)
+            // Do NOT call onChange(v) here — it would trigger a second setNodes
+            // that overwrites command/broadcast with stale data
             loadExample(v);
-            onChange(v);
           }}
           locked={locked}
           placeholder="选择示例模板..."
