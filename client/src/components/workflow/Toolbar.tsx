@@ -11,6 +11,8 @@ import {
   Tooltip,
   message,
   Popconfirm,
+  Dropdown,
+  Avatar,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -36,9 +38,98 @@ import {
   ApartmentOutlined,
   EyeOutlined,
   EyeInvisibleOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  FileOutlined,
+  ThunderboltOutlined,
+  AuditOutlined,
+  LoginOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { listCrons, stopCron } from './nodes/Cron/executor';
+import { useModel, history } from '@umijs/max';
+import { outLogin } from '@/services/ant-design-pro/api';
+
+/* ───────────────────── UserDropdown ───────────────────── */
+
+const UserDropdown: React.FC = () => {
+  const { initialState, setInitialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const isAdmin = currentUser?.is_admin ?? false;
+  const username = currentUser?.name || currentUser?.userid || '';
+
+  const handleLogout = async () => {
+    try { await outLogin(); } catch { /* ignore */ }
+    localStorage.removeItem('access-token');
+    const currentPath = history.location.pathname + history.location.search + history.location.hash;
+    if (currentPath && currentPath !== '/user/login') {
+      sessionStorage.setItem('wf_login_redirect', currentPath);
+    }
+    setInitialState((s) => ({ ...s, currentUser: undefined }));
+    history.push('/user/login');
+  };
+
+  const menuItems = [
+    {
+      key: 'files',
+      icon: <FileOutlined />,
+      label: '我的文件',
+      onClick: () => { history.push('/workflow/history'); },
+    },
+    {
+      key: 'executions',
+      icon: <ThunderboltOutlined />,
+      label: '我的执行',
+      onClick: () => { history.push('/workflow/history'); },
+    },
+    ...(isAdmin ? [{
+      key: 'approvals',
+      icon: <AuditOutlined />,
+      label: '我的审批',
+      onClick: () => { message.info('审批功能开发中'); },
+    }] : []),
+    { type: 'divider' as const },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '注销退出',
+      danger: true,
+      onClick: handleLogout,
+    },
+  ];
+
+  if (!currentUser) {
+    return (
+      <Button
+        icon={<LoginOutlined />}
+        size="small"
+        type="primary"
+        onClick={() => {
+          const currentPath = history.location.pathname + history.location.search + history.location.hash;
+          if (currentPath && currentPath !== '/user/login') {
+            sessionStorage.setItem('wf_login_redirect', currentPath);
+          }
+          history.push('/user/login');
+        }}
+      >
+        登录
+      </Button>
+    );
+  }
+
+  return (
+    <Dropdown
+      menu={{ items: menuItems }}
+      trigger={['click']}
+    >
+      <Space size={4} style={{ cursor: 'pointer', lineHeight: '24px' }}>
+        <Avatar size={22} icon={<UserOutlined />} style={{ backgroundColor: isAdmin ? '#1677ff' : '#87d068' }} />
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>{username}</span>
+        {isAdmin && <span style={{ fontSize: 10, color: '#69b1ff', marginLeft: 2 }}>管理员</span>}
+      </Space>
+    </Dropdown>
+  );
+};
 
 /* ───────────────────── Global Variable API ───────────────────── */
 
@@ -966,14 +1057,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <Tooltip title="导出 JSON">
           <Button icon={<ExportOutlined />} size="small" onClick={handleExport} />
         </Tooltip>
-        <Button
-          icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-          onClick={onFullscreenToggle}
-          size="small"
-          type={isFullscreen ? 'primary' : 'default'}
-        >
-          {isFullscreen ? '退出全屏' : '全屏'}
-        </Button>
+        <Tooltip title={isFullscreen ? '退出全屏' : '全屏'}>
+          <Button
+            icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            onClick={onFullscreenToggle}
+            size="small"
+          />
+        </Tooltip>
+
+        {/* ── 用户信息区域 ── */}
+        <UserDropdown />
       </Space>
 
       {/* ── 全局变量管理 Modal ── */}
