@@ -26,6 +26,35 @@ import { errorConfig } from './requestErrorConfig';
 const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
 
+/** 保存登录前的原始 URL，登录后恢复 */
+const REDIRECT_STORAGE_KEY = 'wf_login_redirect';
+
+const saveLoginRedirect = () => {
+  const current = history.location.pathname + history.location.search + history.location.hash;
+  if (current && current !== loginPath && current !== '/') {
+    sessionStorage.setItem(REDIRECT_STORAGE_KEY, current);
+  }
+};
+
+const getAndClearLoginRedirect = (): string => {
+  const saved = sessionStorage.getItem(REDIRECT_STORAGE_KEY);
+  if (saved) {
+    sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+    return saved;
+  }
+  // 兜底：从 URL 参数中取 redirect
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirect = urlParams.get('redirect');
+  if (redirect) {
+    try {
+      return decodeURIComponent(redirect);
+    } catch {
+      return redirect;
+    }
+  }
+  return '/';
+};
+
 // 获取后端 API 地址
 // 开发模式：留空，走 Umi 代理（proxy.ts 配置）
 // 生产模式：通过 window.FLASK_BACKEND_URL 或环境变量指定后端直连地址
@@ -69,8 +98,9 @@ export async function getInitialState(): Promise<{
         role: result.role,
       } as API.CurrentUser;
     } catch (error) {
-      // token 无效或过期，清除本地 token
+      // token 无效或过期，保存当前路径并跳转登录
       localStorage.removeItem('access-token');
+      saveLoginRedirect();
       history.push(loginPath);
       return undefined;
     }
@@ -112,8 +142,6 @@ export const layout: RunTimeLayoutConfig = ({
       return dom;
     },
     actionsRender: () => {
-      // `locale: false` opts out of the language switcher. ProLayout's own
-      // `locale` prop is a locale string, so narrow to the boolean toggle here.
       const localeEnabled =
         (initialState?.settings as { locale?: boolean })?.locale !== false;
       return [
@@ -129,14 +157,12 @@ export const layout: RunTimeLayoutConfig = ({
         <AvatarDropdown>{avatarChildren}</AvatarDropdown>
       ),
     },
-    // waterMarkProps: {
-    //   content: initialState?.currentUser?.name,
-    // },
     footerRender: () => null,
     onPageChange: () => {
-      // 如果没有登录，重定向到 login
+      // 如果没有登录，保存当前路径并重定向到 login
       const { currentUser } = initialState;
       if (!currentUser && history.location.pathname !== loginPath) {
+        saveLoginRedirect();
         history.push(loginPath);
       }
     },
@@ -168,15 +194,9 @@ export const layout: RunTimeLayoutConfig = ({
           </Link>,
         ]
       : [],
-    // Replace ProLayout's default ErrorBoundary with our offline-aware version,
-    // so chunk load errors show friendly messages instead of "Something went wrong."
     ErrorBoundary,
     menuHeaderRender: undefined,
-    // 自定义 403 页面
-    // unAccessible: <div>unAccessible</div>,
-    // 增加一个 loading 的状态
     childrenRender: (children) => {
-      // if (initialState?.loading) return <PageLoading />;
       return (
         <>
           {children}

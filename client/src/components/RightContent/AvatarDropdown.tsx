@@ -43,6 +43,11 @@ const loginOut = async () => {
   }
   // 清除本地 token
   localStorage.removeItem('access-token');
+  // 保存当前页面到 sessionStorage，登录后可恢复
+  const currentPath = history.location.pathname + history.location.search + history.location.hash;
+  if (currentPath && currentPath !== '/user/login') {
+    sessionStorage.setItem('wf_login_redirect', currentPath);
+  }
   // 跳转到登录页
   history.push('/user/login');
 };

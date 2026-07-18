@@ -13,15 +13,46 @@ import { Footer } from '@/components';
 import { ssoLogin } from '@/services/ant-design-pro/api';
 import Settings from '../../../../config/defaultSettings';
 
+const REDIRECT_STORAGE_KEY = 'wf_login_redirect';
+
+/** 从 sessionStorage 获取并清除登录 redirect 目标 */
+const getAndClearLoginRedirect = (): string => {
+  const saved = sessionStorage.getItem(REDIRECT_STORAGE_KEY);
+  if (saved) {
+    sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+    return saved;
+  }
+  // 兜底：从 URL 参数中取 redirect
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirect = urlParams.get('redirect');
+  if (redirect) {
+    try {
+      return decodeURIComponent(redirect);
+    } catch {
+      return redirect;
+    }
+  }
+  return '/';
+};
+
 /**
  * Validate redirect URL to prevent open redirect attacks.
  * Only allow same-origin relative paths starting with '/'.
+ * Handles both raw and encodeURIComponent-encoded values.
  */
 const getSafeRedirectUrl = (redirect: string | null): string => {
-  if (!redirect?.startsWith('/')) return '/';
-  if (redirect.startsWith('//')) return '/';
+  if (!redirect) return '/';
+  // 先尝试 decode（可能是 encodeURIComponent 编码后的值）
+  let decoded = redirect;
   try {
-    const parsed = new URL(redirect, window.location.origin);
+    decoded = decodeURIComponent(redirect);
+  } catch {
+    // 如果 decode 失败就用原值
+  }
+  if (!decoded.startsWith('/')) return '/';
+  if (decoded.startsWith('//')) return '/';
+  try {
+    const parsed = new URL(decoded, window.location.origin);
     if (parsed.origin !== window.location.origin) return '/';
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
@@ -56,10 +87,12 @@ const getSsoCallbackPayload = () => {
 /** 构建 SSO 回调 URL */
 const buildSsoCallbackUrl = () => {
   const ssoDirectCallbackUrl = (window as any).SSO_DIRECT_CALLBACK_URL || process.env.SSO_DIRECT_CALLBACK_URL;
+  // 从当前登录页 URL 中获取 redirect 参数（已 encodeURIComponent）
   const redirect = new URL(window.location.href).searchParams.get('redirect');
   const callbackParams = new URLSearchParams();
   callbackParams.set('sso_callback', '1');
   if (redirect) {
+    // 透传 redirect，保持编码
     callbackParams.set('redirect', redirect);
   }
 
@@ -156,9 +189,14 @@ const Login: React.FC = () => {
       message.success('登录成功！');
       await fetchUserInfo();
 
-      const urlParams = new URL(window.location.href).searchParams;
-      const redirectUrl = getSafeRedirectUrl(urlParams.get('redirect'));
-      window.location.href = redirectUrl;
+      // 从 sessionStorage 或 URL 参数获取 redirect 目标
+      const redirectUrl = getAndClearLoginRedirect();
+      // 安全验证：只允许同源相对路径
+      if (redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')) {
+        window.location.href = redirectUrl;
+      } else {
+        window.location.href = '/';
+      }
       return true;
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || '登录失败，请重试';
