@@ -53,7 +53,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
 
   const columns = [
     {
-      title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
+      title: '名称', dataIndex: 'name', key: 'name', width: '35%', ellipsis: true,
       render: (v: string, r: WorkflowRecord) => (
         <a onClick={() => {
           onClose();
@@ -62,19 +62,19 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
       ),
     },
     {
-      title: '描述', dataIndex: 'description', key: 'description', ellipsis: true,
+      title: '描述', dataIndex: 'description', key: 'description', width: '30%', ellipsis: true,
       render: (v: string) => v || '-',
     },
     {
-      title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 150,
+      title: '最后更新', dataIndex: 'updatedAt', key: 'updatedAt', width: 140,
       render: (v: string) => v ? new Date(v).toLocaleString('zh-CN') : '-',
       defaultSortOrder: 'descend' as const,
       sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
     },
     {
-      title: '操作', key: 'action', width: 100,
+      title: '操作', key: 'action', width: 100, fixed: 'right' as const,
       render: (_: any, record: WorkflowRecord) => (
-        <Space>
+        <Space size={4}>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => {
             onClose();
             history.push(`/workflow/fullscreen?id=${record.id}`);
@@ -97,6 +97,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
       footer={null}
       width={700}
       destroyOnHidden
+      styles={{ body: { padding: '12px 0 0' } }}
     >
       <Table
         dataSource={data}
@@ -106,6 +107,8 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
         size="small"
         pagination={{ pageSize: 10 }}
         locale={{ emptyText: '暂无文件' }}
+        scroll={{ x: 550 }}
+        style={{ width: '100%' }}
       />
     </Modal>
   );
