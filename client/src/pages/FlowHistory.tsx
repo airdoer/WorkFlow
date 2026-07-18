@@ -50,11 +50,11 @@ const FlowHistory: React.FC = () => {
   };
 
   const handleEdit = (id: string) => {
-    history.push(`/workflow/editor?id=${id}`);
+    history.push(`/workflow?id=${id}`);
   };
 
   const handleCreate = () => {
-    history.push('/workflow/editor');
+    history.push('/workflow');
   };
 
   const columns = [

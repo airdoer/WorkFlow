@@ -17,8 +17,6 @@ import {
 import {
   PlayCircleOutlined,
   StopOutlined,
-  FullscreenOutlined,
-  FullscreenExitOutlined,
   InfoCircleOutlined,
   UnorderedListOutlined,
   LoadingOutlined,
@@ -27,8 +25,6 @@ import {
   CloseOutlined,
   PlusOutlined,
   DeleteOutlined,
-  ExportOutlined,
-  ImportOutlined,
   LinkOutlined,
   RestOutlined,
   RollbackOutlined,
@@ -233,8 +229,6 @@ export interface ToolbarProps {
   workflowCreatedAt?: string;
   workflowUpdatedAt?: string;
   isDirty?: boolean;
-  isFullscreen?: boolean;
-  onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
   onRun?: (json: WorkflowJSON, workflowId?: string) => void;
   runCancelFn?: (() => void) | null;
@@ -264,8 +258,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   workflowCreatedAt,
   workflowUpdatedAt,
   isDirty = false,
-  isFullscreen,
-  onFullscreenToggle,
   onSave,
   onRun,
   runCancelFn,
@@ -840,9 +832,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
       title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
       render: (v: string, r: WorkflowRecord) => {
         const label = formatWorkflowLabel(v, r.description);
-        const base = window.location.pathname.includes('fullscreen')
-          ? '/workflow/fullscreen'
-          : '/workflow/editor';
+        const isOld = window.location.pathname.startsWith('/workflow/old');
+        const base = isOld ? '/workflow/old' : '/workflow';
         const href = `${base}?id=${r.id}`;
         return (
           <a
@@ -1061,7 +1052,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       {/* ── 推右区到最右 */}
       <div style={{ marginLeft: 'auto' }} />
 
-      {/* ── 右区：执行历史 + 导入/导出 + 变量管理 + 定时任务 + 全屏 + 用户 ── */}
+      {/* ── 右区：执行历史 + 变量管理 + 定时任务 + 用户 ── */}
       <Space size={4}>
         <Tooltip title="执行历史">
           <Button icon={<HistoryOutlined />} size="small" onClick={() => setExecHistoryOpen(true)}>执行历史</Button>
@@ -1071,19 +1062,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </Tooltip>
         <Tooltip title="定时任务管理">
           <Button icon={<ClockCircleOutlined />} size="small" onClick={openCronModal}>定时任务</Button>
-        </Tooltip>
-        <Tooltip title="导入 JSON">
-          <Button icon={<ImportOutlined />} size="small" onClick={handleImport} />
-        </Tooltip>
-        <Tooltip title="导出 JSON">
-          <Button icon={<ExportOutlined />} size="small" onClick={handleExport} />
-        </Tooltip>
-        <Tooltip title={isFullscreen ? '退出全屏' : '全屏'}>
-          <Button
-            icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-            onClick={onFullscreenToggle}
-            size="small"
-          />
         </Tooltip>
 
         {/* ── 用户信息区域 ── */}

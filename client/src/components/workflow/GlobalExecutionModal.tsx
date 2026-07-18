@@ -61,7 +61,7 @@ const GlobalExecutionModal: React.FC<{ open: boolean; onClose: () => void }> = (
       title: '工作流', dataIndex: 'workflowName', key: 'workflowName', ellipsis: true,
       render: (v: string, r: GlobalRecord) => (
         <Button type="link" size="small" onClick={() => {
-          const url = `/workflow/fullscreen?id=${r.workflowId}`;
+          const url = `/workflow?id=${r.workflowId}`;
           window.open(url, '_blank');
         }}>
           {v || r.workflowId || '-'}

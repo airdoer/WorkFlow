@@ -57,7 +57,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
       render: (v: string, r: WorkflowRecord) => (
         <a onClick={() => {
           onClose();
-          history.push(`/workflow/fullscreen?id=${r.id}`);
+          history.push(`/workflow?id=${r.id}`);
         }}>{v}</a>
       ),
     },
@@ -77,7 +77,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
         <Space size={4}>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => {
             onClose();
-            history.push(`/workflow/fullscreen?id=${record.id}`);
+            history.push(`/workflow?id=${record.id}`);
           }}>
             编辑
           </Button>

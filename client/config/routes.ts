@@ -9,29 +9,23 @@ export default [
       },
     ],
   },
+  // Default workflow route — fullscreen (no ADP layout chrome)
   {
     path: '/workflow',
-    name: 'workflow',
-    icon: 'apartment',
-    routes: [
-      {
-        path: '/workflow/editor',
-        name: 'editor',
-        icon: 'edit',
-        component: './FlowDemo',
-      },
-      {
-        path: '/workflow/history',
-        name: 'history',
-        icon: 'history',
-        component: './FlowHistory',
-      },
-    ],
-  },
-  // Fullscreen editor route — no ADP layout chrome, accessible via fullscreen button
-  {
-    path: '/workflow/fullscreen',
     component: './FlowDemo',
     layout: false,
-  }
+  },
+  // Legacy editor route — traditional sidebar layout
+  {
+    path: '/workflow/old',
+    name: 'editor',
+    icon: 'edit',
+    component: './FlowDemo',
+  },
+  {
+    path: '/workflow/history',
+    name: 'history',
+    icon: 'history',
+    component: './FlowHistory',
+  },
 ];

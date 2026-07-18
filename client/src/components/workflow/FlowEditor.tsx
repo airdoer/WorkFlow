@@ -43,7 +43,6 @@ interface FlowEditorProps {
   workflowCreatedAt?: string;
   workflowUpdatedAt?: string;
   isFullscreen?: boolean;
-  onFullscreenToggle?: () => void;
   onSave?: (id: string, name: string) => void;
   onSwitchWorkflow?: (id: string) => void;
   onDeleteWorkflow?: () => void;
@@ -59,7 +58,6 @@ function FlowEditorInner({
   workflowCreatedAt,
   workflowUpdatedAt,
   isFullscreen,
-  onFullscreenToggle,
   onSave,
   onSwitchWorkflow,
   onDeleteWorkflow,
@@ -1188,8 +1186,6 @@ function FlowEditorInner({
         workflowCreatedAt={workflowCreatedAt}
         workflowUpdatedAt={workflowUpdatedAt}
         isDirty={isDirty}
-        isFullscreen={isFullscreen}
-        onFullscreenToggle={onFullscreenToggle}
         onSave={(id, name) => {
           setIsDirty(false);
           onSave?.(id, name);

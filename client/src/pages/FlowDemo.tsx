@@ -25,6 +25,9 @@ const WorkflowPage: React.FC = () => {
   const currentUser = initialState?.currentUser;
   const username = currentUser?.name || currentUser?.userid || '';
 
+  // /workflow is fullscreen (default), /workflow/old is sidebar layout
+  const isFullscreen = !window.location.pathname.startsWith('/workflow/old');
+
   const loadWorkflow = async (workflowId: string) => {
     setLoading(true);
     try {
@@ -87,18 +90,6 @@ const WorkflowPage: React.FC = () => {
     setWorkflowData({ key: `new_${Date.now()}` });
   };
 
-  const handleFullscreenToggle = () => {
-    const id = searchParams.get('id') || workflowData.id;
-    const isFullscreen = window.location.pathname === '/workflow/fullscreen';
-    if (isFullscreen) {
-      history.push(`/workflow/editor${id ? `?id=${id}` : ''}`);
-    } else {
-      history.push(`/workflow/fullscreen${id ? `?id=${id}` : ''}`);
-    }
-  };
-
-  const isFullscreen = window.location.pathname === '/workflow/fullscreen';
-
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: isFullscreen ? '100vh' : '100%' }}>
@@ -120,7 +111,6 @@ const WorkflowPage: React.FC = () => {
         workflowUpdatedAt={workflowData.updatedAt}
         isFullscreen={isFullscreen}
         initialLibraryOpen={searchParams.get('library_open') === 'true'}
-        onFullscreenToggle={handleFullscreenToggle}
         onSave={handleSave}
         onSwitchWorkflow={handleSwitchWorkflow}
         onDeleteWorkflow={handleDeleteWorkflow}
