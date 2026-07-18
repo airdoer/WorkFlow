@@ -1205,7 +1205,7 @@ function FlowEditorInner({
           setTimeout(() => doSave(), 100);
         }} collapsed={toolboxCollapsed} onToggleCollapse={() => setToolboxCollapsed(c => !c)} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
-          {/* Override ReactFlow's "not-allowed" cursor during edge drag — show crosshair instead */}
+          {/* Override ReactFlow cursors: crosshair for connecting, grab for panning */}
           <style>{`
             .react-flow.is-connecting,
             .react-flow.is-connecting *,
@@ -1213,9 +1213,13 @@ function FlowEditorInner({
               cursor: crosshair !important;
             }
             .react-flow__edgeupdater {
-              cursor: grab !important;
+              cursor: crosshair !important;
             }
             .react-flow__connectionline {
+              cursor: crosshair !important;
+            }
+            /* Handle hover — crosshair to distinguish from canvas pan (grab) */
+            .react-flow__handle {
               cursor: crosshair !important;
             }
           `}</style>

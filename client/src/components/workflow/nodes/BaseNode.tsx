@@ -613,6 +613,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     background: PORT_COLORS[p.type] || '#d9d9d9',
                     border: '2px solid #fff',
                     boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                    cursor: 'crosshair',
                   }}
                 />
                 <span style={{ marginLeft: 0 }}>{p.label}</span>
@@ -649,6 +650,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                     background: PORT_COLORS[p.type] || '#d9d9d9',
                     border: '2px solid #fff',
                     boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                    cursor: 'crosshair',
                   }}
                 />
               </div>
