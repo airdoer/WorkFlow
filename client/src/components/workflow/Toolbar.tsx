@@ -829,7 +829,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   const libraryColumns = [
     {
-      title: '名称', dataIndex: 'name', key: 'name', ellipsis: true,
+      title: '名称', dataIndex: 'name', key: 'name', width: '30%', ellipsis: true,
       render: (v: string, r: WorkflowRecord) => {
         const label = formatWorkflowLabel(v, r.description);
         const isOld = window.location.pathname.startsWith('/workflow/old');
@@ -1243,7 +1243,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <Button onClick={() => { setLibraryOpen(false); setLibrarySearch(''); }}>关闭</Button>
           </div>
         }
-        width={900}
+        width={1100}
         destroyOnHidden
         styles={{ body: { background: '#f0f4f8', padding: '16px 16px 8px' } }}
       >
@@ -1277,6 +1277,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           size="small"
           pagination={{ pageSize: 8, showSizeChanger: false }}
           rowClassName={(r) => r.id === workflowId ? 'workflow-lib-active-row' : ''}
+          scroll={{ x: 750 }}
         />
       </Modal>
 

@@ -72,7 +72,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
       sorter: (a: WorkflowRecord, b: WorkflowRecord) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
     },
     {
-      title: '操作', key: 'action', width: 100, fixed: 'right' as const,
+      title: '操作', key: 'action', width: 100,
       render: (_: any, record: WorkflowRecord) => (
         <Space size={4}>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => {
@@ -95,7 +95,7 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
       open={open}
       onCancel={onClose}
       footer={null}
-      width={700}
+      width={900}
       destroyOnHidden
       styles={{ body: { padding: '12px 0 0' } }}
     >
@@ -107,7 +107,6 @@ const MyFilesModal: React.FC<Props> = ({ open, onClose }) => {
         size="small"
         pagination={{ pageSize: 10 }}
         locale={{ emptyText: '暂无文件' }}
-        scroll={{ x: 550 }}
         style={{ width: '100%' }}
       />
     </Modal>
