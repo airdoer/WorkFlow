@@ -439,21 +439,35 @@ function FlowEditorInner({
   const quickAddJustOpenedRef = useRef(false); // prevent onPaneClick from closing immediately
 
   const onConnectStart = useCallback((_: any, { nodeId, handleId, type }: Connection) => {
-    // Determine the port type for compatibility filtering
+    // Determine the REAL direction by checking the DOM class of the handle element
+    // ReactFlow's `type` parameter is sometimes unreliable for target-handle drags
+    let actualType: 'source' | 'target' = type || 'source';
     let portType = 'any';
+
+    // Check DOM: target handles have class "react-flow__handle-left", source have "react-flow__handle-right"
+    const evt = _ as MouseEvent;
+    const handleEl = (evt?.target as HTMLElement)?.closest?.('.react-flow__handle');
+    if (handleEl) {
+      if (handleEl.classList.contains('react-flow__handle-left')) {
+        actualType = 'target';
+      } else if (handleEl.classList.contains('react-flow__handle-right')) {
+        actualType = 'source';
+      }
+    }
+
     if (nodeId) {
       const node = nodes.find((n) => n.id === nodeId);
       if (node) {
+        const direction = actualType === 'source' ? 'output' : 'input';
         const port = getNodePorts(node.type || '').find(
-          (p) => p.key === handleId && (type === 'source' ? p.direction === 'output' : p.direction === 'input'),
+          (p) => p.key === handleId && p.direction === direction,
         );
         if (port) portType = port.type;
       }
     }
-    connectStartRef.current = { nodeId: nodeId || '', handleId: handleId || '', type: type || 'source', portType };
+    connectStartRef.current = { nodeId: nodeId || '', handleId: handleId || '', type: actualType, portType };
     connectSucceededRef.current = false;
     // Record mouse start position for drag distance check
-    const evt = _ as MouseEvent;
     if (evt?.clientX !== undefined) {
       connectMouseStartRef.current = { x: evt.clientX, y: evt.clientY };
     }
@@ -461,22 +475,20 @@ function FlowEditorInner({
 
   const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
     const start = connectStartRef.current;
-    if (!start || start.type !== 'source') {
-      connectStartRef.current = null;
+    if (!start) {
       return;
     }
     connectStartRef.current = null;
+
     // Check if the connection actually landed on a Handle element.
-    // ReactFlow Handles have the class 'react-flow__handle'.
-    // If released over a handle, the connection succeeded — don't show menu.
     const target = (event as MouseEvent).target as HTMLElement;
     const landedOnHandle = target?.closest?.('.react-flow__handle');
     if (connectSucceededRef.current || landedOnHandle) {
       connectSucceededRef.current = false;
       return;
     }
-    // Check minimum drag distance — if user barely moved, don't show menu
-    // (prevents accidental clicks on Handles from triggering quick-add)
+
+    // Check minimum drag distance
     const MIN_DRAG_DISTANCE = 10;
     const clientX = 'clientX' in event ? event.clientX : 0;
     const clientY = 'clientY' in event ? event.clientY : 0;
@@ -485,69 +497,195 @@ function FlowEditorInner({
       const dx = clientX - mouseStart.x;
       const dy = clientY - mouseStart.y;
       if (Math.sqrt(dx * dx + dy * dy) < MIN_DRAG_DISTANCE) {
-        return; // Barely moved — just a click, don't show menu
+        return;
       }
     }
-    // Connection did NOT land on a target handle → show quick-add menu
-    // Set flag to prevent onPaneClick from closing the menu immediately
-    // (ReactFlow fires onPaneClick in the same mouseup event)
-    quickAddJustOpenedRef.current = true;
+
     const canvasPos = screenToFlowPosition({ x: clientX, y: clientY });
-    setQuickAdd({
-      canvasX: canvasPos.x,
-      canvasY: canvasPos.y,
-      screenX: clientX,
-      screenY: clientY,
-      sourceId: start.nodeId,
-      sourceHandle: start.handleId,
-      sourcePortType: start.portType,
-    });
-    // Clear the flag after the current event loop tick,
-    // so the next onPaneClick won't be blocked
+
+    if (start.type === 'source') {
+      // Dragged from output handle → show quick-add menu to pick a downstream node
+      quickAddJustOpenedRef.current = true;
+      setQuickAdd({
+        canvasX: canvasPos.x,
+        canvasY: canvasPos.y,
+        screenX: clientX,
+        screenY: clientY,
+        sourceId: start.nodeId,
+        sourceHandle: start.handleId,
+        sourcePortType: start.portType,
+      });
+    } else if (start.type === 'target') {
+      // Dragged from input handle → auto-create an upstream node
+      // Find the current node to determine compatible port type
+      const currentNode = nodes.find((n) => n.id === start.nodeId);
+      const targetPort = currentNode
+        ? getNodePorts(currentNode.type || '').find(
+            (p) => p.key === start.handleId && p.direction === 'input',
+          )
+        : null;
+      const targetPortType = targetPort?.type || 'any';
+
+      // Create a new node positioned so its RIGHT edge aligns with the mouse position
+      // Default node width ~260px, so x = mouseX - nodeWidth
+      const newNodeId = `auto_${Date.now()}`;
+      const newNodePosition = {
+        x: canvasPos.x - 260,
+        y: canvasPos.y - 30,
+      };
+      const newNode: Node = {
+        id: newNodeId,
+        type: 'value', // default to Value node
+        position: newNodePosition,
+        data: {},
+      };
+      setNodes((nds) => [...nds, newNode]);
+
+      // Get the new node's first output port
+      const newNodePorts = getNodePorts('value');
+      const firstOutputPort = newNodePorts.find((p) => p.direction === 'output');
+      const sourceHandle = firstOutputPort?.key || 'output';
+
+      // Check type compatibility
+      const sourcePortType = firstOutputPort?.type || 'any';
+      const compatible = isPortTypeCompatible(sourcePortType, targetPortType);
+      const edgeData: any = {
+        sourcePortType,
+        targetPortType,
+        matchStatus: compatible ? 'matched' : 'mismatched',
+        activated: false,
+      };
+      if (!compatible) {
+        message.warning(`端口类型不兼容: ${sourcePortType} → ${targetPortType}，请检查连线`);
+      }
+
+      const newEdge: Edge = {
+        id: `e_${Date.now()}`,
+        source: newNodeId,
+        sourceHandle,
+        target: start.nodeId,
+        targetHandle: start.handleId,
+        type: 'flowing',
+        data: edgeData,
+      };
+      setEdges((eds) => [...eds, newEdge]);
+      setIsDirty(true);
+      pushUndo();
+      setTimeout(() => doSave(), 150);
+
+      // Open QuickAdd so user can change the auto-created node type
+      quickAddJustOpenedRef.current = true;
+      setQuickAdd({
+        canvasX: canvasPos.x,
+        canvasY: canvasPos.y,
+        screenX: clientX,
+        screenY: clientY,
+        sourceId: '',        // no source — we're building the upstream
+        sourceHandle: '',
+        sourcePortType: '',
+        // Custom fields for reverse-connection mode
+        _reverseTargetId: start.nodeId,
+        _reverseTargetHandle: start.handleId,
+      } as any);
+    }
+
     setTimeout(() => { quickAddJustOpenedRef.current = false; }, 0);
-  }, [screenToFlowPosition]);
+  }, [screenToFlowPosition, nodes, setNodes, setEdges, pushUndo, doSave]);
 
   const handleQuickAddSelect = useCallback((nodeType: string, targetHandle: string) => {
     if (!quickAdd) return;
     const id = `${nodeType}_${Date.now()}`;
     // Provide initial data for nodes that need it (e.g. Format with default str1)
     const initialData = nodeType === 'format' ? getFormatInitialData() : {};
+
+    // Check if this is a reverse-connection (dragged from target handle)
+    const reverseTargetId = (quickAdd as any)._reverseTargetId as string | undefined;
+    const reverseTargetHandle = (quickAdd as any)._reverseTargetHandle as string | undefined;
+
+    // In reverse mode, position node so its RIGHT edge aligns with mouse
+    const nodePosition = (reverseTargetId && reverseTargetHandle)
+      ? { x: quickAdd.canvasX - 260, y: quickAdd.canvasY - 30 }
+      : { x: quickAdd.canvasX, y: quickAdd.canvasY };
+
     const newNode: Node = {
       id,
       type: nodeType,
-      position: { x: quickAdd.canvasX, y: quickAdd.canvasY },
+      position: nodePosition,
       data: initialData,
     };
-    setNodes((nds) => [...nds, newNode]);
 
-    // Build edge data with type compatibility
-    const sourcePort = getNodePorts(nodes.find((n) => n.id === quickAdd.sourceId)?.type || '').find(
-      (p) => p.key === quickAdd.sourceHandle && p.direction === 'output',
-    );
-    let targetPort = getNodePorts(nodeType).find((p) => p.key === targetHandle && p.direction === 'input');
-    // Fallback for dynamic ports: check Format variables
-    if (!targetPort && nodeType === 'format') {
-      targetPort = { key: targetHandle, type: 'string', direction: 'input' as const };
+    let newEdge: Edge;
+
+    if (reverseTargetId && reverseTargetHandle) {
+      // Reverse mode: new node is the SOURCE, existing node is the TARGET
+      const firstOutputPort = getNodePorts(nodeType).find((p) => p.direction === 'output');
+      const sourceHandle = firstOutputPort?.key || 'output';
+      const sourcePortType = firstOutputPort?.type || 'any';
+
+      const targetNode = nodes.find((n) => n.id === reverseTargetId);
+      const targetPort = targetNode
+        ? getNodePorts(targetNode.type || '').find(
+            (p) => p.key === reverseTargetHandle && p.direction === 'input',
+          )
+        : null;
+      const targetPortType = targetPort?.type || 'any';
+
+      const compatible = isPortTypeCompatible(sourcePortType, targetPortType);
+      const edgeData: any = {
+        sourcePortType,
+        targetPortType,
+        matchStatus: compatible ? 'matched' : 'mismatched',
+        activated: false,
+      };
+      if (!compatible) {
+        message.warning(`端口类型不兼容: ${sourcePortType} → ${targetPortType}，请检查连线`);
+      }
+
+      newEdge = {
+        id: `e_${Date.now()}`,
+        source: id,
+        sourceHandle,
+        target: reverseTargetId,
+        targetHandle: reverseTargetHandle,
+        type: 'flowing',
+        data: edgeData,
+      };
+
+      // Remove the auto-created default node and add the proper one
+      setNodes((nds) => [...nds.filter((n) => !n.id.startsWith('auto_')), newNode]);
+    } else {
+      // Normal mode: existing node is the SOURCE, new node is the TARGET
+      const sourcePort = getNodePorts(nodes.find((n) => n.id === quickAdd.sourceId)?.type || '').find(
+        (p) => p.key === quickAdd.sourceHandle && p.direction === 'output',
+      );
+      let targetPort = getNodePorts(nodeType).find((p) => p.key === targetHandle && p.direction === 'input');
+      // Fallback for dynamic ports: check Format variables
+      if (!targetPort && nodeType === 'format') {
+        targetPort = { key: targetHandle, type: 'string', direction: 'input' as const };
+      }
+      const compatible = sourcePort && targetPort ? isPortTypeCompatible(sourcePort?.type || 'any', targetPort.type) : true;
+      const edgeData: any = {
+        sourcePortType: sourcePort?.type || 'any',
+        targetPortType: targetPort?.type || 'any',
+        matchStatus: compatible ? 'matched' : 'mismatched',
+        activated: false,
+      };
+      if (!compatible) {
+        message.warning(`端口类型不兼容: ${sourcePort?.type || '?'} → ${targetPort?.type || '?'}，请检查连线`);
+      }
+      newEdge = {
+        id: `e_${Date.now()}`,
+        source: quickAdd.sourceId,
+        sourceHandle: quickAdd.sourceHandle,
+        target: id,
+        targetHandle,
+        type: 'flowing',
+        data: edgeData,
+      };
+
+      setNodes((nds) => [...nds, newNode]);
     }
-    const compatible = sourcePort && targetPort ? isPortTypeCompatible(sourcePort?.type || 'any', targetPort.type) : true;
-    const edgeData: any = {
-      sourcePortType: sourcePort?.type || 'any',
-      targetPortType: targetPort?.type || 'any',
-      matchStatus: compatible ? 'matched' : 'mismatched',
-      activated: false,
-    };
-    if (!compatible) {
-      message.warning(`端口类型不兼容: ${sourcePort?.type || '?'} → ${targetPort?.type || '?'}，请检查连线`);
-    }
-    const newEdge: Edge = {
-      id: `e_${Date.now()}`,
-      source: quickAdd.sourceId,
-      sourceHandle: quickAdd.sourceHandle,
-      target: id,
-      targetHandle,
-      type: 'flowing',
-      data: edgeData,
-    };
+
     setEdges((eds) => [...eds, newEdge]);
     setQuickAdd(null);
     setIsDirty(true);
@@ -1205,20 +1343,20 @@ function FlowEditorInner({
           setTimeout(() => doSave(), 100);
         }} collapsed={toolboxCollapsed} onToggleCollapse={() => setToolboxCollapsed(c => !c)} />
         <div style={{ flex: 1, minHeight: 0, position: 'relative', width: '100%', height: '100%' }} onKeyDown={onKeyDown} tabIndex={-1}>
-          {/* Override ReactFlow cursors: crosshair for connecting, grab for panning */}
+          {/* Cursor policy: crosshair on Handle (new connection), move on edge/edgeupdater (drag), grab on canvas (pan) */}
           <style>{`
             .react-flow.is-connecting,
             .react-flow.is-connecting *,
             .react-flow.is-connecting .react-flow__pane {
-              cursor: crosshair !important;
+              cursor: move !important;
             }
             .react-flow__edgeupdater {
-              cursor: crosshair !important;
+              cursor: move !important;
             }
             .react-flow__connectionline {
-              cursor: crosshair !important;
+              cursor: move !important;
             }
-            /* Handle hover — crosshair to distinguish from canvas pan (grab) */
+            /* Handle hover — crosshair to indicate "create new connection" */
             .react-flow__handle {
               cursor: crosshair !important;
             }
@@ -1265,6 +1403,15 @@ function FlowEditorInner({
               sourceId={quickAdd.sourceId}
               sourceHandle={quickAdd.sourceHandle}
               sourcePortType={quickAdd.sourcePortType}
+              reverseMode={!!(quickAdd as any)._reverseTargetId}
+              reverseTargetPortType={(() => {
+                const tid = (quickAdd as any)._reverseTargetId;
+                const th = (quickAdd as any)._reverseTargetHandle;
+                if (!tid || !th) return undefined;
+                const tn = nodes.find((n) => n.id === tid);
+                const tp = tn ? getNodePorts(tn.type || '').find((p) => p.key === th && p.direction === 'input') : null;
+                return tp?.type || undefined;
+              })()}
               onSelect={handleQuickAddSelect}
               onClose={() => setQuickAdd(null)}
               // Position the menu near the mouse release point

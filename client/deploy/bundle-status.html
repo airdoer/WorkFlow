@@ -96,20 +96,20 @@
         box-shadow: 0 0 8px var(--sat-color, #4fc3f7), 0 0 20px var(--sat-glow, rgba(79,195,247,0.4));
       }
 
-      /* Trail behind each satellite — now rotated via JS */
+      /* Trail behind each satellite — now rendered via canvas particles */
       .satellite::before {
-        content: '';
+        display: none;
+      }
+
+      /* Particle canvas overlay */
+      #trail-canvas {
         position: absolute;
-        top: -3px;
-        left: 10px;
-        width: 30px;
-        height: 6px;
-        border-radius: 3px;
-        background: linear-gradient(90deg, var(--sat-color, #4fc3f7), transparent);
-        opacity: 0.5;
-        transform-origin: -10px center;
-        /* rotation set by JS: --trail-angle */
-        transform: rotate(var(--trail-angle, 0deg));
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 4;
       }
 
       /* Satellite 1 — blue, orbit-1 */
@@ -263,6 +263,7 @@
 
     <div id="loading">
       <div class="scene">
+        <canvas id="trail-canvas" width="320" height="320"></canvas>
         <div class="center-glow"></div>
         <div class="orbit orbit-1"></div>
         <div class="orbit orbit-2"></div>
@@ -302,36 +303,168 @@
         }
       })();
 
-      // Satellite trail angle tracking — make trail point away from center
+      // Satellite trail particle system — physics-based exhaust particles
       (function() {
-        var sats = document.querySelectorAll('.satellite');
+        var canvas = document.getElementById('trail-canvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var W = 320, H = 320;
+        canvas.width = W * 2;  // retina
+        canvas.height = H * 2;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.scale(2, 2);
+        var cx = W / 2, cy = H / 2;
+
         var orbits = [
-          { radius: 100, duration: 5 },   // sat-1, sat-5
-          { radius: 130, duration: 8 },   // sat-2, sat-3
-          { radius: 155, duration: 12 },  // sat-4
+          { radius: 100, duration: 5 },
+          { radius: 130, duration: 8 },
+          { radius: 155, duration: 12 },
         ];
         var satConfigs = [
-          { orbit: 0, delay: 0 },
-          { orbit: 1, delay: 0 },
-          { orbit: 1, delay: -4000 },
-          { orbit: 2, delay: 0 },
-          { orbit: 0, delay: -2500 },
+          { orbit: 0, delay: 0,     color: [79,  195, 247] },  // #4fc3f7
+          { orbit: 1, delay: 0,     color: [0,   229, 255] },  // #00e5ff
+          { orbit: 1, delay: -4000, color: [179, 136, 255] },  // #b388ff
+          { orbit: 2, delay: 0,     color: [255, 171, 64] },   // #ffab40
+          { orbit: 0, delay: -2500, color: [105, 240, 174] },  // #69f0ae
         ];
+
+        // Particle pool
+        var particles = [];
+        var MAX_PARTICLES = 600;
+
         var startTime = performance.now();
+
+        function getSatPos(cfg, elapsed) {
+          var orb = orbits[cfg.orbit];
+          var t = elapsed + cfg.delay / 1000;
+          var angle = ((t / orb.duration) * 360) % 360;
+          var rad = angle * Math.PI / 180;
+          return {
+            x: cx + Math.cos(rad) * orb.radius,
+            y: cy + Math.sin(rad) * orb.radius,
+            angle: angle,
+            rad: rad,
+          };
+        }
+
+        // Previous positions for velocity
+        var prevPos = satConfigs.map(function() { return null; });
 
         function updateTrails() {
           var now = performance.now();
-          var elapsed = (now - startTime) / 1000; // seconds
+          var elapsed = (now - startTime) / 1000;
 
-          sats.forEach(function(sat, i) {
-            var cfg = satConfigs[i];
-            var orb = orbits[cfg.orbit];
-            var effectiveTime = elapsed + cfg.delay / 1000;
-            var angle = ((effectiveTime / orb.duration) * 360) % 360; // degrees
-            // Trail should point outward (radially away from center)
-            // When satellite is at angle θ, trail points at θ (away from center)
-            sat.style.setProperty('--trail-angle', angle + 'deg');
+          ctx.clearRect(0, 0, W, H);
+
+          // Emit new particles from each satellite
+          satConfigs.forEach(function(cfg, i) {
+            var pos = getSatPos(cfg, elapsed);
+            var prev = prevPos[i];
+
+            if (prev) {
+              // Velocity (direction of motion, tangent to orbit)
+              var vx = pos.x - prev.x;
+              var vy = pos.y - prev.y;
+              // Normalize velocity direction
+              var vLen = Math.sqrt(vx * vx + vy * vy);
+              if (vLen > 0.01) {
+                vx /= vLen;
+                vy /= vLen;
+              }
+
+              // Direction from satellite to center (radially inward)
+              var toCenterX = cx - pos.x;
+              var toCenterY = cy - pos.y;
+              var tcLen = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+              if (tcLen > 0.01) {
+                toCenterX /= tcLen;
+                toCenterY /= tcLen;
+              }
+
+              // Exhaust direction = opposite of velocity (trail behind motion)
+              var exX = -vx;
+              var exY = -vy;
+
+              // Emit 3-5 particles per frame per satellite
+              var count = 3 + Math.floor(Math.random() * 3);
+              for (var j = 0; j < count; j++) {
+                if (particles.length >= MAX_PARTICLES) break;
+                // Spread around exhaust direction
+                var spread = (Math.random() - 0.5) * 0.8; // ±0.4 radians spread
+                var cos_s = Math.cos(spread);
+                var sin_s = Math.sin(spread);
+                var dirX = exX * cos_s - exY * sin_s;
+                var dirY = exX * sin_s + exY * cos_s;
+
+                // Speed with some randomness
+                var speed = 0.4 + Math.random() * 0.6;
+
+                // Add slight outward drift (centrifugal feel)
+                var outward = 0.1;
+
+                particles.push({
+                  x: pos.x + (Math.random() - 0.5) * 2,
+                  y: pos.y + (Math.random() - 0.5) * 2,
+                  vx: dirX * speed + toCenterX * -outward,
+                  vy: dirY * speed + toCenterY * -outward,
+                  life: 1.0,
+                  decay: 0.015 + Math.random() * 0.015,
+                  size: 1.5 + Math.random() * 2.5,
+                  r: cfg.color[0],
+                  g: cfg.color[1],
+                  b: cfg.color[2],
+                });
+              }
+            }
+
+            prevPos[i] = { x: pos.x, y: pos.y };
           });
+
+          // Update & render particles
+          var alive = [];
+          for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            p.life -= p.decay;
+            if (p.life <= 0) continue;
+
+            // Physics: slight gravity toward center (keeps particles curving with orbit)
+            var dx = cx - p.x;
+            var dy = cy - p.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 1) {
+              p.vx += dx / dist * 0.003;
+              p.vy += dy / dist * 0.003;
+            }
+
+            // Slight drag
+            p.vx *= 0.995;
+            p.vy *= 0.995;
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Render with glow
+            var alpha = p.life * 0.7;
+            var size = p.size * (0.3 + p.life * 0.7);
+            
+            // Core
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + alpha + ')';
+            ctx.fill();
+
+            // Outer glow
+            if (p.life > 0.5) {
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, size * 2.5, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + (alpha * 0.15) + ')';
+              ctx.fill();
+            }
+
+            alive.push(p);
+          }
+          particles = alive;
 
           requestAnimationFrame(updateTrails);
         }

@@ -18,6 +18,10 @@ interface QuickAddMenuProps {
   onClose: () => void;
   /** Position style (fixed positioning from mouse release point) */
   style?: React.CSSProperties;
+  /** Reverse mode: new node will be the SOURCE (upstream), connecting to an existing target */
+  reverseMode?: boolean;
+  /** Target port type (for reverse mode compatibility filtering) */
+  reverseTargetPortType?: string;
 }
 
 const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
@@ -28,6 +32,8 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
   onSelect,
   onClose,
   style,
+  reverseMode,
+  reverseTargetPortType,
 }) => {
   const [search, setSearch] = useState('');
   const [highlightIdx, setHighlightIdx] = useState(0);
@@ -98,9 +104,21 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
       )
     : permissionFilteredList;
 
-  // Find first compatible input port for a given node type
+  // Find first compatible port for a given node type
+  // Normal mode: find compatible INPUT port (new node is target)
+  // Reverse mode: find compatible OUTPUT port (new node is source)
   const getTargetHandle = useCallback(
     (nodeType: string): string | null => {
+      if (reverseMode) {
+        const outputPorts = getNodePorts(nodeType).filter((p) => p.direction === 'output');
+        if (!outputPorts.length) return null;
+        // Prefer compatible port with target
+        if (reverseTargetPortType) {
+          const compatible = outputPorts.find((p) => isPortTypeCompatible(p.type, reverseTargetPortType));
+          if (compatible) return compatible.key;
+        }
+        return outputPorts[0].key;
+      }
       const inputPorts = getNodePorts(nodeType).filter((p) => p.direction === 'input');
       if (!inputPorts.length) return null;
       // Prefer compatible port
@@ -111,14 +129,16 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
       // Fallback to first input port
       return inputPorts[0].key;
     },
-    [sourcePortType],
+    [reverseMode, reverseTargetPortType, sourcePortType],
   );
 
-  // Only show node types that have at least one input port (static or dynamic)
-  // This uses getNodePorts which reads the static port definitions.
-  // Nodes with dynamic ports (like 'format') declare a default input port
-  // in PortTypes.ts so they are included here automatically.
-  const connectable = filtered.filter((e) => getNodePorts(e.type).some((p) => p.direction === 'input'));
+  // Normal mode: only show node types that have at least one input port
+  // Reverse mode: only show node types that have at least one output port
+  const connectable = filtered.filter((e) =>
+    reverseMode
+      ? getNodePorts(e.type).some((p) => p.direction === 'output')
+      : getNodePorts(e.type).some((p) => p.direction === 'input')
+  );
 
   // Keyboard navigation
   const handleSearchKeyDown = useCallback(
