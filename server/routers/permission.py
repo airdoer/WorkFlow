@@ -305,3 +305,72 @@ def permission_pending_delete(target_username):
     data['pendingUsers'] = [p for p in data.get('pendingUsers', []) if p.get('username') != target_username]
     _save_data(data)
     return jsonify({'success': True}), 200
+
+
+# ── Admin Management ──────────────────────────────────────────────────────────
+
+def _load_admin_list():
+    """Load admin whitelist from the same file auth.py uses."""
+    file_path = config.ADMIN_WHITELIST_FILE
+    if not os.path.exists(file_path):
+        return []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as fp:
+            data = json.load(fp)
+        if isinstance(data, list):
+            return [str(item).strip() for item in data if str(item).strip()]
+    except (json.JSONDecodeError, OSError):
+        pass
+    return []
+
+
+def _save_admin_list(admins):
+    """Save admin whitelist."""
+    file_path = config.ADMIN_WHITELIST_FILE
+    d = os.path.dirname(file_path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+    with open(file_path, 'w', encoding='utf-8') as fp:
+        json.dump(sorted(admins), fp, ensure_ascii=False, indent=2)
+
+
+@app.route('/api/permission/admins', methods=['GET'])
+def permission_admin_list():
+    """List all admins (admin only)."""
+    username = _get_current_username()
+    if not username:
+        return jsonify({'message': 'Unauthorized'}), 401
+    if not _is_admin(username):
+        return jsonify({'message': 'Forbidden: admin only'}), 403
+    return jsonify({'admins': _load_admin_list()}), 200
+
+
+@app.route('/api/permission/admins/save', methods=['POST'])
+def permission_admin_save():
+    """Add or remove an admin (admin only)."""
+    username = _get_current_username()
+    if not username:
+        return jsonify({'message': 'Unauthorized'}), 401
+    if not _is_admin(username):
+        return jsonify({'message': 'Forbidden: admin only'}), 403
+
+    body = request.get_json(silent=True) or {}
+    action = body.get('action', 'add')  # add | remove
+    target = body.get('username', '').strip()
+    if not target:
+        return jsonify({'message': 'username is required'}), 400
+
+    admins = _load_admin_list()
+    if action == 'add':
+        if target not in admins:
+            admins.append(target)
+    elif action == 'remove':
+        # Cannot remove yourself
+        if target == username:
+            return jsonify({'message': '不能移除自己的管理员权限'}), 400
+        admins = [a for a in admins if a != target]
+    else:
+        return jsonify({'message': 'Invalid action, use add or remove'}), 400
+
+    _save_admin_list(admins)
+    return jsonify({'success': True, 'admins': admins}), 200

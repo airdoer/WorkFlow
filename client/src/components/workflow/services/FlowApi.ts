@@ -17,12 +17,16 @@ function getSocket(): Socket {
   // In dev mode, connect to same origin (proxied via UMI /socket.io/),
   // In Docker / prod, connect to explicit FLASK_BACKEND_URL
   const socketUrl = API_BASE || window.location.origin;
+  const token = localStorage.getItem('access-token') || '';
   _socket = io(socketUrl, {
     transports: ['websocket', 'polling'],
     path: '/socket.io/',
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    extraHeaders: {
+      'Access-Token': token,
+    },
   });
 
   _socket.on('connect', () => {
@@ -223,6 +227,36 @@ export const FlowApi = {
     const res = await fetch(`${API_BASE}/api/permission/pending/${username}`, {
       method: 'DELETE',
       headers: { 'Access-Token': token },
+    });
+    return handleResponse(res);
+  },
+
+  // ── Admin Management ────────────────────────────────────────────────────────
+
+  async getAdmins() {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/admins`, {
+      headers: { 'Access-Token': token },
+    });
+    return handleResponse(res);
+  },
+
+  async addAdmin(username: string) {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/admins/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Access-Token': token },
+      body: JSON.stringify({ action: 'add', username }),
+    });
+    return handleResponse(res);
+  },
+
+  async removeAdmin(username: string) {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/admins/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Access-Token': token },
+      body: JSON.stringify({ action: 'remove', username }),
     });
     return handleResponse(res);
   },

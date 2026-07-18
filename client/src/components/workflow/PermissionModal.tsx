@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Table, Tag, Space, Button, Input, Checkbox, Tabs, Popconfirm, message, Empty, Card, Row, Col } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, UserAddOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, UserAddOutlined, CrownOutlined } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 
 interface PermissionGroup {
@@ -31,6 +31,7 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
   const [allNodes, setAllNodes] = useState<NodeTypeItem[]>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [adminList, setAdminList] = useState<string[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [editingName, setEditingName] = useState<string>('');
@@ -41,14 +42,16 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [gRes, nRes, pRes] = await Promise.all([
+      const [gRes, nRes, pRes, aRes] = await Promise.all([
         FlowApi.getPermissionGroups(),
         FlowApi.getPermissionNodes(),
         FlowApi.getPendingUsers(),
+        FlowApi.getAdmins(),
       ]);
       setGroups(gRes.groups || []);
       setAllNodes(nRes.nodes || []);
       setPendingUsers(pRes.pendingUsers || []);
+      setAdminList(aRes.admins || []);
     } catch (err: any) {
       message.error(`加载权限数据失败: ${err.message}`);
     } finally {
@@ -346,6 +349,52 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
                   },
                 ]}
               />
+            ),
+          },
+          {
+            key: 'admins',
+            label: '管理员',
+            children: (
+              <div>
+                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>
+                    <CrownOutlined style={{ color: '#faad14', marginRight: 4 }} />
+                    管理员列表 ({adminList.length})
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {adminList.map(a => (
+                    <Tag
+                      key={a}
+                      color="gold"
+                      closable
+                      onClose={async () => {
+                        try {
+                          const res = await FlowApi.removeAdmin(a);
+                          setAdminList(res.admins || []);
+                          message.success(`已移除 ${a} 的管理员权限`);
+                        } catch (err: any) {
+                          message.error(err.message || '移除失败');
+                        }
+                      }}
+                    >
+                      {a}
+                    </Tag>
+                  ))}
+                  <AddUserTag onAdd={async (username) => {
+                    try {
+                      const res = await FlowApi.addAdmin(username);
+                      setAdminList(res.admins || []);
+                      message.success(`已添加 ${username} 为管理员`);
+                    } catch (err: any) {
+                      message.error(err.message || '添加失败');
+                    }
+                  }} />
+                </div>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                  管理员拥有所有权限，包括编辑权限组和管理其他管理员。不能移除自己的管理员权限。
+                </div>
+              </div>
             ),
           },
         ]}

@@ -295,6 +295,17 @@ def on_workflow_run(data):
     # Notify client of task_id immediately
     socketio.emit('workflow:started', {'taskId': task_id}, room=request.sid)
 
+    # Extract username HERE (request context is available in the handler,
+    # but NOT in the background greenlet)
+    run_username = ''
+    run_token = request.headers.get('Access-Token', '').strip()
+    if run_token:
+        try:
+            from routers.auth import _parse_token
+            run_username = _parse_token(run_token) or ''
+        except Exception:
+            pass
+
     def run_workflow():
         logger.info("[SocketIO workflow:run] Background task started: task_id=%r", task_id)
         started_at = _now_utc()
@@ -318,26 +329,18 @@ def on_workflow_run(data):
                 node_statuses = (task_info or {}).get('nodes', {})
                 succeeded = sum(1 for s in node_statuses.values() if s == 'success')
                 failed = sum(1 for s in node_statuses.values() if s == 'error')
-                # Try to get username from Access-Token header
-                username = ''
-                token = request.headers.get('Access-Token', '').strip()
-                if token:
-                    try:
-                        from routers.auth import _parse_token
-                        username = _parse_token(token) or ''
-                    except Exception:
-                        pass
                 record = {
                     'id': task_id,
                     'startedAt': started_at,
                     'finishedAt': finished_at,
                     'status': final_status,
                     'trigger': 'manual',
-                    'username': username,
+                    'username': run_username,
                     'nodeCount': len(nodes),
                     'summary': {'succeeded': succeeded, 'failed': failed},
                 }
                 WorkflowManager.add_history(workflow_id, record)
+                logger.info("[workflow:run] History written for task_id=%r, workflow=%r", task_id, workflow_id)
             except Exception as hist_err:
                 logger.warning("[workflow:run] Failed to write history: %s", hist_err)
 
@@ -393,6 +396,17 @@ def on_workflow_run_from_node(data) -> None:
     # Notify client of task_id immediately
     socketio.emit('workflow:started', {'taskId': task_id}, room=request.sid)
 
+    # Extract username HERE (request context is available in the handler,
+    # but NOT in the background greenlet)
+    run_username = ''
+    run_token = request.headers.get('Access-Token', '').strip()
+    if run_token:
+        try:
+            from routers.auth import _parse_token
+            run_username = _parse_token(run_token) or ''
+        except Exception:
+            pass
+
     def run_subgraph():
         logger.info("[SocketIO workflow:run_from_node] Background task started: task_id=%r, startNode=%r",
                     task_id, start_node_id)
@@ -424,26 +438,19 @@ def on_workflow_run_from_node(data) -> None:
                 node_statuses = (task_info or {}).get('nodes', {})
                 succeeded = sum(1 for s in node_statuses.values() if s == 'success')
                 failed = sum(1 for s in node_statuses.values() if s == 'error')
-                username = ''
-                token = request.headers.get('Access-Token', '').strip()
-                if token:
-                    try:
-                        from routers.auth import _parse_token
-                        username = _parse_token(token) or ''
-                    except Exception:
-                        pass
                 record = {
                     'id': task_id,
                     'startedAt': started_at,
                     'finishedAt': finished_at,
                     'status': final_status,
                     'trigger': 'manual',
-                    'username': username,
+                    'username': run_username,
                     'nodeCount': len(nodes),
                     'summary': {'succeeded': succeeded, 'failed': failed},
                     'startNodeId': start_node_id,
                 }
                 WorkflowManager.add_history(workflow_id, record)
+                logger.info("[workflow:run_from_node] History written for task_id=%r, workflow=%r", task_id, workflow_id)
             except Exception as hist_err:
                 logger.warning("[workflow:run_from_node] Failed to write history: %s", hist_err)
 
