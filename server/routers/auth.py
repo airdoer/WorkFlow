@@ -153,6 +153,30 @@ def get_user_info():
     is_admin = username in admins
     role_obj = _build_role_info(is_admin)
 
+    # Compute visible node types from permission groups
+    visible_node_types = []
+    has_non_wildcard_group = False
+    try:
+        from routers.permission import _load_data, _compute_visible_node_types
+        data = _load_data()
+        visible_node_types = _compute_visible_node_types(username, data.get('groups', []))
+        # Check if user belongs to any non-wildcard group
+        for g in data.get('groups', []):
+            users_in_group = g.get('users', [])
+            if '*' not in users_in_group and username in users_in_group:
+                has_non_wildcard_group = True
+                break
+    except Exception:
+        pass
+
+    # If user has no non-wildcard group membership, add to pending
+    if not has_non_wildcard_group and not is_admin:
+        try:
+            from routers.permission import _add_pending_user
+            _add_pending_user(username)
+        except Exception:
+            pass
+
     return jsonify({
         'result': {
             'name': username,
@@ -160,6 +184,8 @@ def get_user_info():
             'role': role_obj,
             'is_admin': is_admin,
             'access': 'admin' if is_admin else 'user',
+            'visibleNodeTypes': visible_node_types,
+            'admins': sorted(admins),
         }
     }), 200
 

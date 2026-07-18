@@ -29,6 +29,10 @@ declare namespace API {
       name: string;
       permissions: { permissionId: string; permissionName: string; actionEntitySet: any[] }[];
     };
+    /** 用户可见的节点类型列表 */
+    visibleNodeTypes?: string[];
+    /** 管理员列表 */
+    admins?: string[];
   };
 
   type LoginResult = {

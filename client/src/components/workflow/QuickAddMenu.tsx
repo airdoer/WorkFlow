@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { nodeRegistryList } from './NodeRegistry';
+import { nodeRegistryList, filterByPermission } from './NodeRegistry';
 import { getNodePorts, isPortTypeCompatible } from './PortTypes';
+import { useModel } from '@umijs/max';
 
 interface QuickAddMenuProps {
   /** ReactFlow canvas coordinates for positioning the new node */
@@ -33,6 +34,14 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const { initialState } = useModel('@@initialState');
+  const visibleNodeTypes = initialState?.currentUser?.visibleNodeTypes;
+
+  // Permission-filtered registry
+  const permissionFilteredList = filterByPermission(visibleNodeTypes).map((e) => {
+    const iconStr = nodeRegistryList.find(n => n.type === e.type)?.icon || '';
+    return { type: e.type, label: e.name, icon: iconStr, category: e.category, description: e.description || '' };
+  });
 
   // Auto-focus search on mount
   useEffect(() => {
@@ -81,13 +90,13 @@ const QuickAddMenu: React.FC<QuickAddMenuProps> = ({
 
   // Filter nodes by search + compatibility
   const filtered = search.trim()
-    ? nodeRegistryList.filter((e) =>
+    ? permissionFilteredList.filter((e) =>
         e.label.toLowerCase().includes(search.toLowerCase()) ||
         e.type.toLowerCase().includes(search.toLowerCase()) ||
         (e.category || '').toLowerCase().includes(search.toLowerCase()) ||
         (e.description || '').toLowerCase().includes(search.toLowerCase()),
       )
-    : nodeRegistryList;
+    : permissionFilteredList;
 
   // Find first compatible input port for a given node type
   const getTargetHandle = useCallback(

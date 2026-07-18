@@ -61,6 +61,13 @@ def _archive_dir(name_id: str) -> str:
     return os.path.join(WORKFLOW_DATA_DIR, f"{name_id}_archive")
 
 
+def _history_path(name_id: str) -> str:
+    """Return the execution history file path for a workflow."""
+    d = _archive_dir(name_id)
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, 'history.json')
+
+
 def _archive_node_path(name_id: str, node_id: str) -> str:
     """Return the archive file path for a specific node's _runOutput."""
     d = _archive_dir(name_id)
@@ -324,6 +331,102 @@ class WorkflowManager:
             description=source.get('description', ''),
         )
         logger.info("[WorkflowManager.duplicate] %r → %r", source_id, result.get('id'))
+        return result
+
+    # ── Execution History ──────────────────────────────────────────
+
+    MAX_HISTORY_RECORDS = 100
+
+    @staticmethod
+    def add_history(workflow_id, record):
+        """Append an execution history record. Keeps at most MAX_HISTORY_RECORDS."""
+        path = _history_path(workflow_id)
+        data = {"records": []}
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                data = {"records": []}
+        records = data.get('records', [])
+        records.append(record)
+        # FIFO: keep only the latest MAX_HISTORY_RECORDS
+        if len(records) > WorkflowManager.MAX_HISTORY_RECORDS:
+            records = records[-WorkflowManager.MAX_HISTORY_RECORDS:]
+        data['records'] = records
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def get_history(workflow_id):
+        """Get execution history for a workflow."""
+        path = _history_path(workflow_id)
+        if not os.path.exists(path):
+            return {"records": []}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {"records": []}
+
+    @staticmethod
+    def get_recent_history(username=None, limit=50):
+        """Get recent execution history across all workflows.
+        If username is provided, only return workflows authored by that user."""
+        _ensure_dir()
+        all_records = []
+        for fname in os.listdir(WORKFLOW_DATA_DIR):
+            if not fname.endswith('.json'):
+                continue
+            fp = os.path.join(WORKFLOW_DATA_DIR, fname)
+            try:
+                with open(fp, 'r', encoding='utf-8') as f:
+                    wf = json.load(f)
+            except Exception:
+                continue
+            wf_id = wf.get('id', '')
+            wf_name = wf.get('name', '')
+            wf_author = wf.get('author', '')
+            if username and wf_author != username:
+                continue
+            hist_path = _history_path(wf_id)
+            if not os.path.exists(hist_path):
+                continue
+            try:
+                with open(hist_path, 'r', encoding='utf-8') as f:
+                    hist = json.load(f)
+            except Exception:
+                continue
+            for rec in hist.get('records', []):
+                rec_copy = dict(rec)
+                rec_copy['workflowId'] = wf_id
+                rec_copy['workflowName'] = wf_name
+                rec_copy['workflowAuthor'] = wf_author
+                all_records.append(rec_copy)
+        # Sort by startedAt descending
+        all_records.sort(key=lambda x: x.get('startedAt', ''), reverse=True)
+        return all_records[:limit]
+
+    @staticmethod
+    def list_by_author(author):
+        """List workflows filtered by author."""
+        _ensure_dir()
+        result = []
+        for fname in os.listdir(WORKFLOW_DATA_DIR):
+            if not fname.endswith('.json'):
+                continue
+            with open(os.path.join(WORKFLOW_DATA_DIR, fname), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data.get('author', '') == author:
+                result.append({
+                    'id': data.get('id'),
+                    'name': data.get('name'),
+                    'author': data.get('author', ''),
+                    'description': data.get('description', ''),
+                    'createdAt': data.get('createdAt', ''),
+                    'updatedAt': data.get('updatedAt', ''),
+                })
+        result.sort(key=lambda x: x.get('updatedAt', ''), reverse=True)
         return result
 
 

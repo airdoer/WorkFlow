@@ -44,19 +44,27 @@ import {
   ThunderboltOutlined,
   AuditOutlined,
   LoginOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { FlowApi } from './services/FlowApi';
 import { listCrons, stopCron } from './nodes/Cron/executor';
 import { useModel, history } from '@umijs/max';
 import { outLogin } from '@/services/ant-design-pro/api';
+import ExecutionHistoryModal from './ExecutionHistoryModal';
+import GlobalExecutionModal from './GlobalExecutionModal';
+import PermissionModal from './PermissionModal';
+import MyFilesModal from './MyFilesModal';
 
 /* ───────────────────── UserDropdown ───────────────────── */
 
-const UserDropdown: React.FC = () => {
+const UserDropdown: React.FC<{ onShowMyFiles?: () => void }> = ({ onShowMyFiles }) => {
   const { initialState, setInitialState } = useModel('@@initialState');
   const currentUser = initialState?.currentUser;
   const isAdmin = currentUser?.is_admin ?? false;
   const username = currentUser?.name || currentUser?.userid || '';
+
+  const [globalExecOpen, setGlobalExecOpen] = useState(false);
+  const [permissionOpen, setPermissionOpen] = useState(false);
 
   const handleLogout = async () => {
     try { await outLogin(); } catch { /* ignore */ }
@@ -74,19 +82,19 @@ const UserDropdown: React.FC = () => {
       key: 'files',
       icon: <FileOutlined />,
       label: '我的文件',
-      onClick: () => { history.push('/workflow/history'); },
+      onClick: () => { onShowMyFiles?.(); },
     },
     {
       key: 'executions',
       icon: <ThunderboltOutlined />,
       label: '我的执行',
-      onClick: () => { history.push('/workflow/history'); },
+      onClick: () => { setGlobalExecOpen(true); },
     },
     ...(isAdmin ? [{
-      key: 'approvals',
+      key: 'permissions',
       icon: <AuditOutlined />,
-      label: '我的审批',
-      onClick: () => { message.info('审批功能开发中'); },
+      label: '权限编辑',
+      onClick: () => { setPermissionOpen(true); },
     }] : []),
     { type: 'divider' as const },
     {
@@ -118,16 +126,20 @@ const UserDropdown: React.FC = () => {
   }
 
   return (
-    <Dropdown
-      menu={{ items: menuItems }}
-      trigger={['click']}
-    >
-      <Space size={4} style={{ cursor: 'pointer', lineHeight: '24px' }}>
-        <Avatar size={22} icon={<UserOutlined />} style={{ backgroundColor: isAdmin ? '#1677ff' : '#87d068' }} />
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>{username}</span>
-        {isAdmin && <span style={{ fontSize: 10, color: '#69b1ff', marginLeft: 2 }}>管理员</span>}
-      </Space>
-    </Dropdown>
+    <>
+      <Dropdown
+        menu={{ items: menuItems }}
+        trigger={['click']}
+      >
+        <Space size={4} style={{ cursor: 'pointer', lineHeight: '24px' }}>
+          <Avatar size={22} icon={<UserOutlined />} style={{ backgroundColor: isAdmin ? '#1677ff' : '#87d068' }} />
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>{username}</span>
+          {isAdmin && <span style={{ fontSize: 10, color: '#69b1ff', marginLeft: 2 }}>管理员</span>}
+        </Space>
+      </Dropdown>
+      <GlobalExecutionModal open={globalExecOpen} onClose={() => setGlobalExecOpen(false)} />
+      <PermissionModal open={permissionOpen} onClose={() => setPermissionOpen(false)} />
+    </>
   );
 };
 
@@ -362,6 +374,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const [varModalOpen, setVarModalOpen] = useState(false);
   const [varList, setVarList] = useState<any[]>([]);
   const [varLoading, setVarLoading] = useState(false);
+
+  // ── Execution history ──────────────────────────────────────
+  const [execHistoryOpen, setExecHistoryOpen] = useState(false);
+
+  // ── My files ───────────────────────────────────────────────
+  const [myFilesOpen, setMyFilesOpen] = useState(false);
   const [editingVarKey, setEditingVarKey] = useState<string | null>(null);
   const [editingVarValue, setEditingVarValue] = useState('');
 
@@ -1043,8 +1061,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
       {/* ── 推右区到最右 */}
       <div style={{ marginLeft: 'auto' }} />
 
-      {/* ── 右区：导入/导出 + 变量管理 + 定时任务 + 全屏 ── */}
+      {/* ── 右区：执行历史 + 导入/导出 + 变量管理 + 定时任务 + 全屏 + 用户 ── */}
       <Space size={4}>
+        <Tooltip title="执行历史">
+          <Button icon={<HistoryOutlined />} size="small" onClick={() => setExecHistoryOpen(true)}>执行历史</Button>
+        </Tooltip>
         <Tooltip title="全局变量管理">
           <Button icon={<DatabaseOutlined />} size="small" onClick={openVarModal}>变量管理</Button>
         </Tooltip>
@@ -1066,8 +1087,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </Tooltip>
 
         {/* ── 用户信息区域 ── */}
-        <UserDropdown />
+        <UserDropdown onShowMyFiles={() => setMyFilesOpen(true)} />
       </Space>
+
+      {/* ── 执行历史 Modal ── */}
+      <ExecutionHistoryModal workflowId={workflowId} open={execHistoryOpen} onClose={() => setExecHistoryOpen(false)} />
+
+      {/* ── 我的文件 Modal ── */}
+      <MyFilesModal open={myFilesOpen} onClose={() => setMyFilesOpen(false)} />
 
       {/* ── 全局变量管理 Modal ── */}
       <Modal

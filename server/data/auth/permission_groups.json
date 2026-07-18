@@ -1,0 +1,35 @@
+{
+  "groups": [
+    {
+      "id": "g_all",
+      "name": "基础权限（全员）",
+      "nodeTypes": ["string", "number", "bool", "calculate", "template", "format", "condition", "if", "loop", "switch", "boolgate", "listbuilder", "objectbuilder", "dictbuilder", "map", "filter", "reduce", "sort", "join", "lookup", "split", "distinct", "flatten", "groupby", "mergeobject", "getglobalvalue", "setglobalvalue", "excel", "json", "table", "diff", "prompt"],
+      "users": ["*"]
+    },
+    {
+      "id": "g_deploy",
+      "name": "部署组",
+      "nodeTypes": ["seal", "jenkinsdeploy", "kdip", "c7server", "servercommand"],
+      "users": []
+    },
+    {
+      "id": "g_datasource",
+      "name": "数据源组",
+      "nodeTypes": ["p4file", "http", "redis", "file", "excelsearch"],
+      "users": []
+    },
+    {
+      "id": "g_notify",
+      "name": "通知组",
+      "nodeTypes": ["kimnotify", "cron"],
+      "users": []
+    },
+    {
+      "id": "g_ai",
+      "name": "AI组",
+      "nodeTypes": ["llm"],
+      "users": []
+    }
+  ],
+  "pendingUsers": []
+}

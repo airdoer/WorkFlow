@@ -71,8 +71,11 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
-  async list() {
-    const res = await fetch(`${API_BASE}/api/workflow/list`);
+  async list(author?: string) {
+    const params = new URLSearchParams();
+    if (author) params.set('author', author);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE}/api/workflow/list${qs}`);
     return handleResponse(res);
   },
 
@@ -151,6 +154,76 @@ export const FlowApi = {
   // REST fallback: query task status
   async getTaskStatus(taskId: string) {
     const res = await fetch(`${API_BASE}/api/workflow/run/${taskId}/status`);
+    return handleResponse(res);
+  },
+
+  // ── Execution History ──────────────────────────────────────────────────────
+
+  async getHistory(workflowId: string) {
+    const res = await fetch(`${API_BASE}/api/workflow/${workflowId}/history`);
+    return handleResponse(res);
+  },
+
+  async getRecentHistory(author?: string, limit = 50) {
+    const params = new URLSearchParams();
+    if (author) params.set('author', author);
+    params.set('limit', String(limit));
+    const res = await fetch(`${API_BASE}/api/workflow/history/recent?${params}`);
+    return handleResponse(res);
+  },
+
+  // ── Permission ──────────────────────────────────────────────────────────────
+
+  async getPermissionGroups() {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/groups`, {
+      headers: { 'Access-Token': token },
+    });
+    return handleResponse(res);
+  },
+
+  async savePermissionGroup(group: any, action: 'save' | 'delete' = 'save') {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/group/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Access-Token': token },
+      body: JSON.stringify({ group, action }),
+    });
+    return handleResponse(res);
+  },
+
+  async getPermissionNodes() {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/nodes`, {
+      headers: { 'Access-Token': token },
+    });
+    return handleResponse(res);
+  },
+
+  async getPendingUsers() {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/pending/list`, {
+      headers: { 'Access-Token': token },
+    });
+    return handleResponse(res);
+  },
+
+  async assignPendingUser(username: string, groupIds: string[]) {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/pending/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Access-Token': token },
+      body: JSON.stringify({ username, groupIds }),
+    });
+    return handleResponse(res);
+  },
+
+  async deletePendingUser(username: string) {
+    const token = localStorage.getItem('access-token') || '';
+    const res = await fetch(`${API_BASE}/api/permission/pending/${username}`, {
+      method: 'DELETE',
+      headers: { 'Access-Token': token },
+    });
     return handleResponse(res);
   },
 

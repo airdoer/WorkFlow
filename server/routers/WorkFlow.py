@@ -1,7 +1,7 @@
 # WorkFlow REST API Routes
 
 # builtin
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import uuid
 import asyncio
@@ -45,6 +45,10 @@ from Implement.workflowImpl.setGlobalValueExecutor import WF_GVAR_PREFIX, WF_GVA
 # region init
 
 logger = logging.getLogger(__name__)
+
+
+def _now_utc():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
 # Register all node executors
 ExecutorManager.register(ExcelExecutor())
@@ -293,6 +297,7 @@ def on_workflow_run(data):
 
     def run_workflow():
         logger.info("[SocketIO workflow:run] Background task started: task_id=%r", task_id)
+        started_at = _now_utc()
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -304,6 +309,37 @@ def on_workflow_run(data):
             socketio.emit('workflow:done', {
                 'taskId': task_id, 'status': 'error', 'error': str(e)
             }, room=task_id)
+        finally:
+            # Write execution history
+            try:
+                task_info = WorkflowRuntime.get_task_status(task_id)
+                finished_at = _now_utc()
+                final_status = (task_info or {}).get('status', 'unknown')
+                node_statuses = (task_info or {}).get('nodes', {})
+                succeeded = sum(1 for s in node_statuses.values() if s == 'success')
+                failed = sum(1 for s in node_statuses.values() if s == 'error')
+                # Try to get username from Access-Token header
+                username = ''
+                token = request.headers.get('Access-Token', '').strip()
+                if token:
+                    try:
+                        from routers.auth import _parse_token
+                        username = _parse_token(token) or ''
+                    except Exception:
+                        pass
+                record = {
+                    'id': task_id,
+                    'startedAt': started_at,
+                    'finishedAt': finished_at,
+                    'status': final_status,
+                    'trigger': 'manual',
+                    'username': username,
+                    'nodeCount': len(nodes),
+                    'summary': {'succeeded': succeeded, 'failed': failed},
+                }
+                WorkflowManager.add_history(workflow_id, record)
+            except Exception as hist_err:
+                logger.warning("[workflow:run] Failed to write history: %s", hist_err)
 
     # Run in socketio background task (gevent greenlet)
     socketio.start_background_task(run_workflow)
@@ -360,6 +396,7 @@ def on_workflow_run_from_node(data) -> None:
     def run_subgraph():
         logger.info("[SocketIO workflow:run_from_node] Background task started: task_id=%r, startNode=%r",
                     task_id, start_node_id)
+        started_at = _now_utc()
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -378,6 +415,37 @@ def on_workflow_run_from_node(data) -> None:
             socketio.emit('workflow:done', {
                 'taskId': task_id, 'status': 'error', 'error': str(e)
             }, room=task_id)
+        finally:
+            # Write execution history
+            try:
+                task_info = WorkflowRuntime.get_task_status(task_id)
+                finished_at = _now_utc()
+                final_status = (task_info or {}).get('status', 'unknown')
+                node_statuses = (task_info or {}).get('nodes', {})
+                succeeded = sum(1 for s in node_statuses.values() if s == 'success')
+                failed = sum(1 for s in node_statuses.values() if s == 'error')
+                username = ''
+                token = request.headers.get('Access-Token', '').strip()
+                if token:
+                    try:
+                        from routers.auth import _parse_token
+                        username = _parse_token(token) or ''
+                    except Exception:
+                        pass
+                record = {
+                    'id': task_id,
+                    'startedAt': started_at,
+                    'finishedAt': finished_at,
+                    'status': final_status,
+                    'trigger': 'manual',
+                    'username': username,
+                    'nodeCount': len(nodes),
+                    'summary': {'succeeded': succeeded, 'failed': failed},
+                    'startNodeId': start_node_id,
+                }
+                WorkflowManager.add_history(workflow_id, record)
+            except Exception as hist_err:
+                logger.warning("[workflow:run_from_node] Failed to write history: %s", hist_err)
 
     socketio.start_background_task(run_subgraph)
 
@@ -443,14 +511,42 @@ def workflow_get(workflow_id):
 
 @app.route('/api/workflow/list', methods=['GET'])
 def workflow_list():
-    """List all workflows"""
+    """List all workflows, optionally filtered by author"""
     logger.info("[workflow_list] Request from %s", request.remote_addr)
     try:
-        workflows = WorkflowManager.list_all()
-        logger.info("[workflow_list] Returning %d workflows", len(workflows))
+        author = request.args.get('author', '').strip()
+        if author:
+            workflows = WorkflowManager.list_by_author(author)
+        else:
+            workflows = WorkflowManager.list_all()
+        logger.info("[workflow_list] Returning %d workflows (author=%r)", len(workflows), author)
         return jsonify({'list': workflows})
     except Exception as e:
         logger.exception("[workflow_list] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/<workflow_id>/history', methods=['GET'])
+def workflow_history(workflow_id):
+    """Get execution history for a workflow"""
+    try:
+        history = WorkflowManager.get_history(workflow_id)
+        return jsonify(history)
+    except Exception as e:
+        logger.exception("[workflow_history] Unexpected error: %s", e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/workflow/history/recent', methods=['GET'])
+def workflow_history_recent():
+    """Get recent execution history across all workflows"""
+    try:
+        author = request.args.get('author', '').strip()
+        limit = int(request.args.get('limit', '50'))
+        records = WorkflowManager.get_recent_history(username=author or None, limit=limit)
+        return jsonify({'records': records})
+    except Exception as e:
+        logger.exception("[workflow_history_recent] Unexpected error: %s", e)
         return jsonify({'error': str(e)}), 500
 
 

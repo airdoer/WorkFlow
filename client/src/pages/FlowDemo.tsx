@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Spin } from 'antd';
-import { useSearchParams, history } from '@umijs/max';
+import { useSearchParams, history, useModel } from '@umijs/max';
 import FlowEditor from '@/components/workflow/FlowEditor';
 import { FlowApi } from '@/components/workflow/services/FlowApi';
 import type { WorkflowJSON } from '@/components/workflow/types';
@@ -21,6 +21,9 @@ const WorkflowPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [workflowData, setWorkflowData] = useState<WorkflowMeta>({});
   const [searchParams] = useSearchParams();
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
+  const username = currentUser?.name || currentUser?.userid || '';
 
   const loadWorkflow = async (workflowId: string) => {
     setLoading(true);
@@ -48,8 +51,8 @@ const WorkflowPage: React.FC = () => {
     if (workflowId) {
       loadWorkflow(workflowId);
     } else {
-      // New empty workflow
-      setWorkflowData({ key: '__new__' });
+      // New empty workflow — set author to current user
+      setWorkflowData({ key: '__new__', author: username });
     }
   }, [searchParams]);
 
@@ -70,7 +73,7 @@ const WorkflowPage: React.FC = () => {
       // Navigate to new empty workflow; carry pre-supplied name if present
       const presetName = id.startsWith('__new__:') ? id.slice('__new__:'.length) : undefined;
       history.push(currentPath);
-      setWorkflowData({ key: `new_${Date.now()}`, name: presetName });
+      setWorkflowData({ key: `new_${Date.now()}`, name: presetName, author: username });
     } else {
       history.push(`${currentPath}?id=${id}`);
       loadWorkflow(id);

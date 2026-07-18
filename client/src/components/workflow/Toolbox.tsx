@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState, type DragEvent } from 'react';
 import type { Node } from 'reactflow';
-import { nodeRegistryList } from './NodeRegistry';
+import { nodeRegistryList, filterByPermission } from './NodeRegistry';
+import { useModel } from '@umijs/max';
 import { getFormatInitialData } from './nodes/Format';
 
 interface ToolboxProps {
@@ -14,6 +15,20 @@ interface ToolboxProps {
 const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode, collapsed, onToggleCollapse }) => {
   const dragRef = useRef<{ nodeType: string; offsetX: number; offsetY: number } | null>(null);
   const [search, setSearch] = useState('');
+  const { initialState } = useModel('@@initialState');
+  const visibleNodeTypes = initialState?.currentUser?.visibleNodeTypes;
+
+  // Permission-filtered registry
+  const permissionFilteredList = filterByPermission(visibleNodeTypes).map((e) => {
+    const iconStr = nodeRegistryList.find(n => n.type === e.type)?.icon || '';
+    return {
+      type: e.type,
+      label: e.name,
+      icon: iconStr,
+      category: e.category,
+      description: e.description || '',
+    };
+  });
 
   const handleNodeClick = useCallback(
     (nodeType: string) => {
@@ -46,12 +61,12 @@ const Toolbox: React.FC<ToolboxProps> = ({ nodes, setNodes, onAddNode, collapsed
 
   // Filter by search keyword
   const filtered = search.trim()
-    ? nodeRegistryList.filter((e) =>
+    ? permissionFilteredList.filter((e) =>
         e.label.toLowerCase().includes(search.toLowerCase()) ||
         (e.category || '').toLowerCase().includes(search.toLowerCase()) ||
         (e.description || '').toLowerCase().includes(search.toLowerCase()),
       )
-    : nodeRegistryList;
+    : permissionFilteredList;
 
   // Group by category (preserving original order)
   const grouped = filtered.reduce<Record<string, typeof nodeRegistryList>>((acc, entry) => {

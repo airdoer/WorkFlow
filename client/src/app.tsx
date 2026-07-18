@@ -96,6 +96,8 @@ export async function getInitialState(): Promise<{
         access: result.access,
         is_admin: result.is_admin,
         role: result.role,
+        visibleNodeTypes: result.visibleNodeTypes || [],
+        admins: result.admins || [],
       } as API.CurrentUser;
     } catch (error) {
       // token 无效或过期，保存当前路径并跳转登录
@@ -166,6 +168,23 @@ export const layout: RunTimeLayoutConfig = ({
         history.push(loginPath);
       }
     },
+    // Show warning banner for users with limited permissions
+    headerContentRender: (() => {
+      const currentUser = initialState?.currentUser;
+      if (!currentUser) return null;
+      const visibleTypes = currentUser.visibleNodeTypes || [];
+      const admins = currentUser.admins || [];
+      // If user has very few visible node types (< 5), show a tip
+      if (visibleTypes.length > 0 && visibleTypes.length < 5 && !currentUser.is_admin) {
+        return (
+          <div style={{ background: '#fffbe6', padding: '4px 16px', fontSize: 12, borderBottom: '1px solid #ffe58f' }}>
+            ⚠️ 您当前权限有限，仅可使用 {visibleTypes.length} 种节点。请联系管理员申请权限：
+            {admins.map(a => <span key={a} style={{ marginLeft: 8, color: '#1677ff' }}>{a}</span>)}
+          </div>
+        );
+      }
+      return null;
+    })(),
     bgLayoutImgList: [
       {
         src: 'https://mdn.alipayobjects.com/yuyan_qk0oxh/afts/img/D2LWSqNny4sAAAAAAAAAAAAAFl94AQBr',

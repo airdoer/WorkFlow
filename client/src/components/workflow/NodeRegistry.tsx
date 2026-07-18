@@ -261,6 +261,16 @@ export function getAllNodeTypes(): string[] {
   return NODE_REGISTRY.map((e) => e.type);
 }
 
+/**
+ * Filter node registry by visible node types (permission-based).
+ * Returns only entries whose type is in the visible list.
+ * If visibleTypes is undefined or empty, returns all (no filtering — for admin or when permissions not loaded).
+ */
+export function filterByPermission(visibleTypes: string[] | undefined): NodeRegistryEntry[] {
+  if (!visibleTypes || visibleTypes.length === 0) return NODE_REGISTRY;
+  return NODE_REGISTRY.filter((e) => visibleTypes.includes(e.type));
+}
+
 // ── Backward-compatible exports for Toolbox.tsx and PropertyPanel.tsx ──
 
 /**
