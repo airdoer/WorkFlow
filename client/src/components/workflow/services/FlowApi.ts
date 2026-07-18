@@ -241,12 +241,12 @@ export const FlowApi = {
     return handleResponse(res);
   },
 
-  async addAdmin(username: string) {
+  async addAdmin(username: string, level: 'super' | 'admin' = 'admin') {
     const token = localStorage.getItem('access-token') || '';
     const res = await fetch(`${API_BASE}/api/permission/admins/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Access-Token': token },
-      body: JSON.stringify({ action: 'add', username }),
+      body: JSON.stringify({ action: 'add', username, level }),
     });
     return handleResponse(res);
   },

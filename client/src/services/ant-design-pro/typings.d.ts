@@ -23,6 +23,8 @@ declare namespace API {
     phone?: string;
     /** 是否为超级管理员 */
     is_admin?: boolean;
+    /** 是否为超级管理员（拥有最高权限，可管理其他管理员） */
+    is_super_admin?: boolean;
     /** 用户角色信息 */
     role?: {
       id: string;

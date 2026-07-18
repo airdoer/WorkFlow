@@ -309,68 +309,107 @@ def permission_pending_delete(target_username):
 
 # ── Admin Management ──────────────────────────────────────────────────────────
 
-def _load_admin_list():
-    """Load admin whitelist from the same file auth.py uses."""
-    file_path = config.ADMIN_WHITELIST_FILE
-    if not os.path.exists(file_path):
-        return []
-    try:
-        with open(file_path, 'r', encoding='utf-8') as fp:
-            data = json.load(fp)
-        if isinstance(data, list):
-            return [str(item).strip() for item in data if str(item).strip()]
-    except (json.JSONDecodeError, OSError):
-        pass
-    return []
+def _load_admin_data():
+    """Load admin data dict with super/admin separation from auth.py."""
+    from routers.auth import _load_admin_data as _auth_load_admin_data
+    return _auth_load_admin_data()
 
 
-def _save_admin_list(admins):
-    """Save admin whitelist."""
+def _save_admin_data(admin_data):
+    """Save admin whitelist with super/admin structure."""
     file_path = config.ADMIN_WHITELIST_FILE
     d = os.path.dirname(file_path)
     if d:
         os.makedirs(d, exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as fp:
-        json.dump(sorted(admins), fp, ensure_ascii=False, indent=2)
+        json.dump(admin_data, fp, ensure_ascii=False, indent=2)
 
 
 @app.route('/api/permission/admins', methods=['GET'])
 def permission_admin_list():
-    """List all admins (admin only)."""
+    """List all admins with super/admin distinction (admin only)."""
     username = _get_current_username()
     if not username:
         return jsonify({'message': 'Unauthorized'}), 401
     if not _is_admin(username):
         return jsonify({'message': 'Forbidden: admin only'}), 403
-    return jsonify({'admins': _load_admin_list()}), 200
+
+    admin_data = _load_admin_data()
+    from routers.auth import _is_super_admin
+    is_super = _is_super_admin(username)
+    return jsonify({
+        'super': admin_data.get('super', []),
+        'admin': admin_data.get('admin', []),
+        'isSuperAdmin': is_super,
+    }), 200
 
 
 @app.route('/api/permission/admins/save', methods=['POST'])
 def permission_admin_save():
-    """Add or remove an admin (admin only)."""
+    """Add or remove an admin.
+    
+    Rules:
+    - Super admin: can add anyone as super admin or regular admin,
+      can remove any regular admin (but not themselves),
+      cannot remove other super admins.
+    - Regular admin: can add anyone as regular admin only,
+      cannot remove any admin (including themselves).
+    """
     username = _get_current_username()
     if not username:
         return jsonify({'message': 'Unauthorized'}), 401
     if not _is_admin(username):
         return jsonify({'message': 'Forbidden: admin only'}), 403
 
+    from routers.auth import _is_super_admin
+    is_super = _is_super_admin(username)
+
     body = request.get_json(silent=True) or {}
     action = body.get('action', 'add')  # add | remove
     target = body.get('username', '').strip()
+    level = body.get('level', 'admin')  # super | admin (only for 'add')
     if not target:
         return jsonify({'message': 'username is required'}), 400
 
-    admins = _load_admin_list()
+    admin_data = _load_admin_data()
+    super_list = list(admin_data.get('super', []))
+    admin_list = list(admin_data.get('admin', []))
+
     if action == 'add':
-        if target not in admins:
-            admins.append(target)
+        # Both super and regular admins can add, but with different levels
+        if is_super:
+            # Super admin can add to either level
+            if level == 'super':
+                if target not in super_list:
+                    super_list.append(target)
+                # Remove from admin list if they were there
+                admin_list = [a for a in admin_list if a != target]
+            else:
+                if target not in admin_list and target not in super_list:
+                    admin_list.append(target)
+        else:
+            # Regular admin can only add as regular admin
+            if target not in admin_list and target not in super_list:
+                admin_list.append(target)
+
     elif action == 'remove':
         # Cannot remove yourself
         if target == username:
             return jsonify({'message': '不能移除自己的管理员权限'}), 400
-        admins = [a for a in admins if a != target]
+
+        if not is_super:
+            # Regular admin cannot remove anyone
+            return jsonify({'message': '普通管理员无法移除其他管理员，请联系超级管理员'}), 403
+
+        # Super admin can remove regular admins
+        if target in super_list:
+            return jsonify({'message': '无法移除超级管理员，只能移除普通管理员'}), 400
+
+        admin_list = [a for a in admin_list if a != target]
+
     else:
         return jsonify({'message': 'Invalid action, use add or remove'}), 400
 
-    _save_admin_list(admins)
-    return jsonify({'success': True, 'admins': admins}), 200
+    admin_data = {"super": sorted(super_list), "admin": sorted(admin_list)}
+    _save_admin_data(admin_data)
+    return jsonify({'success': True, 'super': admin_data['super'], 'admin': admin_data['admin']}), 200

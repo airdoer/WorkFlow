@@ -95,6 +95,7 @@ export async function getInitialState(): Promise<{
         userid: result.username,
         access: result.access,
         is_admin: result.is_admin,
+        is_super_admin: result.is_super_admin,
         role: result.role,
         visibleNodeTypes: result.visibleNodeTypes || [],
         admins: result.admins || [],

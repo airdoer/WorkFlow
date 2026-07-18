@@ -30,13 +30,16 @@ def _get_access_token():
 
 
 def _load_admin_whitelist():
+    """Load admin whitelist. Returns a set of all admin usernames (super + admin)."""
     file_path = config.ADMIN_WHITELIST_FILE
     directory = os.path.dirname(file_path)
     if directory:
         os.makedirs(directory, exist_ok=True)
     if not os.path.exists(file_path):
+        # Create default file with current user as super admin
+        default = {"super": [], "admin": []}
         with open(file_path, 'w', encoding='utf-8') as fp:
-            json.dump([], fp, ensure_ascii=False)
+            json.dump(default, fp, ensure_ascii=False, indent=2)
         return set()
 
     try:
@@ -45,9 +48,53 @@ def _load_admin_whitelist():
     except (json.JSONDecodeError, OSError):
         return set()
 
-    if not isinstance(data, list):
-        return set()
-    return {str(item).strip() for item in data if str(item).strip()}
+    # Support new format: {"super": [...], "admin": [...]}
+    if isinstance(data, dict):
+        super_admins = data.get('super', [])
+        admins = data.get('admin', [])
+        if not isinstance(super_admins, list):
+            super_admins = []
+        if not isinstance(admins, list):
+            admins = []
+        return {str(item).strip() for item in (super_admins + admins) if str(item).strip()}
+
+    # Support legacy format: ["user1", "user2"] — treat all as super admins
+    if isinstance(data, list):
+        return {str(item).strip() for item in data if str(item).strip()}
+
+    return set()
+
+
+def _load_admin_data():
+    """Load the full admin data dict with super/admin separation.
+    Returns {"super": [...], "admin": [...]}"""
+    file_path = config.ADMIN_WHITELIST_FILE
+    try:
+        with open(file_path, 'r', encoding='utf-8') as fp:
+            data = json.load(fp)
+    except (json.JSONDecodeError, OSError):
+        return {"super": [], "admin": []}
+
+    if isinstance(data, dict):
+        return {
+            "super": [str(x).strip() for x in data.get('super', []) if str(x).strip()],
+            "admin": [str(x).strip() for x in data.get('admin', []) if str(x).strip()],
+        }
+
+    # Legacy format: treat all as super
+    if isinstance(data, list):
+        return {
+            "super": [str(x).strip() for x in data if str(x).strip()],
+            "admin": [],
+        }
+
+    return {"super": [], "admin": []}
+
+
+def _is_super_admin(username):
+    """Check if user is a super admin."""
+    admin_data = _load_admin_data()
+    return username in admin_data.get('super', [])
 
 
 def _build_role_info(is_admin: bool):
@@ -151,6 +198,7 @@ def get_user_info():
 
     admins = _load_admin_whitelist()
     is_admin = username in admins
+    is_super_admin = _is_super_admin(username) if is_admin else False
     role_obj = _build_role_info(is_admin)
 
     # Compute visible node types from permission groups
@@ -183,6 +231,7 @@ def get_user_info():
             'username': username,
             'role': role_obj,
             'is_admin': is_admin,
+            'is_super_admin': is_super_admin,
             'access': 'admin' if is_admin else 'user',
             'visibleNodeTypes': visible_node_types,
             'admins': sorted(admins),

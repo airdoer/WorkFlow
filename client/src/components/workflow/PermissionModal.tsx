@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Table, Tag, Space, Button, Input, Checkbox, Tabs, Popconfirm, message, Empty, Card, Row, Col } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, UserAddOutlined, CrownOutlined } from '@ant-design/icons';
+import { Modal, Table, Tag, Space, Button, Input, Checkbox, Tabs, Popconfirm, message, Empty, Card, Row, Col, Switch } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SaveOutlined, UserAddOutlined, CrownOutlined, StarOutlined } from '@ant-design/icons';
+import { useModel } from '@umijs/max';
 import { FlowApi } from './services/FlowApi';
 
 interface PermissionGroup {
@@ -31,11 +32,15 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
   const [allNodes, setAllNodes] = useState<NodeTypeItem[]>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const [adminList, setAdminList] = useState<string[]>([]);
+  const [superAdmins, setSuperAdmins] = useState<string[]>([]);
+  const [regularAdmins, setRegularAdmins] = useState<string[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [editingName, setEditingName] = useState<string>('');
   const [nameDraft, setNameDraft] = useState('');
+  const { initialState } = useModel('@@initialState');
+  const currentUser = initialState?.currentUser;
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
 
@@ -51,7 +56,9 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
       setGroups(gRes.groups || []);
       setAllNodes(nRes.nodes || []);
       setPendingUsers(pRes.pendingUsers || []);
-      setAdminList(aRes.admins || []);
+      setSuperAdmins(aRes.super || []);
+      setRegularAdmins(aRes.admin || []);
+      setIsSuperAdmin(aRes.isSuperAdmin || false);
     } catch (err: any) {
       message.error(`加载权限数据失败: ${err.message}`);
     } finally {
@@ -356,43 +363,86 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
             label: '管理员',
             children: (
               <div>
-                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>
-                    <CrownOutlined style={{ color: '#faad14', marginRight: 4 }} />
-                    管理员列表 ({adminList.length})
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                  {adminList.map(a => (
-                    <Tag
-                      key={a}
-                      color="gold"
-                      closable
-                      onClose={async () => {
+                {/* Super Admins */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                    <StarOutlined style={{ color: '#faad14', marginRight: 4 }} />
+                    超级管理员 ({superAdmins.length})
+                    <span style={{ fontWeight: 400, fontSize: 11, color: '#999', marginLeft: 8 }}>
+                      拥有最高权限，可管理其他管理员
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {superAdmins.map(a => (
+                      <Tag key={a} color="gold" icon={<CrownOutlined />}>
+                        {a}
+                        {a === currentUser?.userid && <span style={{ marginLeft: 4, fontSize: 10 }}>(我)</span>}
+                      </Tag>
+                    ))}
+                    {isSuperAdmin && (
+                      <AddUserTag onAdd={async (username) => {
                         try {
-                          const res = await FlowApi.removeAdmin(a);
-                          setAdminList(res.admins || []);
-                          message.success(`已移除 ${a} 的管理员权限`);
+                          const res = await FlowApi.addAdmin(username, 'super');
+                          setSuperAdmins(res.super || []);
+                          setRegularAdmins(res.admin || []);
+                          message.success(`已添加 ${username} 为超级管理员`);
                         } catch (err: any) {
-                          message.error(err.message || '移除失败');
+                          message.error(err.message || '添加失败');
                         }
-                      }}
-                    >
-                      {a}
-                    </Tag>
-                  ))}
-                  <AddUserTag onAdd={async (username) => {
-                    try {
-                      const res = await FlowApi.addAdmin(username);
-                      setAdminList(res.admins || []);
-                      message.success(`已添加 ${username} 为管理员`);
-                    } catch (err: any) {
-                      message.error(err.message || '添加失败');
-                    }
-                  }} />
+                      }} label="添加超管" />
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
-                  管理员拥有所有权限，包括编辑权限组和管理其他管理员。不能移除自己的管理员权限。
+
+                {/* Regular Admins */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                    <CrownOutlined style={{ color: '#1677ff', marginRight: 4 }} />
+                    管理员 ({regularAdmins.length})
+                    <span style={{ fontWeight: 400, fontSize: 11, color: '#999', marginLeft: 8 }}>
+                      可编辑权限组、添加用户
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {regularAdmins.map(a => (
+                      <Tag
+                        key={a}
+                        color="blue"
+                        closable={isSuperAdmin && a !== currentUser?.userid}
+                        onClose={async () => {
+                          try {
+                            const res = await FlowApi.removeAdmin(a);
+                            setRegularAdmins(res.admin || []);
+                            message.success(`已移除 ${a} 的管理员权限`);
+                          } catch (err: any) {
+                            message.error(err.message || '移除失败');
+                          }
+                        }}
+                      >
+                        {a}
+                        {a === currentUser?.userid && <span style={{ marginLeft: 4, fontSize: 10 }}>(我)</span>}
+                      </Tag>
+                    ))}
+                    <AddUserTag onAdd={async (username) => {
+                      try {
+                        const level = isSuperAdmin ? 'admin' : 'admin';
+                        const res = await FlowApi.addAdmin(username, level);
+                        setSuperAdmins(res.super || []);
+                        setRegularAdmins(res.admin || []);
+                        message.success(`已添加 ${username} 为管理员`);
+                      } catch (err: any) {
+                        message.error(err.message || '添加失败');
+                      }
+                    }} label="添加管理员" />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 12, color: '#999', marginTop: 12, padding: '8px 12px', background: '#fafafa', borderRadius: 4 }}>
+                  {isSuperAdmin
+                    ? '你是超级管理员，可添加/移除普通管理员，也可添加超级管理员。无法移除自己的权限。'
+                    : '你是普通管理员，可添加其他人为管理员或普通用户，但无法移除任何管理员。如需移除管理员请联系超级管理员。'
+                  }
+                  <br />超级管理员：{superAdmins.join('、') || '无'}
                 </div>
               </div>
             ),
@@ -404,14 +454,14 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
 };
 
 /** Inline tag that adds a user on click */
-const AddUserTag: React.FC<{ onAdd: (username: string) => void }> = ({ onAdd }) => {
+const AddUserTag: React.FC<{ onAdd: (username: string) => void; label?: string }> = ({ onAdd, label = '添加用户' }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
 
   if (!editing) {
     return (
       <Tag onClick={() => setEditing(true)} style={{ cursor: 'pointer', background: '#fff', borderStyle: 'dashed' }}>
-        <UserAddOutlined /> 添加用户
+        <UserAddOutlined /> {label}
       </Tag>
     );
   }

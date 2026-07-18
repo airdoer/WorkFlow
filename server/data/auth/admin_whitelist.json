@@ -1,1 +1,4 @@
-["chenzhixu"]
+{
+  "super": ["chenzhixu"],
+  "admin": []
+}
