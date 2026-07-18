@@ -10,7 +10,7 @@ from appImp import app
 
 
 def _serializer():
-    return URLSafeTimedSerializer(config.AUTH_TOKEN_SECRET, salt='game-watchman-auth')
+    return URLSafeTimedSerializer(config.AUTH_TOKEN_SECRET, salt='work-flow-auth')
 
 
 def _generate_token(username: str):
@@ -55,15 +55,15 @@ def _build_role_info(is_admin: bool):
     role_name = '管理员' if is_admin else '普通用户'
     permissions = [
         {
-            'permissionId': 'c7',
-            'permissionName': 'C7工具',
+            'permissionId': 'workflow',
+            'permissionName': '工作流',
             'actionEntitySet': []
         }
     ]
     if is_admin:
         permissions.append({
-            'permissionId': 'mail_admin',
-            'permissionName': '邮件管理员',
+            'permissionId': 'admin',
+            'permissionName': '超级管理员',
             'actionEntitySet': []
         })
 
@@ -75,12 +75,17 @@ def _build_role_info(is_admin: bool):
 
 
 def _fetch_username_from_sso_key(key: str):
+    """通过 SSO key 获取用户名"""
     if not key:
+        return ''
+
+    authen_get_url = getattr(config, 'AUTHEN_GET_URL', '')
+    if not authen_get_url:
         return ''
 
     try:
         response = requests.get(
-            config.AUTHEN_GET_URL.format(key=key),
+            authen_get_url.format(key=key),
             proxies={"http": None, "https": None},
             timeout=5
         )
@@ -93,8 +98,9 @@ def _fetch_username_from_sso_key(key: str):
     return response.text.strip()
 
 
-@app.route('/auth/authen_get', methods=['GET'])
+@app.route('/api/auth/authen_get', methods=['GET'])
 def authen_get():
+    """SSO key 换取用户名"""
     key = request.args.get('key', '').strip()
     if not key:
         return jsonify({'message': 'Missing key'}), 400
@@ -106,8 +112,9 @@ def authen_get():
     return jsonify({'result': {'username': username}, 'user_name': username}), 200
 
 
-@app.route('/auth/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST'])
 def auth_login():
+    """登录接口：支持 username 或 SSO key 登录"""
     payload = request.get_json(silent=True) or {}
     username = str(payload.get('username', '')).strip()
     sso_key = str(payload.get('key', '')).strip()
@@ -122,18 +129,21 @@ def auth_login():
     return jsonify({'result': {'token': token, 'username': username}}), 200
 
 
-@app.route('/auth/logout', methods=['POST'])
+@app.route('/api/auth/logout', methods=['POST'])
 def auth_logout():
+    """退出登录"""
     return jsonify({'result': True}), 200
 
 
-@app.route('/auth/2step-code', methods=['POST'])
+@app.route('/api/auth/2step-code', methods=['POST'])
 def auth_2step_code():
+    """二次验证（预留，当前不需要）"""
     return jsonify({'result': {'stepCode': False}}), 200
 
 
-@app.route('/user/info', methods=['GET'])
+@app.route('/api/user/info', methods=['GET'])
 def get_user_info():
+    """获取当前用户信息，admin_whitelist.json 中的用户为超级管理员"""
     token = _get_access_token()
     username = _parse_token(token) if token else ''
     if not username:
@@ -148,11 +158,13 @@ def get_user_info():
             'name': username,
             'username': username,
             'role': role_obj,
-            'is_admin': is_admin
+            'is_admin': is_admin,
+            'access': 'admin' if is_admin else 'user',
         }
     }), 200
 
 
-@app.route('/user/nav', methods=['GET'])
+@app.route('/api/user/nav', methods=['GET'])
 def get_user_nav():
+    """获取用户导航菜单（预留）"""
     return jsonify({'result': []}), 200

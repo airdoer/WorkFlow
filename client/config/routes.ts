@@ -1,5 +1,15 @@
 export default [
   {
+    path: '/user',
+    layout: false,
+    routes: [
+      {
+        path: '/user/login',
+        component: './user/login',
+      },
+    ],
+  },
+  {
     path: '/workflow',
     name: 'workflow',
     icon: 'apartment',

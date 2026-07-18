@@ -27,9 +27,14 @@ const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
 
 // 获取后端 API 地址
-// 优先使用环境变量 FLASK_BACKEND_URL，否则使用默认值
+// 开发模式：留空，走 Umi 代理（proxy.ts 配置）
+// 生产模式：通过 window.FLASK_BACKEND_URL 或环境变量指定后端直连地址
 const getBackendURL = () => {
-  // 运行时环境变量（Docker 容器中通过 window 注入）
+  // 开发模式始终走 Umi 代理，忽略 window.FLASK_BACKEND_URL
+  if (isDev) {
+    return '';
+  }
+  // 生产模式：运行时环境变量（Docker/Nginx 通过 env-config.js 注入 window）
   if (typeof window !== 'undefined' && (window as any).FLASK_BACKEND_URL) {
     return (window as any).FLASK_BACKEND_URL;
   }
@@ -37,8 +42,8 @@ const getBackendURL = () => {
   if (process.env.FLASK_BACKEND_URL) {
     return process.env.FLASK_BACKEND_URL;
   }
-  // 默认值
-  return isDev ? '' : 'https://pro-api.ant-design-demo.workers.dev';
+  // 默认值（生产模式兜底）
+  return 'https://pro-api.ant-design-demo.workers.dev';
 };
 
 /**
@@ -52,23 +57,39 @@ export async function getInitialState(): Promise<{
   settingDrawerOpen?: boolean;
 }> {
   const fetchUserInfo = async () => {
-    // 禁用鉴权：返回模拟用户数据
-    return {
-      name: 'Guest User',
-      avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
-      userid: 'guest',
-      email: 'guest@example.com',
-      signature: 'No authentication required',
-      title: 'Guest',
-      group: 'Visitor',
-      access: 'admin',
-    } as API.CurrentUser;
+    try {
+      const msg = await queryCurrentUser();
+      const result = msg.result;
+      return {
+        name: result.username,
+        avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
+        userid: result.username,
+        access: result.access,
+        is_admin: result.is_admin,
+        role: result.role,
+      } as API.CurrentUser;
+    } catch (error) {
+      // token 无效或过期，清除本地 token
+      localStorage.removeItem('access-token');
+      history.push(loginPath);
+      return undefined;
+    }
   };
-  // 直接返回用户信息，不做登录检查
-  const currentUser = await fetchUserInfo();
+
+  // 如果不是登录页，则获取用户信息
+  const { location } = history;
+  if (location.pathname !== loginPath) {
+    const currentUser = await fetchUserInfo();
+    return {
+      fetchUserInfo,
+      currentUser,
+      settings: defaultSettings as Partial<LayoutSettings>,
+      settingDrawerOpen: false,
+    };
+  }
+
   return {
     fetchUserInfo,
-    currentUser,
     settings: defaultSettings as Partial<LayoutSettings>,
     settingDrawerOpen: false,
   };
@@ -103,7 +124,7 @@ export const layout: RunTimeLayoutConfig = ({
     },
     avatarProps: {
       src: initialState?.currentUser?.avatar,
-      title: 'ProUser',
+      title: initialState?.currentUser?.name || 'ProUser',
       render: (_, avatarChildren) => (
         <AvatarDropdown>{avatarChildren}</AvatarDropdown>
       ),
@@ -113,7 +134,11 @@ export const layout: RunTimeLayoutConfig = ({
     // },
     footerRender: () => null,
     onPageChange: () => {
-      // 禁用鉴权：不做任何登录检查
+      // 如果没有登录，重定向到 login
+      const { currentUser } = initialState;
+      if (!currentUser && history.location.pathname !== loginPath) {
+        history.push(loginPath);
+      }
     },
     bgLayoutImgList: [
       {

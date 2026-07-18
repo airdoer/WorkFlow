@@ -21,6 +21,14 @@ declare namespace API {
     };
     address?: string;
     phone?: string;
+    /** 是否为超级管理员 */
+    is_admin?: boolean;
+    /** 用户角色信息 */
+    role?: {
+      id: string;
+      name: string;
+      permissions: { permissionId: string; permissionName: string; actionEntitySet: any[] }[];
+    };
   };
 
   type LoginResult = {

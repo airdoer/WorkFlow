@@ -2,27 +2,9 @@
 /* eslint-disable */
 import { request } from '@umijs/max';
 
-/** 获取当前的用户 GET /api/currentUser */
-export async function currentUser(options?: { [key: string]: any }) {
-  return request<{
-    data: API.CurrentUser;
-  }>('/api/currentUser', {
-    method: 'GET',
-    ...(options || {}),
-  });
-}
-
-/** 退出登录接口 POST /api/login/outLogin */
-export async function outLogin(options?: { [key: string]: any }) {
-  return request<Record<string, any>>('/api/login/outLogin', {
-    method: 'POST',
-    ...(options || {}),
-  });
-}
-
-/** 登录接口 POST /api/login/account */
-export async function login(body: API.LoginParams, options?: { [key: string]: any }) {
-  return request<API.LoginResult>('/api/login/account', {
+/** SSO 登录 POST /api/auth/login */
+export async function ssoLogin(body: { username?: string; key?: string }, options?: { [key: string]: any }) {
+  return request<{ result: { token: string; username: string } }>('/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -32,10 +14,26 @@ export async function login(body: API.LoginParams, options?: { [key: string]: an
   });
 }
 
-/** 此处后端没有提供注释 GET /api/notices */
-export async function getNotices(options?: { [key: string]: any }) {
-  return request<API.NoticeIconList>('/api/notices', {
+/** 获取当前用户信息 GET /api/user/info */
+export async function currentUser(options?: { [key: string]: any }) {
+  return request<{
+    result: {
+      name: string;
+      username: string;
+      role: { id: string; name: string; permissions: any[] };
+      is_admin: boolean;
+      access: string;
+    };
+  }>('/api/user/info', {
     method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/** 退出登录 POST /api/auth/logout */
+export async function outLogin(options?: { [key: string]: any }) {
+  return request<Record<string, any>>('/api/auth/logout', {
+    method: 'POST',
     ...(options || {}),
   });
 }
@@ -57,38 +55,5 @@ export async function rule(
       ...params,
     },
     ...(options || {}),
-  });
-}
-
-/** 更新规则 PUT /api/rule */
-export async function updateRule(options?: { [key: string]: any }) {
-  return request<API.RuleListItem>('/api/rule', {
-    method: 'POST',
-    data: {
-      method: 'update',
-      ...(options || {}),
-    },
-  });
-}
-
-/** 新建规则 POST /api/rule */
-export async function addRule(options?: { [key: string]: any }) {
-  return request<API.RuleListItem>('/api/rule', {
-    method: 'POST',
-    data: {
-      method: 'post',
-      ...(options || {}),
-    },
-  });
-}
-
-/** 删除规则 DELETE /api/rule */
-export async function removeRule(options?: { [key: string]: any }) {
-  return request<Record<string, any>>('/api/rule', {
-    method: 'POST',
-    data: {
-      method: 'delete',
-      ...(options || {}),
-    },
   });
 }

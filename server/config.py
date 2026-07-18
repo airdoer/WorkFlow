@@ -8,7 +8,7 @@ if 'ROUTER_LIST' in os.environ:
     routerList = routerListStr.split(',')
 else:
     routerList = ['battle', 'battleExternal', 'heatmap', 'xlsx', 'gameServerRoute', 'battleServerRoute', 'serverInfoRoute', 'hotfixMongoRoute']
-    routerList = ['WorkFlow']
+    routerList = ['auth', 'WorkFlow']
 
 print('--- use router list: ', routerList)
 enableMonkeyPatch = True
@@ -88,9 +88,10 @@ bucket_name = "ksgame-c7-pick-data"
 region_name = "hb1"
 
 # auth + kitsso
-AUTH_TOKEN_SECRET = os.environ.get('AUTH_TOKEN_SECRET', 'game_watchman_auth_secret')
+AUTH_TOKEN_SECRET = os.environ.get('AUTH_TOKEN_SECRET', 'work_flow_auth_secret')
 AUTH_TOKEN_EXPIRE_SECONDS = int(os.environ.get('AUTH_TOKEN_EXPIRE_SECONDS', 7 * 24 * 60 * 60))
 SSO_URL = os.environ.get('SSO_URL', 'https://sogame-kagura-gateway.corp.kuaishou.com/login')
+AUTHEN_GET_URL = os.environ.get('AUTHEN_GET_URL', 'https://sogame-kagura-gateway.corp.kuaishou.com/authen_get?key={key}')
 ADMIN_WHITELIST_FILE = os.environ.get('ADMIN_WHITELIST_FILE', './data/auth/admin_whitelist.json')
 CHANNEL_MAP_CONFIG_FILE = os.environ.get('CHANNEL_MAP_CONFIG_FILE', './data/mail/channel_map_config.json').strip()
 

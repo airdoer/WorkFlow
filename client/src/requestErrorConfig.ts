@@ -70,6 +70,12 @@ export const errorConfig: RequestConfig = {
               message.error(errorMessage);
           }
         }
+      } else if (error.response && error.response.status === 401) {
+        // 401 未授权 — 清除 token 并跳转登录
+        localStorage.removeItem('access-token');
+        if (window.location.pathname !== '/user/login') {
+          window.location.href = '/user/login';
+        }
       } else if (error.response) {
         // Axios 的错误
         // 请求成功发出且服务器也响应了状态码，但状态代码超出了 2xx 的范围
@@ -93,16 +99,26 @@ export const errorConfig: RequestConfig = {
   // 请求拦截器
   requestInterceptors: [
     (config: RequestOptions) => {
-      // 拦截请求配置，进行个性化处理。
-      // 示例：为请求附加 token（按需启用）
-      // const token = localStorage.getItem('token');
-      // if (token) {
-      //   config.headers = { ...config.headers, Authorization: `Bearer ${token}` };
-      // }
+      // 为请求自动附加 Access-Token
+      const token = localStorage.getItem('access-token');
+      if (token) {
+        config.headers = { ...config.headers, 'Access-Token': token };
+      }
       return config;
     },
   ],
 
   // 响应拦截器
-  responseInterceptors: [],
+  responseInterceptors: [
+    (response: any) => {
+      // 对 401 响应自动跳转到登录页
+      if (response?.status === 401) {
+        localStorage.removeItem('access-token');
+        if (window.location.pathname !== '/user/login') {
+          window.location.href = '/user/login';
+        }
+      }
+      return response;
+    },
+  ],
 };

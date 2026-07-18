@@ -36,8 +36,15 @@ const menuItems: MenuProps['items'] = [
 ];
 
 const loginOut = async () => {
-  // 禁用鉴权：不执行登出操作，不跳转到登录页
-  console.log('Logout disabled in no-auth mode');
+  try {
+    await outLogin();
+  } catch {
+    // 即使接口调用失败也要清除本地状态
+  }
+  // 清除本地 token
+  localStorage.removeItem('access-token');
+  // 跳转到登录页
+  history.push('/user/login');
 };
 
 export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({

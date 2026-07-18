@@ -18,6 +18,20 @@ export default {
         'X-Forwarded-Host': 'localhost',
       },
     },
+    '/api/auth/': {
+      target: process.env.FLASK_BACKEND_URL || 'http://localhost:16666',
+      changeOrigin: true,
+      headers: {
+        'X-Forwarded-Host': 'localhost',
+      },
+    },
+    '/api/user/': {
+      target: process.env.FLASK_BACKEND_URL || 'http://localhost:16666',
+      changeOrigin: true,
+      headers: {
+        'X-Forwarded-Host': 'localhost',
+      },
+    },
     // Socket.IO WebSocket + HTTP long-polling proxy
     '/socket.io/': {
       target: process.env.FLASK_BACKEND_URL || 'http://localhost:16666',

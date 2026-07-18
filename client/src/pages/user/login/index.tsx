@@ -1,30 +1,16 @@
 import {
-  AlipayCircleOutlined,
-  LockOutlined,
-  MobileOutlined,
-  TaobaoCircleOutlined,
-  UserOutlined,
-  WeiboCircleOutlined,
-} from '@ant-design/icons';
-import {
   LoginForm,
-  ProFormCaptcha,
   ProFormCheckbox,
-  ProFormText,
 } from '@ant-design/pro-components';
 import {
-  FormattedMessage,
   Helmet,
-  SelectLang,
-  useIntl,
   useModel,
 } from '@umijs/max';
-import { Alert, App, Button, Tabs } from 'antd';
+import { Alert, App, Spin } from 'antd';
 import { createStyles } from 'antd-style';
-import React, { startTransition, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Footer } from '@/components';
-import { login } from '@/services/ant-design-pro/api';
-import { getFakeCaptcha } from '@/services/ant-design-pro/login';
+import { ssoLogin } from '@/services/ant-design-pro/api';
 import Settings from '../../../../config/defaultSettings';
 
 /**
@@ -33,9 +19,7 @@ import Settings from '../../../../config/defaultSettings';
  */
 const getSafeRedirectUrl = (redirect: string | null): string => {
   if (!redirect?.startsWith('/')) return '/';
-
   if (redirect.startsWith('//')) return '/';
-
   try {
     const parsed = new URL(redirect, window.location.origin);
     if (parsed.origin !== window.location.origin) return '/';
@@ -45,30 +29,77 @@ const getSafeRedirectUrl = (redirect: string | null): string => {
   }
 };
 
+/** 获取 SSO 回调 URL 中的 payload（token、username） */
+const getSsoCallbackPayload = () => {
+  const routeQuery: Record<string, string> = {};
+  new URLSearchParams(window.location.search || '').forEach((v, k) => {
+    routeQuery[k] = v;
+  });
+  const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#\/?/, ''));
+
+  const readValue = (keys: string[]) => {
+    for (const key of keys) {
+      const routeValue = routeQuery[key];
+      if (routeValue) return String(routeValue).trim();
+      const hashValue = hashParams.get(key);
+      if (hashValue) return String(hashValue).trim();
+    }
+    return '';
+  };
+
+  return {
+    token: readValue(['token', 'access_token', 'sso_token']),
+    username: readValue(['username', 'user_name', 'login_name', 'loginName', 'name']),
+  };
+};
+
+/** 构建 SSO 回调 URL */
+const buildSsoCallbackUrl = () => {
+  const ssoDirectCallbackUrl = (window as any).SSO_DIRECT_CALLBACK_URL || process.env.SSO_DIRECT_CALLBACK_URL;
+  const redirect = new URL(window.location.href).searchParams.get('redirect');
+  const callbackParams = new URLSearchParams();
+  callbackParams.set('sso_callback', '1');
+  if (redirect) {
+    callbackParams.set('redirect', redirect);
+  }
+
+  if (ssoDirectCallbackUrl) {
+    const joinChar = ssoDirectCallbackUrl.includes('?') ? '&' : '?';
+    return `${ssoDirectCallbackUrl}${joinChar}${callbackParams.toString()}`;
+  }
+
+  const callbackBase = `${window.location.origin}${window.location.pathname}`;
+  return `${callbackBase}?${callbackParams.toString()}`;
+};
+
+/** 判断是否为 SSO 回调请求 */
+const isSsoCallbackRequest = () => {
+  const searchParams = new URLSearchParams(window.location.search || '');
+  return searchParams.get('sso_callback') === '1';
+};
+
+/** 标记 SSO 跳转时间，防止循环跳转 */
+const markSsoRedirect = () => {
+  sessionStorage.setItem('wf_sso_redirect_at', String(Date.now()));
+};
+
+const clearSsoRedirectMark = () => {
+  sessionStorage.removeItem('wf_sso_redirect_at');
+};
+
+const wasRecentSsoRedirect = () => {
+  const raw = sessionStorage.getItem('wf_sso_redirect_at');
+  if (!raw) return false;
+  const timestamp = Number(raw);
+  if (!timestamp || Number.isNaN(timestamp)) {
+    clearSsoRedirectMark();
+    return false;
+  }
+  return Date.now() - timestamp < 2 * 60 * 1000; // 2 分钟内
+};
+
 const useStyles = createStyles(({ token }) => {
   return {
-    action: {
-      marginLeft: '8px',
-      color: 'rgba(0, 0, 0, 0.2)',
-      fontSize: '24px',
-      verticalAlign: 'middle',
-      cursor: 'pointer',
-      transition: 'color 0.3s',
-      '&:hover': {
-        color: token.colorPrimaryActive,
-      },
-    },
-    lang: {
-      width: 42,
-      height: 42,
-      lineHeight: '42px',
-      position: 'fixed',
-      right: 16,
-      borderRadius: token.borderRadius,
-      ':hover': {
-        backgroundColor: token.colorBgTextHover,
-      },
-    },
     container: {
       display: 'flex',
       flexDirection: 'column',
@@ -78,115 +109,112 @@ const useStyles = createStyles(({ token }) => {
         "url('https://mdn.alipayobjects.com/yuyan_qk0oxh/afts/img/V-_oS6r-i7wAAAAAAAAAAAAAFl94AQBr')",
       backgroundSize: '100% 100%',
     },
+    ssoTip: {
+      marginBottom: 16,
+      color: 'rgba(0, 0, 0, 0.65)',
+    },
   };
 });
 
-const ActionIcons = () => {
-  const { styles } = useStyles();
-
-  return (
-    <>
-      <AlipayCircleOutlined
-        key="AlipayCircleOutlined"
-        className={styles.action}
-      />
-      <TaobaoCircleOutlined
-        key="TaobaoCircleOutlined"
-        className={styles.action}
-      />
-      <WeiboCircleOutlined
-        key="WeiboCircleOutlined"
-        className={styles.action}
-      />
-    </>
-  );
-};
-
-const Lang = () => {
-  const { styles } = useStyles();
-
-  return (
-    <div className={styles.lang} data-lang>
-      {SelectLang && <SelectLang />}
-    </div>
-  );
-};
-
-const LoginMessage: React.FC<{
-  content: string;
-}> = ({ content }) => {
-  return (
-    <Alert
-      style={{
-        marginBottom: 24,
-      }}
-      title={content}
-      type="error"
-      showIcon
-    />
-  );
-};
-
 const Login: React.FC = () => {
-  const [userLoginState, setUserLoginState] = useState<API.LoginResult>({});
-  const [type, setType] = useState<string>('account');
   const { initialState, setInitialState } = useModel('@@initialState');
   const { styles } = useStyles();
   const { message } = App.useApp();
-  const intl = useIntl();
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [ssoUsername, setSsoUsername] = useState('');
 
   const fetchUserInfo = async () => {
     const userInfo = await initialState?.fetchUserInfo?.();
     if (userInfo) {
-      startTransition(() => {
-        setInitialState((s) => ({
-          ...s,
-          currentUser: userInfo,
-        }));
-      });
+      setInitialState((s) => ({
+        ...s,
+        currentUser: userInfo,
+      }));
     }
   };
 
-  const handleSubmit = async (values: API.LoginParams) => {
+  /** 尝试使用 SSO 回调中的信息登录 */
+  const trySsoCallbackLogin = async () => {
+    const { token, username } = getSsoCallbackPayload();
+    if (!token && !username) return false;
+
+    setLoading(true);
     try {
-      // 登录
-      const msg = await login({ ...values, type });
-      if (msg.status === 'ok') {
-        const defaultLoginSuccessMessage = intl.formatMessage({
-          id: 'pages.login.success',
-          defaultMessage: '登录成功！',
-        });
-        message.success(defaultLoginSuccessMessage);
-        await fetchUserInfo();
-        const urlParams = new URL(window.location.href).searchParams;
-        const redirectUrl = getSafeRedirectUrl(urlParams.get('redirect'));
-        window.location.href = redirectUrl;
-        return;
+      // 如果 SSO 回调带了 username，调用后端登录接口获取 token
+      const loginResult = await ssoLogin({ username });
+      const resultToken = loginResult.result?.token;
+      const resultUsername = loginResult.result?.username || username;
+
+      if (resultToken) {
+        localStorage.setItem('access-token', resultToken);
       }
-      // 如果失败去设置用户错误信息
-      setUserLoginState(msg);
-    } catch {
-      const defaultLoginFailureMessage = intl.formatMessage({
-        id: 'pages.login.failure',
-        defaultMessage: '登录失败，请重试！',
-      });
-      message.error(defaultLoginFailureMessage);
+
+      clearSsoRedirectMark();
+      setSsoUsername(resultUsername);
+
+      message.success('登录成功！');
+      await fetchUserInfo();
+
+      const urlParams = new URL(window.location.href).searchParams;
+      const redirectUrl = getSafeRedirectUrl(urlParams.get('redirect'));
+      window.location.href = redirectUrl;
+      return true;
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || '登录失败，请重试';
+      setErrorMessage(msg);
+      message.error(msg);
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
-  const { status, type: loginType } = userLoginState;
+
+  /** 启动 SSO 登录跳转 */
+  const startSsoLogin = () => {
+    setErrorMessage('');
+    setSsoUsername('');
+    setLoading(true);
+
+    const ssoUrl = (window as any).SSO_URL || process.env.SSO_URL || 'https://sogame-kagura-gateway.corp.kuaishou.com/login';
+    const jumpTargetUrl = buildSsoCallbackUrl();
+    const jumpUrl = `${ssoUrl}?url=${encodeURIComponent(jumpTargetUrl)}`;
+    markSsoRedirect();
+    window.location.replace(jumpUrl);
+  };
+
+  useEffect(() => {
+    // 1. 尝试使用 SSO 回调信息登录
+    const payload = getSsoCallbackPayload();
+    if (payload.token || payload.username) {
+      trySsoCallbackLogin();
+      return;
+    }
+
+    // 2. 如果是 SSO 回调但没带有效信息
+    if (isSsoCallbackRequest()) {
+      setErrorMessage('SSO 回调未携带有效登录信息，请检查 SSO 回调参数配置');
+      return;
+    }
+
+    // 3. 如果刚跳转过 SSO 但回来还是没信息，防止循环跳转
+    if (wasRecentSsoRedirect()) {
+      setErrorMessage('SSO 登录未返回有效信息，已停止循环跳转，请检查 SSO 回调参数');
+      return;
+    }
+
+    // 4. 正常启动 SSO 登录流程
+    startSsoLogin();
+  }, []);
 
   return (
     <div className={styles.container}>
       <Helmet>
         <title>
-          {intl.formatMessage({
-            id: 'menu.login',
-            defaultMessage: '登录页',
-          })}
+          登录页
           {Settings.title && ` - ${Settings.title}`}
         </title>
       </Helmet>
-      <Lang />
       <div
         style={{
           flex: '1',
@@ -199,212 +227,35 @@ const Login: React.FC = () => {
             maxWidth: '75vw',
           }}
           logo={<img alt="logo" src="/logo1.png" />}
-          title="Ant Design"
-          subTitle={intl.formatMessage({
-            id: 'pages.layouts.userLayout.title',
-          })}
-          initialValues={{
-            autoLogin: true,
-          }}
-          actions={[
-            <FormattedMessage
-              key="loginWith"
-              id="pages.login.loginWith"
-              defaultMessage="其他登录方式"
-            />,
-            <ActionIcons key="icons" />,
-          ]}
-          onFinish={async (values) => {
-            await handleSubmit(values as API.LoginParams);
+          title="WorkFlow"
+          subTitle="统一 SSO 登录"
+          onFinish={async () => {
+            // 点击登录按钮也触发 SSO 跳转
+            startSsoLogin();
           }}
         >
-          <Tabs
-            activeKey={type}
-            onChange={setType}
-            centered
-            items={[
-              {
-                key: 'account',
-                label: intl.formatMessage({
-                  id: 'pages.login.accountLogin.tab',
-                  defaultMessage: '账户密码登录',
-                }),
-              },
-              {
-                key: 'mobile',
-                label: intl.formatMessage({
-                  id: 'pages.login.phoneLogin.tab',
-                  defaultMessage: '手机号登录',
-                }),
-              },
-            ]}
-          />
-
-          {status === 'error' && loginType === 'account' && (
-            <LoginMessage
-              content={intl.formatMessage({
-                id: 'pages.login.accountLogin.errorMessage',
-                defaultMessage: '账户或密码错误(admin/ant.design)',
-              })}
+          {errorMessage && (
+            <Alert
+              style={{ marginBottom: 24 }}
+              message={errorMessage}
+              type="error"
+              showIcon
             />
           )}
-          {type === 'account' && (
-            <>
-              <ProFormText
-                name="username"
-                fieldProps={{
-                  size: 'large',
-                  prefix: <UserOutlined />,
-                }}
-                placeholder={intl.formatMessage({
-                  id: 'pages.login.username.placeholder',
-                  defaultMessage: '用户名: admin or user',
-                })}
-                rules={[
-                  {
-                    required: true,
-                    message: (
-                      <FormattedMessage
-                        id="pages.login.username.required"
-                        defaultMessage="请输入用户名!"
-                      />
-                    ),
-                  },
-                ]}
-              />
-              <ProFormText.Password
-                name="password"
-                fieldProps={{
-                  size: 'large',
-                  prefix: <LockOutlined />,
-                }}
-                placeholder={intl.formatMessage({
-                  id: 'pages.login.password.placeholder',
-                  defaultMessage: '密码: ant.design',
-                })}
-                rules={[
-                  {
-                    required: true,
-                    message: (
-                      <FormattedMessage
-                        id="pages.login.password.required"
-                        defaultMessage="请输入密码！"
-                      />
-                    ),
-                  },
-                ]}
-              />
-            </>
-          )}
 
-          {status === 'error' && loginType === 'mobile' && (
-            <LoginMessage content="验证码错误" />
-          )}
-          {type === 'mobile' && (
-            <>
-              <ProFormText
-                fieldProps={{
-                  size: 'large',
-                  prefix: <MobileOutlined />,
-                }}
-                name="mobile"
-                placeholder={intl.formatMessage({
-                  id: 'pages.login.phoneNumber.placeholder',
-                  defaultMessage: '手机号',
-                })}
-                rules={[
-                  {
-                    required: true,
-                    message: (
-                      <FormattedMessage
-                        id="pages.login.phoneNumber.required"
-                        defaultMessage="请输入手机号！"
-                      />
-                    ),
-                  },
-                  {
-                    pattern: /^1\d{10}$/,
-                    message: (
-                      <FormattedMessage
-                        id="pages.login.phoneNumber.invalid"
-                        defaultMessage="手机号格式错误！"
-                      />
-                    ),
-                  },
-                ]}
-              />
-              <ProFormCaptcha
-                fieldProps={{
-                  size: 'large',
-                  prefix: <LockOutlined />,
-                }}
-                captchaProps={{
-                  size: 'large',
-                }}
-                placeholder={intl.formatMessage({
-                  id: 'pages.login.captcha.placeholder',
-                  defaultMessage: '请输入验证码',
-                })}
-                captchaTextRender={(timing, count) => {
-                  if (timing) {
-                    return `${count} ${intl.formatMessage({
-                      id: 'pages.getCaptchaSecondText',
-                      defaultMessage: '获取验证码',
-                    })}`;
-                  }
-                  return intl.formatMessage({
-                    id: 'pages.login.phoneLogin.getVerificationCode',
-                    defaultMessage: '获取验证码',
-                  });
-                }}
-                name="captcha"
-                rules={[
-                  {
-                    required: true,
-                    message: (
-                      <FormattedMessage
-                        id="pages.login.captcha.required"
-                        defaultMessage="请输入验证码！"
-                      />
-                    ),
-                  },
-                ]}
-                onGetCaptcha={async (phone) => {
-                  const result = await getFakeCaptcha({
-                    phone,
-                  });
-                  if (!result) {
-                    return;
-                  }
-                  message.success('获取验证码成功！验证码为：1234');
-                }}
-              />
-            </>
-          )}
-          <div
-            style={{
-              marginBottom: 24,
-            }}
-          >
-            <ProFormCheckbox noStyle name="autoLogin">
-              <FormattedMessage
-                id="pages.login.rememberMe"
-                defaultMessage="自动登录"
-              />
-            </ProFormCheckbox>
-            <Button
-              type="link"
-              style={{
-                float: 'right',
-                padding: 0,
-              }}
-            >
-              <FormattedMessage
-                id="pages.login.forgotPassword"
-                defaultMessage="忘记密码"
-              />
-            </Button>
+          <div className={styles.ssoTip}>
+            {loading ? (
+              <Spin tip="正在处理登录..." />
+            ) : (
+              <span>点击登录将跳转到 SSO 进行认证，认证成功后将自动返回。</span>
+            )}
           </div>
+
+          {ssoUsername && (
+            <div style={{ marginTop: 16, fontSize: 12, color: 'rgba(0, 0, 0, 0.65)' }}>
+              当前认证用户：{ssoUsername}
+            </div>
+          )}
         </LoginForm>
       </div>
       <Footer />
