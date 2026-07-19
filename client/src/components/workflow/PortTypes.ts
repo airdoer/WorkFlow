@@ -246,6 +246,11 @@ export const NODE_PORT_DEFINITIONS: Record<string, PortDefinition[]> = {
     { key: 'valueIn', label: '布尔输入', type: 'boolean', direction: 'input', maxConnections: 1 },
     { key: 'value', label: '通过结果', type: 'boolean', direction: 'output' },
   ],
+  gate: [
+    { key: 'valueIn', label: '输入值', type: 'any', direction: 'input', maxConnections: 1 },
+    { key: 'enabledIn', label: '启用', type: 'boolean', direction: 'input', maxConnections: 1 },
+    { key: 'value', label: '输出值', type: 'any', direction: 'output' },
+  ],
 
   // ===== Basic Types =====
   bool: [

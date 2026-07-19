@@ -80,6 +80,7 @@ class ExecutorManager:
             "bool": "boolean",
             "number": "number",
             "boolgate": "boolean",
+            "gate": "any",
             "prompt": "string",
             "llm": "string",
             "calculate": "number",

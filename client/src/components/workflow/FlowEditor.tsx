@@ -319,6 +319,7 @@ function FlowEditorInner({
     processing: 'running',
     success: 'success',
     error: 'error',
+    skipped: 'skipped',
   };
 
   /** Read a node's run status (fast lookup from cache, falls back to node.data) */
@@ -367,7 +368,7 @@ function FlowEditorInner({
             return e;
           });
         });
-      } else if (nodeStatus === 'error' || nodeStatus === 'idle') {
+      } else if (nodeStatus === 'error' || nodeStatus === 'skipped' || nodeStatus === 'idle') {
         // Deactivate outgoing edges from the failed/reset node
         setEdges((eds) => {
           return eds.map((e) => {

@@ -4,6 +4,7 @@ import { getNodePorts } from './PortTypes';
 // Node component imports
 import BoolNode from './nodes/Bool';
 import BoolGateNode from './nodes/BoolGate';
+import GateNode from './nodes/Gate';
 import C7ServerNode from './nodes/C7Server';
 import CronNode from './nodes/Cron';
 import DiffNode from './nodes/Diff';
@@ -58,6 +59,7 @@ export const nodeTypes = {
   // Original
   bool: BoolNode,
   boolgate: BoolGateNode,
+  gate: GateNode,
   c7server: C7ServerNode,
   cron: CronNode,
   diff: DiffNode,
@@ -186,6 +188,7 @@ export const NODE_REGISTRY: NodeRegistryEntry[] = [
   { type: 'loop', name: 'Loop 循环', category: 'controlflow', description: '循环迭代' },
   { type: 'switch', name: 'Switch 开关', category: 'controlflow', description: '多路分支' },
   { type: 'boolgate', name: 'BoolGate 门控', category: 'controlflow', description: '布尔门控（False 时中断）' },
+  { type: 'gate', name: 'Gate 门', category: 'controlflow', description: '条件门控（enabled=true 时透传 value）' },
 
   // ===== 7. Basic Types =====
   { type: 'string', name: 'String 字符串', category: 'basic', description: '字符串值' },
@@ -317,7 +320,7 @@ function getNodeIcon(nodeType: string): string {
     listbuilder: '📦', objectbuilder: '🏗️', dictbuilder: '📖',
     calculate: '🧮', template: '📝', condition: '❓',
     prompt: '🤖', llm: '🤖',
-    if: '🔀', loop: '🔁', switch: '🎛️', boolgate: '🚦',
+    if: '🔀', loop: '🔁', switch: '🎛️', boolgate: '🚦', gate: '🚪',
     bool: '🔘', string: '📝', number: '🔢',
     excel: '📊', json: '📋', lua: '🌙', table: '📊', diff: '🔄',
     c7server: '🖥️', seal: '🐾', jenkinsdeploy: '🚀', format: '🔤', kdip: '⚙️', kimnotify: '🔔', cron: '⏰',

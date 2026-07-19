@@ -602,22 +602,21 @@ class WorkflowRuntime:
                 await asyncio.gather(*[node_done[p].wait() for p in preds])
                 logger.info("[WorkflowRuntime] task_id=%r, node=%r: all predecessors done", task_id, nid)
 
-            # Check upstream errors (only for predecessors that were in exec set)
+            # Check upstream errors — if any predecessor failed, skip this node silently
             async with context_lock:
-                upstream_errors = [
-                    f"{p}: {context[p].get('error')}"
+                upstream_failed = any(
+                    p in exec_set and isinstance(context.get(p), dict) and context[p].get('error')
                     for p in preds
-                    if p in exec_set and isinstance(context.get(p), dict) and context[p].get('error')
-                ]
-            if upstream_errors:
-                error_msg = f"Upstream node(s) failed: {'; '.join(upstream_errors)}"
-                logger.warning("[WorkflowRuntime] task_id=%r, node=%r: skipping due to upstream errors",
-                               task_id, nid)
+                )
+            if upstream_failed:
+                logger.info("[WorkflowRuntime] task_id=%r, node=%r: skipped (upstream node failed)",
+                            task_id, nid)
                 async with context_lock:
-                    context[nid] = {'error': error_msg}
-                cls._tasks[task_id]['nodes'][nid] = 'error'
+                    context[nid] = {'error': '__skip__', 'skipped': True}
+                cls._tasks[task_id]['nodes'][nid] = 'skipped'
                 cls._emit('workflow:node_update', {
-                    'taskId': task_id, 'nodeId': nid, 'status': 'error', 'output': {'error': error_msg}
+                    'taskId': task_id, 'nodeId': nid, 'status': 'skipped',
+                    'output': {'skipped': True}
                 }, room=task_id)
                 node_done[nid].set()
                 return

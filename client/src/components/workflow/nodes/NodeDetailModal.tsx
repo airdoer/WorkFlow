@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useMemo, lazy, Suspense, useRef } from 'react';
 import { Modal, Button, Tag, message, Select } from 'antd';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, CopyOutlined, CloseOutlined } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
 import type { NodeField, RunStatus } from './BaseNode';
 import { FieldTextInput, FieldTextarea, stripRuntimeMeta, SeqBadge } from './BaseNode';
@@ -29,6 +29,8 @@ const STATUS_CONFIG: Record<RunStatus, { color: string; bg: string; label: strin
   running: { color: '#1890ff', bg: '#bae7ff', label: '运行中', icon: LoadingOutlined },
   success: { color: '#52c41a', bg: '#d9f7be', label: '运行成功', icon: CheckCircleOutlined },
   error: { color: '#ff4d4f', bg: '#ffa39e', label: '运行失败', icon: CloseCircleOutlined },
+  skipped: { color: '#d9d9d9', bg: '#f5f5f5', label: '已跳过', icon: MinusCircleOutlined },
+  stale: { color: '#8c8c8c', bg: '#e8e8e8', label: '需重跑', icon: PlayCircleOutlined },
 };
 
 // Lazy renderers

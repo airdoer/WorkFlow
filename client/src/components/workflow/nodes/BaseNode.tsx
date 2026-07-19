@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { Select } from 'antd';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, ExpandOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts, type PortDefinition } from '../PortTypes';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -77,7 +77,7 @@ function isBinaryContent(str: string): boolean {
 }
 const LuaRenderer = lazy(() => import('./Lua/LuaRenderer'));
 
-export type RunStatus = 'idle' | 'running' | 'success' | 'error' | 'stale';
+export type RunStatus = 'idle' | 'running' | 'success' | 'error' | 'stale' | 'skipped';
 export { FieldTextInput, FieldTextarea };
 export interface NodeField {
   key: string;
@@ -125,6 +125,7 @@ const STATUS_CONFIG = {
   running: { color: '#1890ff', bg: '#e6f7ff', icon: LoadingOutlined, title: '运行中...' },
   success: { color: '#52c41a', bg: '#f6ffed', icon: CheckCircleOutlined, title: '运行成功' },
   error: { color: '#ff4d4f', bg: '#fff2f0', icon: CloseCircleOutlined, title: '运行失败' },
+  skipped: { color: '#d9d9d9', bg: '#fafafa', icon: MinusCircleOutlined, title: '已跳过（上游未成功）' },
   stale: { color: '#8c8c8c', bg: '#fafafa', icon: PlayCircleOutlined, title: '参数已修改，需重新运行' },
 };
 

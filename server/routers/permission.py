@@ -82,7 +82,13 @@ def _is_admin(username):
 
 
 def _compute_visible_node_types(username, groups):
-    """Compute the set of node types visible to a user based on their group memberships."""
+    """Compute the set of node types visible to a user based on their group memberships.
+    Admins always see all node types (returns empty list = no restriction)."""
+    from routers.auth import _load_admin_whitelist
+    admins = _load_admin_whitelist()
+    if username in admins:
+        return []  # Empty list = all visible (admin bypasses permission filtering)
+
     visible = set()
     for g in groups:
         users_in_group = g.get('users', [])
