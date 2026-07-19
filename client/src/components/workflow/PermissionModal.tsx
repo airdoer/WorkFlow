@@ -261,23 +261,18 @@ const PermissionModal: React.FC<Props> = ({ open, onClose }) => {
                             <div style={{ fontWeight: 600, fontSize: 12, color: '#666', marginBottom: 4 }}>
                               {categoryNames[cat] || cat}
                             </div>
-                            <Checkbox.Group
-                              value={selectedGroup.nodeTypes}
-                              onChange={() => {}} // handled by individual checkbox
-                            >
-                              <Row gutter={[8, 4]}>
-                                {nodes.map(n => (
-                                  <Col key={n.type}>
-                                    <Checkbox
-                                      checked={selectedGroup.nodeTypes.includes(n.type)}
-                                      onChange={e => handleToggleNode(n.type, e.target.checked)}
-                                    >
-                                      <span style={{ fontSize: 12 }}>{n.name}</span>
-                                    </Checkbox>
-                                  </Col>
-                                ))}
-                              </Row>
-                            </Checkbox.Group>
+                            <Row gutter={[8, 4]}>
+                              {nodes.map(n => (
+                                <Col key={n.type}>
+                                  <Checkbox
+                                    checked={selectedGroup.nodeTypes.includes(n.type)}
+                                    onChange={e => handleToggleNode(n.type, e.target.checked)}
+                                  >
+                                    <span style={{ fontSize: 12 }}>{n.name}</span>
+                                  </Checkbox>
+                                </Col>
+                              ))}
+                            </Row>
                           </div>
                         ))}
                       </div>
