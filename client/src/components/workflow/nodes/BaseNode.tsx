@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { Select, message } from 'antd';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined, UndoOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts, type PortDefinition } from '../PortTypes';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -547,6 +547,46 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               {formatLastRunTime((data as any)._lastRunTime)}
             </span>
           )}
+          {/* Reset button — clears this node's fields and run status */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setNodes((nds) => {
+                const d = nds.map((n) => {
+                  if (n.id !== id) return n;
+                  const nd = n.data as Record<string, any>;
+                  const cleaned: Record<string, any> = {};
+                  for (const [k, v] of Object.entries(nd)) {
+                    if (k === '_runStatus') { cleaned[k] = 'idle'; }
+                    else if (k === '_runStatusHint') { cleaned[k] = 'idle'; }
+                    else if (k === '_runOutput') { cleaned[k] = null; }
+                    else if (k === '_lastRunTime') { /* drop */ }
+                    else if (k === '_pollingStatus') { /* drop */ }
+                    else if (k.startsWith('_')) { cleaned[k] = v; }
+                    else { cleaned[k] = ''; }
+                  }
+                  return { ...n, data: cleaned };
+                });
+                return d;
+              });
+              setEdges((eds) =>
+                eds.map((e) => {
+                  const isRelated = e.source === id || e.target === id;
+                  return isRelated ? { ...e, data: { ...e.data, activated: false, flowing: false } } : e;
+                }),
+              );
+              message.success('已重置节点');
+            }}
+            title="重置节点"
+            style={{
+              width: 24, height: 24, borderRadius: 4, border: 'none',
+              background: '#fff7e6', color: '#fa8c16', cursor: 'pointer',
+              fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 0, flexShrink: 0, transition: 'all 0.2s',
+            }}
+          >
+            <UndoOutlined />
+          </button>
           {/* Expand button — opens NodeDetailModal */}
           <button
             onClick={(e) => { e.stopPropagation(); setDetailNodeId(id); }}

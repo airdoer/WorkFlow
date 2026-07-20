@@ -1007,6 +1007,36 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           保存
         </Button>
+        <Popconfirm
+          title="重置所有节点"
+          description="将清空所有节点的填写值和运行状态，是否继续？"
+          onConfirm={() => {
+            setNodes((nds) =>
+              nds.map((n) => {
+                const d = n.data as Record<string, any>;
+                const cleaned: Record<string, any> = {};
+                for (const [k, v] of Object.entries(d)) {
+                  if (k === '_runStatus') { cleaned[k] = 'idle'; }
+                  else if (k === '_runStatusHint') { cleaned[k] = 'idle'; }
+                  else if (k === '_runOutput') { cleaned[k] = null; }
+                  else if (k === '_lastRunTime') { /* drop */ }
+                  else if (k === '_pollingStatus') { /* drop */ }
+                  else if (k.startsWith('_')) { cleaned[k] = v; } // keep other meta
+                  else { cleaned[k] = ''; } // clear user fields
+                }
+                return { ...n, data: cleaned };
+              }),
+            );
+            setEdges((eds) =>
+              eds.map((e) => ({ ...e, data: { ...e.data, activated: false, flowing: false } })),
+            );
+            message.success('已重置所有节点');
+          }}
+          okText="重置"
+          cancelText="取消"
+        >
+          <Button icon={<RollbackOutlined />} size="small" danger>重置</Button>
+        </Popconfirm>
         
       <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
 
