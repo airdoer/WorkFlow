@@ -100,13 +100,10 @@ class JenkinsDeployExecutor(BaseNodeExecutor):
                 return {"success": False, "error": "serverName（目标服务器）不能为空"}
             params["SERVER_DEPLOY_NAMESPACE"] = server_name
 
-            # 布尔参数
-            if config.get('trigger_seal'):
-                params["trigger_seal"] = "true"
-            if config.get('with_server_appendix'):
-                params["with_server_appendix"] = "true"
-            if config.get('CLEAN_ALL_DB_DATA'):
-                params["CLEAN_ALL_DB_DATA"] = "true"
+            # 布尔参数 — 始终显式传递 true/false，避免 Jenkins 使用默认值
+            params["trigger_seal"] = "true" if config.get('trigger_seal') else "false"
+            params["with_server_appendix"] = "true" if config.get('with_server_appendix') else "false"
+            params["CLEAN_ALL_DB_DATA"] = "true" if config.get('CLEAN_ALL_DB_DATA') else "false"
 
             # 更新模式
             build_type = config.get('SERVER_BUILD_TYPE', 'full')
