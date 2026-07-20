@@ -259,7 +259,10 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       nodeDataOverrides,
       onNodeUpdate,
       (_status, error) => {
-        if (error) console.error('[NodeDetailModal] NodeRun error:', error);
+        if (error) {
+          console.error('[NodeDetailModal] NodeRun error:', error);
+          message.error(`节点运行失败: ${error}`);
+        }
       },
     );
   }, [nodeId, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes, getRunOutput]);

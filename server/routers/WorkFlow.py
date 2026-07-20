@@ -344,8 +344,11 @@ def on_workflow_run(data):
             except Exception as hist_err:
                 logger.warning("[workflow:run] Failed to write history: %s", hist_err)
 
-    # Run in socketio background task (gevent greenlet)
-    socketio.start_background_task(run_workflow)
+    # Run in a dedicated thread (not gevent greenlet) to avoid asyncio event loop conflicts
+    # when multiple workflows run concurrently (e.g., Seal polling + run_from_node)
+    import threading
+    t = threading.Thread(target=run_workflow, daemon=True, name=f"wf-run-{task_id[:8]}")
+    t.start()
 
 
 @socketio.on('workflow:run_from_node')
@@ -454,7 +457,10 @@ def on_workflow_run_from_node(data) -> None:
             except Exception as hist_err:
                 logger.warning("[workflow:run_from_node] Failed to write history: %s", hist_err)
 
-    socketio.start_background_task(run_subgraph)
+    # Run in a dedicated thread (not gevent greenlet) to avoid asyncio event loop conflicts
+    import threading
+    t = threading.Thread(target=run_subgraph, daemon=True, name=f"wf-node-{task_id[:8]}")
+    t.start()
 
 
 @socketio.on('workflow:cancel')

@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
-import { Select } from 'antd';
+import { Select, message } from 'antd';
 import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts, type PortDefinition } from '../PortTypes';
@@ -463,6 +463,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         (_status, error) => {
           if (error) {
             console.error('[BaseNode] NodeRun finished with error:', error);
+            message.error(`节点运行失败: ${error}`);
           }
         },
       );
