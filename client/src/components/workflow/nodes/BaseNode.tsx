@@ -245,7 +245,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   overridePorts,
 }) => {
   const { setNodes, setEdges, getNodes } = useReactFlow();
-  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput } = useWorkflowContext();
+  const { workflowId, onNodeUpdate, ensureSaved, multiSelectedIds, compactMode, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput, resetNode } = useWorkflowContext();
   const detailOpen = detailNodeId === id;
 
   // Read run status/output from the external store (not from node.data)
@@ -551,30 +551,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setNodes((nds) => {
-                const d = nds.map((n) => {
-                  if (n.id !== id) return n;
-                  const nd = n.data as Record<string, any>;
-                  const cleaned: Record<string, any> = {};
-                  for (const [k, v] of Object.entries(nd)) {
-                    if (k === '_runStatus') { cleaned[k] = 'idle'; }
-                    else if (k === '_runStatusHint') { cleaned[k] = 'idle'; }
-                    else if (k === '_runOutput') { cleaned[k] = null; }
-                    else if (k === '_lastRunTime') { /* drop */ }
-                    else if (k === '_pollingStatus') { /* drop */ }
-                    else if (k.startsWith('_')) { cleaned[k] = v; }
-                    else { cleaned[k] = ''; }
-                  }
-                  return { ...n, data: cleaned };
-                });
-                return d;
-              });
-              setEdges((eds) =>
-                eds.map((e) => {
-                  const isRelated = e.source === id || e.target === id;
-                  return isRelated ? { ...e, data: { ...e.data, activated: false, flowing: false } } : e;
-                }),
-              );
+              resetNode(id);
               message.success('已重置节点');
             }}
             title="重置节点"

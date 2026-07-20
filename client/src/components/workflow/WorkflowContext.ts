@@ -38,6 +38,8 @@ export interface WorkflowContextValue {
   getRunStatus: (nodeId: string) => string;
   /** Read a node's run output from the external run-output store */
   getRunOutput: (nodeId: string) => any;
+  /** Reset a single node: clear fields, run status, output, and cache */
+  resetNode: (nodeId: string) => void;
 }
 
 export const WorkflowContext = createContext<WorkflowContextValue>({
@@ -54,6 +56,7 @@ export const WorkflowContext = createContext<WorkflowContextValue>({
   setDetailNodeId: () => {},
   getRunStatus: () => 'idle',
   getRunOutput: () => undefined,
+  resetNode: () => {},
 });
 
 export function useWorkflowContext() {

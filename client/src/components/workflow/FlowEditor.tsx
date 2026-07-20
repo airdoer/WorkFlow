@@ -1103,6 +1103,65 @@ function FlowEditorInner({
   // localStorage makes it accessible from any tab/window on the same origin.
   const CLIPBOARD_KEY = 'wf_clipboard';
 
+  /** Reset all nodes: clear fields, run status, output, and cache */
+  const handleResetAll = useCallback(() => {
+    // 1. Clear the fast lookup cache (this is what getRunStatus/getRunOutput reads)
+    runStateCacheRef.current = {};
+    // 2. Reset node.data: clear user fields + run status
+    setNodes((nds) =>
+      nds.map((n) => {
+        const d = n.data as Record<string, any>;
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(d)) {
+          if (k === '_runStatus') { cleaned[k] = 'idle'; }
+          else if (k === '_runStatusHint') { cleaned[k] = 'idle'; }
+          else if (k === '_runOutput') { cleaned[k] = null; }
+          else if (k === '_lastRunTime') { /* drop */ }
+          else if (k === '_pollingStatus') { /* drop */ }
+          else if (k.startsWith('_')) { cleaned[k] = v; }
+          else { cleaned[k] = ''; }
+        }
+        return { ...n, data: cleaned };
+      }),
+    );
+    // 3. Reset edges
+    setEdges((eds) =>
+      eds.map((e) => ({ ...e, data: { ...e.data, activated: false, flowing: false } })),
+    );
+    message.success('已重置所有节点');
+  }, [setNodes, setEdges]);
+
+  /** Reset a single node: clear fields, run status, output, and cache entry */
+  const resetNode = useCallback((nodeId: string) => {
+    // 1. Clear cache entry for this node
+    delete runStateCacheRef.current[nodeId];
+    // 2. Reset node.data
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== nodeId) return n;
+        const d = n.data as Record<string, any>;
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(d)) {
+          if (k === '_runStatus') { cleaned[k] = 'idle'; }
+          else if (k === '_runStatusHint') { cleaned[k] = 'idle'; }
+          else if (k === '_runOutput') { cleaned[k] = null; }
+          else if (k === '_lastRunTime') { /* drop */ }
+          else if (k === '_pollingStatus') { /* drop */ }
+          else if (k.startsWith('_')) { cleaned[k] = v; }
+          else { cleaned[k] = ''; }
+        }
+        return { ...n, data: cleaned };
+      }),
+    );
+    // 3. Reset related edges
+    setEdges((eds) =>
+      eds.map((e) => {
+        const isRelated = e.source === nodeId || e.target === nodeId;
+        return isRelated ? { ...e, data: { ...e.data, activated: false, flowing: false } } : e;
+      }),
+    );
+  }, [setNodes, setEdges]);
+
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
       // Auto-save before running to ensure backend has latest state
@@ -1323,7 +1382,8 @@ function FlowEditorInner({
     setDetailNodeId,
     getRunStatus,
     getRunOutput,
-  }), [workflowId, workflowName, handleNodeUpdate, ensureSaved, multiSelectedIds, compactMode, setCompactMode, selectedNodeId, setSelectedNodeId, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput]);
+    resetNode,
+  }), [workflowId, workflowName, handleNodeUpdate, ensureSaved, multiSelectedIds, compactMode, setCompactMode, selectedNodeId, setSelectedNodeId, detailNodeId, setDetailNodeId, getRunStatus, getRunOutput, resetNode]);
 
   return (
     <WorkflowContext.Provider value={contextValue}>
@@ -1351,6 +1411,7 @@ function FlowEditorInner({
         onSwitchWorkflow={onSwitchWorkflow}
         onDeleteWorkflow={onDeleteWorkflow}
         initialLibraryOpen={initialLibraryOpen}
+        onResetAll={handleResetAll}
       />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <Toolbox nodes={nodes} setNodes={setNodes} onAddNode={() => {
