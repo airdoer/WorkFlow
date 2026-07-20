@@ -453,6 +453,210 @@ class WorkflowRuntime:
             logger.debug("[WorkflowRuntime._emit] socketio not available, skip emit %r", event)
 
     @classmethod
+    async def run_single(cls, workflow_json, task_id, node_id: str, node_data_overrides: dict = None):
+        """Run only ONE node — execute it, store output in context, but do NOT
+        execute any downstream nodes. The output is sent to the frontend so
+        that downstream nodes can display it via edge connections.
+
+        Args:
+            workflow_json:       Saved workflow JSON (nodes + edges).
+            task_id:             Unique task identifier for this run.
+            node_id:             The single node to execute.
+            node_data_overrides: Per-node data overrides from frontend.
+        """
+        from Implement.workflowImpl.nodeExecutor import ExecutorManager
+
+        logger.info("[WorkflowRuntime.run_single] Starting: task_id=%r, node_id=%r", task_id, node_id)
+
+        nodes = workflow_json.get('nodes', [])
+        edges = workflow_json.get('edges', [])
+
+        if not nodes:
+            cls._tasks[task_id] = {'status': 'success', 'nodes': {}, 'result': {}}
+            cls._emit('workflow:done', {'taskId': task_id, 'status': 'success', 'error': None}, room=task_id)
+            return
+
+        node_map = {n['id']: n for n in nodes}
+
+        if node_id not in node_map:
+            error_msg = f"Node '{node_id}' not found in workflow"
+            logger.error("[WorkflowRuntime.run_single] task_id=%r: %s", task_id, error_msg)
+            cls._tasks[task_id] = {'status': 'error', 'nodes': {}, 'result': None, 'error': error_msg}
+            cls._emit('workflow:node_update', {
+                'taskId': task_id, 'nodeId': node_id, 'status': 'error',
+                'output': {'error': error_msg}
+            }, room=task_id)
+            cls._emit('workflow:done', {'taskId': task_id, 'status': 'error', 'error': error_msg}, room=task_id)
+            return
+
+        # ── Build adjacency structures (same as run()) ──
+        predecessors: dict = {n['id']: [] for n in nodes}
+        edges_by_target: dict = {n['id']: [] for n in nodes}
+        for edge in edges:
+            src = edge.get('source') or edge.get('sourceNodeID')
+            tgt = edge.get('target') or edge.get('targetNodeID')
+            if src in node_map and tgt in node_map:
+                predecessors[tgt].append(src)
+                edges_by_target[tgt].append(edge)
+
+        # ── Initialize task state ──
+        cls._tasks[task_id] = {
+            'status': 'processing',
+            'nodes': {nid: 'idle' for nid in node_map},
+            'result': None,
+            'error': None,
+        }
+
+        # Pre-fill context with upstream outputs from node_data_overrides
+        context: dict = {}
+        context_lock = asyncio.Lock()
+        if node_data_overrides:
+            for nid, override_data in node_data_overrides.items():
+                context[nid] = override_data
+                logger.debug("[WorkflowRuntime.run_single] task_id=%r: pre-filled context for node %r", task_id, nid)
+
+        # node_done event for the single node
+        node_done = {nid: asyncio.Event() for nid in node_map}
+        # Mark all nodes except the target as "done" so the single node doesn't wait
+        for nid in node_map:
+            if nid != node_id:
+                node_done[nid].set()
+
+        exec_set = {node_id}
+
+        # ── Execute the single node ──
+        async def execute_single():
+            node = node_map[node_id]
+            node_type = node.get('type', '')
+            preds = predecessors[node_id]
+
+            # Wait for predecessors (they are pre-done, so this returns immediately)
+            if preds:
+                await asyncio.gather(*[node_done[p].wait() for p in preds])
+
+            # Check upstream errors
+            async with context_lock:
+                upstream_failed = any(
+                    isinstance(context.get(p), dict) and context.get(p, {}).get('error')
+                    for p in preds
+                )
+
+            if upstream_failed:
+                logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r: upstream has errors, still executing",
+                            task_id, node_id)
+                # Unlike full run, we still execute the node even if upstream failed
+                # The user explicitly clicked "run" on this specific node
+
+            # ── Execute the node ──
+            try:
+                logger.info("[WorkflowRuntime.run_single] task_id=%r: executing node %r (type=%r)",
+                            task_id, node_id, node_type)
+                cls._tasks[task_id]['nodes'][node_id] = 'processing'
+                cls._emit('workflow:node_update', {
+                    'taskId': task_id, 'nodeId': node_id, 'status': 'processing',
+                    'output': None
+                }, room=task_id)
+
+                executor = ExecutorManager.get_executor(node_type)
+                if not executor:
+                    raise ValueError(f"No executor found for node type: {node_type}")
+
+                # Get input data from context (upstream outputs)
+                node_input = {}
+                for pred in preds:
+                    pred_output = context.get(pred)
+                    if pred_output is not None:
+                        node_input[pred] = pred_output
+
+                # Run the executor
+                output = await executor(node, node_input, context, edges_by_target)
+
+                # Process output (same logic as execute_node in run())
+                _META_KEYS = {'__runtime_type__', '__value__', '_pollingStatus'}
+
+                if isinstance(output, dict) and output.get('error'):
+                    async with context_lock:
+                        context[node_id] = output
+                    cls._tasks[task_id]['nodes'][node_id] = 'error'
+                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS}
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': node_id, 'status': 'error',
+                        'output': clean_output
+                    }, room=task_id)
+                    logger.error("[WorkflowRuntime.run_single] task_id=%r: node %r failed: %s",
+                                 task_id, node_id, output.get('error'))
+
+                elif isinstance(output, dict) and output.get('_sealPolling'):
+                    # Seal async polling — same as in run()
+                    seal_task_id = output.get('_sealTaskId') or output.get('taskId')
+                    loop = asyncio.get_running_loop()
+                    seal_poll_done = asyncio.Event()
+
+                    clean_output = {k: v for k, v in output.items()
+                                    if k not in _META_KEYS and k != '_sealPolling' and k != '_sealTaskId'}
+                    clean_output['executionSuccess'] = None
+                    clean_output['_pollingStatus'] = 'polling'
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': node_id, 'status': 'processing',
+                        'output': clean_output
+                    }, room=task_id)
+
+                    poll_thread = threading.Thread(
+                        target=cls._seal_poll_and_finish,
+                        daemon=True, name=f"seal-poll-{seal_task_id}",
+                        args=(task_id, node_id, seal_task_id, context, context_lock,
+                              node_done, loop, seal_poll_done)
+                    )
+                    poll_thread.start()
+                    await seal_poll_done.wait()
+
+                    final_output = context.get(node_id, {})
+                    final_status = cls._tasks[task_id]['nodes'].get(node_id, 'error')
+                    clean_final = {k: v for k, v in final_output.items()
+                                   if k not in _META_KEYS and k != '_sealPolling' and k != '_sealTaskId'}
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': node_id, 'status': final_status,
+                        'output': clean_final
+                    }, room=task_id)
+
+                else:
+                    async with context_lock:
+                        context[node_id] = output
+                    cls._tasks[task_id]['nodes'][node_id] = 'success'
+                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS}
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': node_id, 'status': 'success',
+                        'output': clean_output
+                    }, room=task_id)
+                    logger.info("[WorkflowRuntime.run_single] task_id=%r: node %r succeeded", task_id, node_id)
+
+            except Exception as e:
+                logger.exception("[WorkflowRuntime.run_single] task_id=%r: node %r execution error: %s",
+                                 task_id, node_id, e)
+                async with context_lock:
+                    context[node_id] = {'error': str(e)}
+                cls._tasks[task_id]['nodes'][node_id] = 'error'
+                cls._emit('workflow:node_update', {
+                    'taskId': task_id, 'nodeId': node_id, 'status': 'error',
+                    'output': {'error': str(e)}
+                }, room=task_id)
+
+            finally:
+                node_done[node_id].set()
+
+        await execute_single()
+
+        # Determine final task status
+        node_status = cls._tasks[task_id]['nodes'].get(node_id, 'error')
+        cls._tasks[task_id]['status'] = node_status
+        cls._emit('workflow:done', {
+            'taskId': task_id,
+            'status': node_status,
+            'error': None if node_status == 'success' else (context.get(node_id, {}).get('error') if isinstance(context.get(node_id), dict) else 'Unknown error'),
+        }, room=task_id)
+        logger.info("[WorkflowRuntime.run_single] task_id=%r: finished with status=%r", task_id, node_status)
+
+    @classmethod
     async def run(cls, workflow_json, task_id, start_node_id: str = None, node_data_overrides: dict = None):
         """Run workflow (full graph or subgraph from start_node_id).
 

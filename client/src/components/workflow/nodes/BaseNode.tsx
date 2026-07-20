@@ -455,7 +455,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         }
       }
 
-      FlowApi.runNodeWS(
+      FlowApi.runSingleNodeWS(
         savedId,
         id,
         nodeDataOverrides,

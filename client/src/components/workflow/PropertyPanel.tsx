@@ -174,7 +174,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
       }
     }
 
-    FlowApi.runNodeWS(
+    FlowApi.runSingleNodeWS(
       savedId,
       selectedNode.id,
       nodeDataOverrides,

@@ -404,4 +404,64 @@ export const FlowApi = {
       cleanup();
     };
   },
+
+  /**
+   * Run only a SINGLE node — execute it, propagate output, but do NOT
+   * automatically execute downstream nodes. Used when the user clicks
+   * the ▶ button on a single node.
+   */
+  runSingleNodeWS(
+    workflowId: string,
+    nodeId: string,
+    nodeDataOverrides: Record<string, any>,
+    onNodeUpdate: (nodeId: string, status: string, output: any) => void,
+    onDone: (status: string, error: string | null) => void,
+  ): () => void {
+    const socket = getSocket();
+    let taskId: string | null = null;
+
+    const onStarted = (data: { taskId: string }) => {
+      taskId = data.taskId;
+      console.log('[FlowApi] SingleNodeRun started, taskId:', taskId, 'node:', nodeId);
+    };
+
+    const onNodeUpd = (data: { taskId: string; nodeId: string; status: string; output: any }) => {
+      onNodeUpdate(data.nodeId, data.status, data.output);
+    };
+
+    const onDoneEvt = (data: { taskId: string; status: string; error: string | null }) => {
+      console.log('[FlowApi] SingleNodeRun done:', data);
+      onDone(data.status, data.error);
+      cleanup();
+    };
+
+    const onError = (data: { error: string }) => {
+      console.error('[FlowApi] SingleNodeRun error:', data.error);
+      onDone('error', data.error);
+      cleanup();
+    };
+
+    function cleanup() {
+      socket.off('workflow:started', onStarted);
+      socket.off('workflow:node_update', onNodeUpd);
+      socket.off('workflow:done', onDoneEvt);
+      socket.off('workflow:error', onError);
+    }
+
+    socket.on('workflow:started', onStarted);
+    socket.on('workflow:node_update', onNodeUpd);
+    socket.on('workflow:done', onDoneEvt);
+    socket.on('workflow:error', onError);
+
+    socket.emit('workflow:run_single_node', {
+      workflowId,
+      nodeId,
+      nodeDataOverrides,
+    });
+
+    return () => {
+      if (taskId) socket.emit('workflow:cancel', { taskId });
+      cleanup();
+    };
+  },
 };

@@ -253,7 +253,7 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
       }
     }
 
-    FlowApi.runNodeWS(
+    FlowApi.runSingleNodeWS(
       workflowId,
       nodeId,
       nodeDataOverrides,

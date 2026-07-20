@@ -463,6 +463,103 @@ def on_workflow_run_from_node(data) -> None:
     t.start()
 
 
+@socketio.on('workflow:run_single_node')
+def on_workflow_run_single_node(data) -> None:
+    """Run only ONE node — execute it, propagate output to downstream edges,
+    but do NOT execute downstream nodes.
+
+    Client sends:
+      {
+        workflowId,        # required
+        nodeId,            # required: the single node to execute
+        nodeDataOverrides, # optional: { nodeId: { fieldKey: value, ... } }
+                           #   - for the target node: its latest field values
+                           #   - for upstream nodes: their last known _runOutput
+      }
+    Server emits:
+      - workflow:started      { taskId }
+      - workflow:node_update  { taskId, nodeId, status, output }  (for the single node only)
+      - workflow:done         { taskId, status, error }
+    """
+    workflow_id = data.get('workflowId')
+    node_id = data.get('nodeId')
+    node_data_overrides = data.get('nodeDataOverrides') or {}
+
+    logger.info("[SocketIO workflow:run_single_node] sid=%s, workflowId=%r, nodeId=%r",
+                request.sid, workflow_id, node_id)
+
+    if not workflow_id or not node_id:
+        socketio.emit('workflow:error', {'error': 'workflowId and nodeId are required'}, room=request.sid)
+        return
+
+    workflow = WorkflowManager.get(workflow_id)
+    if not workflow:
+        socketio.emit('workflow:error', {'error': f'Workflow not found: {workflow_id}'}, room=request.sid)
+        return
+
+    workflow_json = workflow.get('json')
+
+    task_id = str(uuid.uuid4())
+    join_room(task_id)
+    socketio.emit('workflow:started', {'taskId': task_id}, room=request.sid)
+
+    # Extract username
+    run_username = ''
+    run_token = request.headers.get('Access-Token', '').strip()
+    if run_token:
+        try:
+            from routers.auth import _parse_token
+            run_username = _parse_token(run_token) or ''
+        except Exception:
+            pass
+
+    def run_single():
+        logger.info("[SocketIO workflow:run_single_node] Background task: task_id=%r, node=%r",
+                    task_id, node_id)
+        started_at = _now_utc()
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                WorkflowRuntime.run_single(
+                    workflow_json,
+                    task_id,
+                    node_id=node_id,
+                    node_data_overrides=node_data_overrides,
+                )
+            )
+            loop.close()
+        except Exception as e:
+            logger.exception("[SocketIO workflow:run_single_node] error: task_id=%r, %s", task_id, e)
+            socketio.emit('workflow:done', {
+                'taskId': task_id, 'status': 'error', 'error': str(e)
+            }, room=task_id)
+        finally:
+            try:
+                task_info = WorkflowRuntime.get_task_status(task_id)
+                finished_at = _now_utc()
+                final_status = (task_info or {}).get('status', 'unknown')
+                record = {
+                    'id': task_id,
+                    'startedAt': started_at,
+                    'finishedAt': finished_at,
+                    'status': final_status,
+                    'trigger': 'single_node',
+                    'username': run_username,
+                    'nodeCount': 1,
+                    'summary': {'succeeded': 1 if final_status == 'success' else 0,
+                                'failed': 1 if final_status == 'error' else 0},
+                    'startNodeId': node_id,
+                }
+                WorkflowManager.add_history(workflow_id, record)
+            except Exception as hist_err:
+                logger.warning("[workflow:run_single_node] Failed to write history: %s", hist_err)
+
+    import threading
+    t = threading.Thread(target=run_single, daemon=True, name=f"wf-single-{task_id[:8]}")
+    t.start()
+
+
 @socketio.on('workflow:cancel')
 def on_workflow_cancel(data):
     """Cancel a running workflow via Socket.IO."""
