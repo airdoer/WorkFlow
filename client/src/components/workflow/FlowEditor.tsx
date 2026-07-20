@@ -359,11 +359,26 @@ function FlowEditorInner({
           return eds.map((e) => {
             // Activate outgoing edges from the succeeded node (data flows out)
             if (e.source === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
-              return { ...e, data: { ...e.data, activated: true } };
+              return { ...e, data: { ...e.data, activated: true, flowing: false } };
             }
             // Also activate incoming edges to the succeeded node (data reached target)
             if (e.target === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
-              return { ...e, data: { ...e.data, activated: true } };
+              return { ...e, data: { ...e.data, activated: true, flowing: false } };
+            }
+            return e;
+          });
+        });
+      } else if (nodeStatus === 'processing') {
+        // Running/polling — mark outgoing AND incoming edges as flowing (blue animated)
+        setEdges((eds) => {
+          return eds.map((e) => {
+            // Outgoing edges from the running node → flowing
+            if (e.source === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
+              return { ...e, data: { ...e.data, flowing: true, activated: false } };
+            }
+            // Incoming edges to the running node → also flowing (data flowing in)
+            if (e.target === nodeId && (e.data?.matchStatus === 'matched' || e.data?.matchStatus === 'unknown')) {
+              return { ...e, data: { ...e.data, flowing: true, activated: false } };
             }
             return e;
           });
@@ -373,7 +388,7 @@ function FlowEditorInner({
         setEdges((eds) => {
           return eds.map((e) => {
             if (e.source === nodeId) {
-              return { ...e, data: { ...e.data, activated: false } };
+              return { ...e, data: { ...e.data, activated: false, flowing: false } };
             }
             return e;
           });
@@ -1103,7 +1118,7 @@ function FlowEditorInner({
         nds.map((n) => ({ ...n, data: { ...n.data, _runStatus: 'idle', _runOutput: null, _runStatusHint: 'idle' } })),
       );
       setEdges((eds) =>
-        eds.map((e) => ({ ...e, data: { ...e.data, activated: false } })),
+        eds.map((e) => ({ ...e, data: { ...e.data, activated: false, flowing: false } })),
       );
 
       const cancelFn = FlowApi.runWorkflowWS(
@@ -1265,7 +1280,7 @@ function FlowEditorInner({
             sourceHandle: e.sourceHandle,
             targetHandle: e.targetHandle,
             type: e.type || 'flowing',
-            data: { ...e.data, activated: false },  // clear activation status
+            data: { ...e.data, activated: false, flowing: false },  // clear activation/flowing status
           }));
 
           // Deselect existing nodes, then add pasted ones on top

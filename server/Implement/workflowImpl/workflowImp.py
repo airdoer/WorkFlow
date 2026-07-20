@@ -695,6 +695,60 @@ class WorkflowRuntime:
                     cls._emit('workflow:node_update', {
                         'taskId': task_id, 'nodeId': nid, 'status': 'error', 'output': clean_output or output
                     }, room=task_id)
+
+                elif isinstance(output, dict) and output.get('_sealPolling'):
+                    # ── Seal 异步轮询模式 ──────────────────────────────────
+                    # 任务已创建并启动，需要后台轮询 SOPS 状态
+                    # 协程会 await 轮询完成事件，确保 asyncio.gather 正确等待
+                    seal_task_id = output.get('_sealTaskId') or output.get('taskId')
+                    logger.info("[WorkflowRuntime] task_id=%r, node=%r: Seal polling started, "
+                                "seal_task_id=%s", task_id, nid, seal_task_id)
+
+                    # 保存 event loop 引用，后台线程需要用它唤醒协程
+                    loop = asyncio.get_running_loop()
+
+                    # 创建轮询完成事件，协程会 await 它
+                    seal_poll_done = asyncio.Event()
+
+                    # 推送中间状态（创建成功，但执行中）
+                    clean_output = {k: v for k, v in output.items()
+                                    if k not in _META_KEYS and k != '_sealPolling' and k != '_sealTaskId'}
+                    clean_output['executionSuccess'] = None  # 尚未完成
+                    clean_output['_pollingStatus'] = 'polling'  # 告知前端正在轮询
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': nid, 'status': 'processing',
+                        'output': clean_output
+                    }, room=task_id)
+
+                    # 启动后台轮询线程
+                    import threading
+                    poll_thread = threading.Thread(
+                        target=cls._seal_poll_and_finish,
+                        daemon=True,
+                        name=f"seal-poll-{seal_task_id}",
+                        args=(task_id, nid, seal_task_id, context, context_lock,
+                              node_done, loop, seal_poll_done)
+                    )
+                    poll_thread.start()
+
+                    # ★ 协程等待轮询完成 — 确保 asyncio.gather 不会提前结束
+                    await seal_poll_done.wait()
+
+                    # 轮询完成后，context[nid] 已被后台线程更新
+                    final_output = context.get(nid, {})
+                    final_status = cls._tasks[task_id]['nodes'].get(nid, 'error')
+
+                    # 推送最终状态
+                    clean_final = {k: v for k, v in final_output.items()
+                                   if k not in _META_KEYS and k != '_sealPolling' and k != '_sealTaskId'}
+                    cls._emit('workflow:node_update', {
+                        'taskId': task_id, 'nodeId': nid, 'status': final_status,
+                        'output': clean_final
+                    }, room=task_id)
+
+                    logger.info("[WorkflowRuntime] task_id=%r, node=%r: Seal polling completed, "
+                                "final_status=%s", task_id, nid, final_status)
+
                 else:
                     logger.info("[WorkflowRuntime] task_id=%r, node=%r: success, output_keys=%s",
                                 task_id, nid, list(output.keys()) if isinstance(output, dict) else type(output).__name__)
@@ -736,6 +790,86 @@ class WorkflowRuntime:
             cls._emit('workflow:done', {'taskId': task_id, 'status': 'success', 'error': None}, room=task_id)
 
         cls._tasks[task_id]['result'] = context
+
+    # ── Seal 异步轮询 ─────────────────────────────────────────────────────────
+
+    @classmethod
+    def _seal_poll_and_finish(cls, wf_task_id: str, node_id: str, seal_task_id: str,
+                               context: dict, context_lock, node_done: dict, loop,
+                               seal_poll_done):
+        """
+        后台线程：轮询 SOPS 任务状态，完成后更新 context 和任务状态，
+        然后通过 seal_poll_done 通知 execute_node 协程。
+
+        参数:
+            wf_task_id: 工作流 task_id（Socket.IO room）
+            node_id: 工作流节点 ID
+            seal_task_id: SOPS 任务 ID
+            context: 工作流共享上下文
+            context_lock: asyncio.Lock（主事件循环的锁）
+            node_done: {node_id: asyncio.Event} 用于通知下游节点
+            loop: 主事件循环引用（asyncio.AbstractEventLoop）
+            seal_poll_done: asyncio.Event — 轮询完成后通知协程
+        """
+        from Implement.hotfixImpl.sealImp import SealClient
+        client = SealClient()
+
+        logger.info("[SealPoll] Started: wf_task=%s, node=%s, seal_task=%s",
+                     wf_task_id, node_id, seal_task_id)
+
+        # 轮询等待 SOPS 任务完成（每 60 秒，最多 30 分钟）
+        result = client.wait_for_task_completion(
+            seal_task_id, poll_interval=30, timeout=1800
+        )
+
+        logger.info("[SealPoll] Finished: seal_task=%s, completed=%s, state=%s, elapsed=%.1fs",
+                     seal_task_id, result.get('completed'), result.get('state'), result.get('elapsed', 0))
+
+        # 判断最终结果
+        is_success = (result.get('completed') and result.get('state', '').upper() == 'FINISHED'
+                      and not result.get('failed_nodes'))
+
+        # 更新 context 中的 output
+        node_output = context.get(node_id, {})
+        if isinstance(node_output, dict):
+            node_output['executionSuccess'] = is_success
+            node_output.pop('_sealPolling', None)
+            node_output.pop('_sealTaskId', None)
+            node_output.pop('_pollingStatus', None)
+            # 补充轮询结果信息
+            node_output['sealState'] = result.get('state', 'UNKNOWN')
+            node_output['sealElapsed'] = result.get('elapsed', 0)
+            node_output['sealPollCount'] = result.get('poll_count', 0)
+            if result.get('failed_nodes'):
+                node_output['failedNodes'] = result.get('failed_nodes')
+            if result.get('error'):
+                node_output['sealError'] = result.get('error')
+
+        # 更新工作流任务状态（供 finalize 阶段检查）
+        if is_success:
+            final_status = 'success'
+        else:
+            final_status = 'error'
+            # 如果任务完成但非 FINISHED，设置错误信息
+            if not node_output.get('error'):
+                error_msg = result.get('error', '') or f"SOPS 任务终态: {result.get('state', 'UNKNOWN')}"
+                node_output['error'] = error_msg
+
+        cls._tasks[wf_task_id]['nodes'][node_id] = final_status
+
+        logger.info("[SealPoll] Node %s final status: %s, executionSuccess=%s",
+                     node_id, final_status, is_success)
+
+        # 通知 execute_node 协程：轮询完成，可以继续了
+        try:
+            loop.call_soon_threadsafe(seal_poll_done.set)
+        except Exception as e:
+            logger.warning("[SealPoll] Failed to notify poll_done for %s: %s", node_id, e)
+            # Fallback
+            try:
+                seal_poll_done.set()
+            except Exception:
+                pass
 
     @classmethod
     def get_task_status(cls, task_id):

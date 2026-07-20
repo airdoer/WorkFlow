@@ -206,3 +206,139 @@ class SealClient:
         headers = self._get_headers()
         resp = requests.get(api, headers=headers, timeout=30)
         return resp.json()
+
+    def get_task_detail(self, task_id: str) -> dict:
+        """
+        查询任务详情（包含任务名、执行人、失败节点等）。
+
+        API 返回示例:
+        {
+            "result": true,
+            "data": {
+                "instance_id": "n7ab8a...",
+                "name": "C7_DeployTest_test_c7",
+                "executor": "chenzhixu",
+                "state": "FINISHED",
+                "task_url": "https://...",
+                "failed_nodes": null
+            },
+            "code": 0,
+            "message": ""
+        }
+        """
+        api = f"{SOPS_HOST}/api/open/taskflow/{task_id}/detail"
+        headers = self._get_headers()
+        resp = requests.get(api, headers=headers, timeout=30)
+        return resp.json()
+
+    def wait_for_task_completion(self, task_id: str,
+                                  poll_interval: float = 10.0,
+                                  timeout: float = 1800.0,
+                                  terminal_states: tuple = None) -> dict:
+        """
+        轮询等待任务执行完成。
+
+        参数:
+            task_id: SOPS 任务 ID
+            poll_interval: 轮询间隔（秒），默认 10s
+            timeout: 超时时间（秒），默认 1800s（30 分钟）
+            terminal_states: 视为"已完成"的终态列表，默认
+                ('FINISHED', 'FAILED', 'REVOKED', 'SUSPENDED')
+
+        返回:
+            dict 包含:
+            - completed (bool): 是否到达终态
+            - state (str): 最终状态
+            - elapsed (float): 等待耗时（秒）
+            - poll_count (int): 轮询次数
+            - last_status (dict): 最后一次 API 返回的完整状态
+            - error (str): 错误信息（如有）
+            - timeout (bool): 是否超时
+
+        SOPS 任务状态参考:
+            CREATED   - 已创建（未启动）
+            RUNNING   - 执行中
+            SUSPENDED - 暂停/等待审批
+            FINISHED  - 执行成功
+            FAILED    - 执行失败
+            REVOKED   - 已撤销
+        """
+        if terminal_states is None:
+            terminal_states = ('FINISHED', 'FAILED', 'REVOKED', 'SUSPENDED')
+
+        start_time = time.time()
+        poll_count = 0
+        last_status = {}
+
+        self._log_info("[Seal] Waiting for task %s to complete (timeout=%ds, interval=%ds)",
+                       task_id, timeout, poll_interval)
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > timeout:
+                self._log_warning("[Seal] Task %s wait timed out after %.1fs (%d polls)",
+                                  task_id, elapsed, poll_count)
+                return {
+                    "completed": False,
+                    "state": last_status.get("data", {}).get("state", "UNKNOWN"),
+                    "elapsed": elapsed,
+                    "poll_count": poll_count,
+                    "last_status": last_status,
+                    "error": "等待超时",
+                    "timeout": True,
+                }
+
+            try:
+                status_resp = self.get_task_status(task_id)
+            except requests.exceptions.RequestException as e:
+                self._log_warning("[Seal] Task %s status poll failed: %s (will retry)", task_id, e)
+                time.sleep(poll_interval)
+                poll_count += 1
+                continue
+
+            last_status = status_resp
+            poll_count += 1
+
+            if not status_resp.get("result", False):
+                self._log_warning("[Seal] Task %s status API error: %s", task_id, status_resp)
+                time.sleep(poll_interval)
+                continue
+
+            # 从响应 data 中提取 state
+            data = status_resp.get("data", {})
+            state = data.get("state", "")
+
+            self._log_info("[Seal] Task %s state=%s (%.1fs elapsed, poll #%d)",
+                           task_id, state, elapsed, poll_count)
+
+            if state.upper() in terminal_states:
+                self._log_info("[Seal] Task %s reached terminal state: %s (%.1fs)",
+                               task_id, state, elapsed)
+
+                # 任务到达终态时，额外获取详情（含执行人、任务名、失败节点）
+                detail = {}
+                try:
+                    detail_resp = self.get_task_detail(task_id)
+                    if detail_resp.get("result"):
+                        detail = detail_resp.get("data", {})
+                except Exception:
+                    pass  # detail 获取失败不影响主流程
+
+                is_success = state.upper() == "FINISHED"
+                failed_nodes = detail.get("failed_nodes")
+
+                return {
+                    "completed": True,
+                    "state": state,
+                    "elapsed": elapsed,
+                    "poll_count": poll_count,
+                    "last_status": status_resp,
+                    "detail": detail,
+                    "failed_nodes": failed_nodes,
+                    "error": "" if is_success and not failed_nodes
+                             else (f"失败节点: {failed_nodes}" if failed_nodes
+                                   else f"任务终态: {state}"),
+                    "timeout": False,
+                }
+
+            time.sleep(poll_interval)

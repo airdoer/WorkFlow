@@ -2,10 +2,11 @@ import React, { useMemo } from 'react';
 import { EdgeProps, getBezierPath } from 'reactflow';
 
 /**
- * Custom edge with three visual states:
+ * Custom edge with four visual states:
  * - mismatched: red dashed + ✗
  * - matched (not activated): gray line (types compatible but no data flowing yet)
- * - activated: green solid + flowing dot animation + ✓
+ * - flowing: blue solid + blue flowing dot animation + ⏳ (upstream node is running/polling)
+ * - activated: green solid + green flowing dot animation + ✓
  *   (upstream node executed successfully and data flowed through)
  */
 const FlowingEdge: React.FC<EdgeProps> = ({
@@ -31,24 +32,28 @@ const FlowingEdge: React.FC<EdgeProps> = ({
   const matchStatus: 'matched' | 'mismatched' | 'unknown' =
     (data?.matchStatus as any) || 'unknown';
   const activated: boolean = (data?.activated as boolean) || false;
+  const flowing: boolean = (data?.flowing as boolean) || false;
 
   // Visual state determination:
   // mismatched → always red dashed
-  // matched + NOT activated → gray (neutral, types match but no data flow)
-  // matched + activated → green with flow
-  // unknown + activated → green with flow (dynamic ports like Format variables)
-  // unknown + NOT activated → gray (neutral)
+  // matched + activated → green with flow (success)
+  // matched/unknown + flowing → blue with flow (running/polling)
+  // matched + NOT activated/flowing → gray (neutral, types match but no data flow)
+  // unknown + NOT activated/flowing → gray (neutral)
   const visualState = useMemo(() => {
     if (matchStatus === 'mismatched') return 'mismatched' as const;
     if ((matchStatus === 'matched' || matchStatus === 'unknown') && activated) return 'activated' as const;
+    if ((matchStatus === 'matched' || matchStatus === 'unknown') && flowing) return 'flowing' as const;
     if (matchStatus === 'matched') return 'matched_idle' as const;
     return 'unknown' as const;
-  }, [matchStatus, activated]);
+  }, [matchStatus, activated, flowing]);
 
   const edgeStyle = useMemo(() => {
     switch (visualState) {
       case 'activated':
         return { stroke: '#52c41a', strokeWidth: 2.5 };
+      case 'flowing':
+        return { stroke: '#1890ff', strokeWidth: 2.5 };
       case 'matched_idle':
         // Types match but no data flowing yet — neutral gray
         return { stroke: '#bfbfbf', strokeWidth: 1.5 };
@@ -59,14 +64,22 @@ const FlowingEdge: React.FC<EdgeProps> = ({
     }
   }, [visualState]);
 
+  const glowColor = useMemo(() => {
+    switch (visualState) {
+      case 'activated': return 'rgba(82, 196, 26, 0.2)';
+      case 'flowing': return 'rgba(24, 144, 255, 0.15)';
+      default: return null;
+    }
+  }, [visualState]);
+
   return (
     <g className="react-flow__edge">
-      {/* Glow for activated edges */}
-      {visualState === 'activated' && (
+      {/* Glow for activated/flowing edges */}
+      {glowColor && (
         <path
           d={edgePath}
           fill="none"
-          stroke="rgba(82, 196, 26, 0.2)"
+          stroke={glowColor}
           strokeWidth={8}
           strokeLinecap="round"
         />
@@ -79,15 +92,28 @@ const FlowingEdge: React.FC<EdgeProps> = ({
         {...edgeStyle}
         markerEnd={markerEnd}
       />
-      {/* Flowing dot animation — only for activated edges */}
-      {visualState === 'activated' && (
+      {/* Flowing dot animation — for activated and flowing edges */}
+      {(visualState === 'activated' || visualState === 'flowing') && (
         <>
-          <circle r="3.5" fill="#52c41a" opacity="0.9">
-            <animateMotion dur="1.5s" repeatCount="indefinite" path={edgePath} />
-          </circle>
-          <circle r="2.5" fill="#95de64" opacity="0.5">
-            <animateMotion dur="1.5s" repeatCount="indefinite" path={edgePath} begin="0.75s" />
-          </circle>
+          {visualState === 'activated' ? (
+            <>
+              <circle r="3.5" fill="#52c41a" opacity="0.9">
+                <animateMotion dur="1.5s" repeatCount="indefinite" path={edgePath} />
+              </circle>
+              <circle r="2.5" fill="#95de64" opacity="0.5">
+                <animateMotion dur="1.5s" repeatCount="indefinite" path={edgePath} begin="0.75s" />
+              </circle>
+            </>
+          ) : (
+            <>
+              <circle r="3.5" fill="#1890ff" opacity="0.9">
+                <animateMotion dur="2s" repeatCount="indefinite" path={edgePath} />
+              </circle>
+              <circle r="2.5" fill="#69c0ff" opacity="0.5">
+                <animateMotion dur="2s" repeatCount="indefinite" path={edgePath} begin="1s" />
+              </circle>
+            </>
+          )}
         </>
       )}
       {/* Checkmark at midpoint — only for activated edges */}
@@ -111,6 +137,30 @@ const FlowingEdge: React.FC<EdgeProps> = ({
             fill="#389e0d"
           >
             ✓
+          </text>
+        </g>
+      )}
+      {/* Flowing indicator — only for flowing (running) edges */}
+      {visualState === 'flowing' && (
+        <g transform={`translate(${labelX}, ${labelY})`}>
+          <rect
+            x={-12}
+            y={-8}
+            width={24}
+            height={16}
+            rx={4}
+            fill="#e6f7ff"
+            stroke="#91d5ff"
+            strokeWidth={1}
+          />
+          <text
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={9}
+            fontWeight={700}
+            fill="#096dd9"
+          >
+            ⏳
           </text>
         </g>
       )}

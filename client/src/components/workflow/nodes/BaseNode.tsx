@@ -9,7 +9,7 @@ import NodeDetailModal from './NodeDetailModal';
 
 // Internal meta keys injected by the backend runtime type system —
 // these should never be shown to the user in output display.
-const RUNTIME_META_KEYS = new Set(['__runtime_type__', '__value__']);
+const RUNTIME_META_KEYS = new Set(['__runtime_type__', '__value__', '_pollingStatus']);
 
 /** Strip backend runtime meta keys from an output object for display purposes. */
 export function stripRuntimeMeta<T>(obj: T): T {
@@ -488,9 +488,11 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       ? '#f6ffed'
       : runStatus === 'error'
         ? '#fff2f0'
-        : runStatus === 'stale'
-          ? '#f5f5f5'
-          : 'transparent';
+        : runStatus === 'running'
+          ? '#e6f7ff'
+          : runStatus === 'stale'
+            ? '#f5f5f5'
+            : 'transparent';
 
   return (
     <>
@@ -527,7 +529,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {/* Last run time badge */}
-          {(data as any)._lastRunTime && (runStatus === 'success' || runStatus === 'error' || runStatus === 'stale') && (
+          {(data as any)._lastRunTime && (runStatus === 'success' || runStatus === 'error' || runStatus === 'stale' || runStatus === 'running') && (
             <span
               title={`最后运行: ${new Date((data as any)._lastRunTime).toLocaleString('zh-CN')}`}
               style={{
@@ -572,7 +574,9 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               opacity: !canRun ? 0.5 : 1,
             }}
           >
-            {React.createElement(canRun ? statusCfg.icon : PlayCircleOutlined, { spin: canRun && runStatus === 'running' })}
+            <span style={canRun && runStatus === 'running' ? { display: 'inline-flex', animation: 'wf-btn-spin 1s linear infinite' } : undefined}>
+              {React.createElement(canRun ? statusCfg.icon : PlayCircleOutlined, { spin: canRun && runStatus === 'running' })}
+            </span>
           </button>
         </div>
       </div>
@@ -834,12 +838,14 @@ const BaseNode: React.FC<BaseNodeProps> = ({
         )}
 
         {/* Run output — per output port */}
-        {runOutput && runStatus !== 'idle' && runStatus !== 'running' && (
+        {runOutput && runStatus !== 'idle' && (runStatus !== 'running' || runOutput?._pollingStatus === 'polling') && (
           compactMode ? (
             /* Compact: only show status badge, no detail content */
             <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
               {runStatus === 'error' ? (
                 <span style={{ color: '#cf1322' }}>❌ 错误</span>
+              ) : runOutput?._pollingStatus === 'polling' ? (
+                <span style={{ color: '#096dd9' }}>⏳ 执行中</span>
               ) : (
                 <span style={{ color: '#389e0d' }}>✅ 已执行</span>
               )}
@@ -859,6 +865,44 @@ const BaseNode: React.FC<BaseNodeProps> = ({
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf1322' }}>
                     {typeof runOutput === 'string' ? runOutput : runOutput.error || JSON.stringify(stripRuntimeMeta(runOutput), null, 2)}
                   </pre>
+                </div>
+              </div>
+            ) : runOutput?._pollingStatus === 'polling' ? (
+              /* ── Seal 轮询中间状态：蓝色主题 ── */
+              <div style={{
+                background: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: 4, overflow: 'hidden',
+              }}>
+                <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#096dd9', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#1890ff', display: 'inline-block', animation: 'seal-pulse 1.5s infinite' }} />
+                  任务执行中（轮询等待）
+                </div>
+                <div style={{ padding: '4px 6px', maxHeight: 200, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #91d5ff' }}
+                     className="nowheel nopan">
+                  {outputPorts.length > 0 ? outputPorts.map((p) => {
+                    const portValue = runOutput?.[p.key];
+                    const hasValue = portValue !== undefined && portValue !== null;
+                    const displayValue = hasValue ? portValue : undefined;
+                    const hasDisplay = displayValue !== undefined && displayValue !== null;
+                    return (
+                      <div key={p.key} style={{ marginBottom: 2, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ color: '#096dd9', fontWeight: 600, fontSize: 9, minWidth: 60, textAlign: 'right' }}>{p.label}:</span>
+                        {p.key === 'executionSuccess' && !hasDisplay ? (
+                          <span style={{ color: '#8c8c8c', fontSize: 9 }}>⏳ 等待中...</span>
+                        ) : hasDisplay && p.key === 'taskUrl' && typeof displayValue === 'string' && /^https?:\/\//i.test(displayValue) ? (
+                          <a href={displayValue} target="_blank" rel="noopener noreferrer"
+                             style={{ color: '#1890ff', textDecoration: 'underline', fontSize: 9 }}>🔗 查看任务</a>
+                        ) : hasDisplay && typeof displayValue === 'boolean' ? (
+                          <span style={{ fontSize: 9, color: displayValue ? '#389e0d' : '#cf1322' }}>{displayValue ? '✅ true' : '❌ false'}</span>
+                        ) : hasDisplay ? (
+                          <span style={{ fontSize: 9 }}>{String(displayValue)}</span>
+                        ) : (
+                          <span style={{ color: '#8c8c8c', fontSize: 9 }}>-</span>
+                        )}
+                      </div>
+                    );
+                  }) : (
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(stripRuntimeMeta(runOutput), null, 2)}</pre>
+                  )}
                 </div>
               </div>
             ) : outputPorts.length > 0 ? (

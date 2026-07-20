@@ -106,7 +106,8 @@ function SealNode({ data, id, selected }: NodeProps) {
       });
     }
     ports.push(
-      { key: 'success', label: '执行结果', type: 'boolean', direction: 'output' },
+      { key: 'createSuccess', label: '任务创建结果', type: 'boolean', direction: 'output' },
+      { key: 'executionSuccess', label: '任务执行结果', type: 'boolean', direction: 'output' },
       { key: 'taskUrl', label: '任务链接', type: 'string', direction: 'output' },
       { key: 'taskId', label: '任务ID', type: 'string', direction: 'output' },
     );

@@ -195,6 +195,15 @@
         "tree_id": 97026,
         "seal_env": "test"
     },
+    "c7_singapore": {
+        "namespace": "c7_singapore",
+        "name": "新加坡服",
+        "env": "idc",
+        "zone_id": 266,
+        "server_id": 2103,
+        "tree_id": 99590,
+        "seal_env": "test"
+    },
     "c7_ios_recommend": {
         "namespace": "c7_ios_recommend",
         "name": "iOS推荐服",
