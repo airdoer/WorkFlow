@@ -968,11 +968,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
 
-      {/* ── 中左区：信息 + 简略/详细 + 运行/停止 ── */}
+      {/* ── 中左区：简略/详细 + 运行/停止 + 保存 + 整理 ── */}
       <Space size={8}>
-        <Popover content={metaContent} title="工作流信息" trigger="click">
-          <Button icon={<InfoCircleOutlined />} size="small">信息</Button>
-        </Popover>
         <Tooltip title={compactMode ? '当前：简略模式（仅显示入参）' : '当前：详细模式（显示执行结果）'}>
           <Button
             icon={compactMode ? <EyeInvisibleOutlined /> : <EyeOutlined />}
@@ -1010,6 +1007,31 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           保存
         </Button>
+          <Tooltip title="自动整理节点布局">
+          <Button size="small" icon={<ApartmentOutlined />} onClick={handleAutoLayout}>整理</Button>
+        </Tooltip>
+      </Space>
+
+      {/* ── 中区：工作流库（绝对定位，基于整个 toolbar 居中）── */}
+      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <Button
+          icon={<UnorderedListOutlined />}
+          size="small"
+          onClick={openLibrary}
+          style={{ minWidth: 100 }}
+        >
+          工作流库
+        </Button>
+      </div>
+
+      {/* ── 推右区到最右 */}
+      <div style={{ marginLeft: 'auto' }} />
+
+      {/* ── 右区：信息 + 重置 + 删除 | 执行历史 + 变量管理 + 定时任务 + 用户 ── */}
+      <Space size={4}>
+        <Popover content={metaContent} title="工作流信息" trigger="click">
+          <Button icon={<InfoCircleOutlined />} size="small">信息</Button>
+        </Popover>
         <Popconfirm
           title="重置所有节点"
           description="将清空所有节点的填写值和运行状态，是否继续？"
@@ -1044,12 +1066,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           <Button icon={<RollbackOutlined />} size="small" danger>重置</Button>
         </Popconfirm>
-        
-      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
-
-          <Tooltip title="自动整理节点布局">
-          <Button size="small" icon={<ApartmentOutlined />} onClick={handleAutoLayout}>整理</Button>
-        </Tooltip>
         {workflowId && (
           <Popconfirm
             title="确定删除当前工作流？"
@@ -1072,24 +1088,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
         )}
       </Space>
 
-      {/* ── 中区：工作流库（绝对定位，基于整个 toolbar 居中）── */}
-      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-        <Button
-          icon={<UnorderedListOutlined />}
-          size="small"
-          onClick={openLibrary}
-          style={{ minWidth: 100 }}
-        >
-          工作流库
-        </Button>
-      </div>
+      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 6px' }} />
 
-      <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
-
-      {/* ── 推右区到最右 */}
-      <div style={{ marginLeft: 'auto' }} />
-
-      {/* ── 右区：执行历史 + 变量管理 + 定时任务 + 用户 ── */}
       <Space size={4}>
         <Tooltip title="执行历史">
           <Button icon={<HistoryOutlined />} size="small" onClick={() => setExecHistoryOpen(true)}>执行历史</Button>
