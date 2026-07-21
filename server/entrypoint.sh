@@ -107,23 +107,23 @@ create_or_update_stream_workspace() {
 	fi
 }
 
-create_or_update_stream_workspace \
-	"hotfix_mainline_mini_workspace" \
-	"//C7/Development/Mainline" \
-	"/app/p4MiniWorkSpace/Mainline" \
-	"//C7/Development/Mainline/Server/hotfix/..."
+# create_or_update_stream_workspace \
+# 	"hotfix_mainline_mini_workspace" \
+# 	"//C7/Development/Mainline" \
+# 	"/app/p4MiniWorkSpace/Mainline" \
+# 	"//C7/Development/Mainline/Server/hotfix/..."
 
-create_or_update_stream_workspace \
-	"hotfix_weekly_mini_workspace" \
-	"//C7/Development/Weekly" \
-	"/app/p4MiniWorkSpace/Weekly" \
-	"//C7/Development/Weekly/Server/hotfix/..."
+# create_or_update_stream_workspace \
+# 	"hotfix_weekly_mini_workspace" \
+# 	"//C7/Development/Weekly" \
+# 	"/app/p4MiniWorkSpace/Weekly" \
+# 	"//C7/Development/Weekly/Server/hotfix/..."
 
-create_or_update_stream_workspace \
-	"hotfix_preonline_mini_workspace" \
-	"//C7/Release/Preonline" \
-	"/app/p4MiniWorkSpace/Preonline" \
-	"//C7/Release/Preonline/Server/hotfix/..."
+# create_or_update_stream_workspace \
+# 	"hotfix_preonline_mini_workspace" \
+# 	"//C7/Release/Preonline" \
+# 	"/app/p4MiniWorkSpace/Preonline" \
+# 	"//C7/Release/Preonline/Server/hotfix/..."
 
 p4 info
 

@@ -71,6 +71,22 @@
         "server_id": 10005,
         "tree_id": null
     },
+    "c7_qa6": {
+        "namespace": "c7_qa6",
+        "name": "内部qa6跨服一区",
+        "env": "staging",
+        "zone_id": 144,
+        "server_id": 16001,
+        "tree_id": null
+    },
+    "c7_qa6_cross": {
+        "namespace": "c7_qa6_cross",
+        "name": "内部qa6跨服cross",
+        "env": "staging",
+        "zone_id": 144,
+        "server_id": 16101,
+        "tree_id": null
+    },
     "c7_acceptance": {
         "namespace": "c7_acceptance",
         "name": "线上运营验收服",

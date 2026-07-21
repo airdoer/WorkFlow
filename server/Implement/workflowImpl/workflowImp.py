@@ -534,61 +534,74 @@ class WorkflowRuntime:
             if preds:
                 await asyncio.gather(*[node_done[p].wait() for p in preds])
 
-            # Check upstream errors
+            # Assemble input_data via port mapping (same as execute_node in run())
+            _META_KEYS = {'__runtime_type__', '__value__', '_pollingStatus'}
             async with context_lock:
-                upstream_failed = any(
-                    isinstance(context.get(p), dict) and context.get(p, {}).get('error')
-                    for p in preds
-                )
+                input_data: dict = {}
+                for edge in edges_by_target[node_id]:
+                    src = edge.get('source') or edge.get('sourceNodeID')
+                    src_handle = edge.get('sourceHandle')
+                    tgt_handle = edge.get('targetHandle')
+                    src_output = context.get(src)
+                    if src_output is None or not isinstance(src_output, dict):
+                        if src_output is not None and tgt_handle:
+                            input_data[tgt_handle] = src_output
+                        continue
+                    # Skip if error (but for single node run, we still include errored upstream)
+                    if src_handle and tgt_handle:
+                        if src_handle in src_output:
+                            input_data[tgt_handle] = src_output[src_handle]
+                        elif '__value__' in src_output:
+                            input_data[tgt_handle] = src_output['__value__']
+                        elif 'value' in src_output:
+                            input_data[tgt_handle] = src_output['value']
+                        else:
+                            for k, v in src_output.items():
+                                if k not in _META_KEYS:
+                                    input_data[k] = v
+                    elif tgt_handle:
+                        input_data[tgt_handle] = src_output
+                    else:
+                        for k, v in src_output.items():
+                            if k not in _META_KEYS:
+                                input_data[k] = v
 
-            if upstream_failed:
-                logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r: upstream has errors, still executing",
-                            task_id, node_id)
-                # Unlike full run, we still execute the node even if upstream failed
-                # The user explicitly clicked "run" on this specific node
+            # Merge node data with any frontend overrides
+            node_data = dict(node.get('data', {}))
+            if node_data_overrides and node_id in node_data_overrides:
+                node_data.update(node_data_overrides[node_id])
 
-            # ── Execute the node ──
+            logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r (type=%r): executing, input_keys=%s",
+                        task_id, node_id, node_type, list(input_data.keys()))
+
+            # Push "running" status
+            cls._tasks[task_id]['nodes'][node_id] = 'processing'
+            cls._emit('workflow:node_update', {
+                'taskId': task_id, 'nodeId': node_id, 'status': 'processing',
+                'output': None
+            }, room=task_id)
+
             try:
-                logger.info("[WorkflowRuntime.run_single] task_id=%r: executing node %r (type=%r)",
-                            task_id, node_id, node_type)
-                cls._tasks[task_id]['nodes'][node_id] = 'processing'
-                cls._emit('workflow:node_update', {
-                    'taskId': task_id, 'nodeId': node_id, 'status': 'processing',
-                    'output': None
-                }, room=task_id)
-
-                executor = ExecutorManager.get_executor(node_type)
-                if not executor:
-                    raise ValueError(f"No executor found for node type: {node_type}")
-
-                # Get input data from context (upstream outputs)
-                node_input = {}
-                for pred in preds:
-                    pred_output = context.get(pred)
-                    if pred_output is not None:
-                        node_input[pred] = pred_output
-
-                # Run the executor
-                output = await executor(node, node_input, context, edges_by_target)
-
-                # Process output (same logic as execute_node in run())
-                _META_KEYS = {'__runtime_type__', '__value__', '_pollingStatus'}
+                output = ExecutorManager.run_node(node_type, node_data, input_data)
+                async with context_lock:
+                    context[node_id] = output
 
                 if isinstance(output, dict) and output.get('error'):
-                    async with context_lock:
-                        context[node_id] = output
+                    logger.warning("[WorkflowRuntime.run_single] task_id=%r, node=%r: executor error: %s",
+                                   task_id, node_id, output['error'])
                     cls._tasks[task_id]['nodes'][node_id] = 'error'
                     clean_output = {k: v for k, v in output.items() if k not in _META_KEYS}
                     cls._emit('workflow:node_update', {
                         'taskId': task_id, 'nodeId': node_id, 'status': 'error',
-                        'output': clean_output
+                        'output': clean_output or output
                     }, room=task_id)
-                    logger.error("[WorkflowRuntime.run_single] task_id=%r: node %r failed: %s",
-                                 task_id, node_id, output.get('error'))
 
                 elif isinstance(output, dict) and output.get('_sealPolling'):
                     # Seal async polling — same as in run()
                     seal_task_id = output.get('_sealTaskId') or output.get('taskId')
+                    logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r: Seal polling started, "
+                                "seal_task_id=%s", task_id, node_id, seal_task_id)
+
                     loop = asyncio.get_running_loop()
                     seal_poll_done = asyncio.Event()
 
@@ -601,6 +614,7 @@ class WorkflowRuntime:
                         'output': clean_output
                     }, room=task_id)
 
+                    import threading
                     poll_thread = threading.Thread(
                         target=cls._seal_poll_and_finish,
                         daemon=True, name=f"seal-poll-{seal_task_id}",
@@ -619,26 +633,27 @@ class WorkflowRuntime:
                         'output': clean_final
                     }, room=task_id)
 
+                    logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r: Seal polling completed, "
+                                "final_status=%s", task_id, node_id, final_status)
+
                 else:
-                    async with context_lock:
-                        context[node_id] = output
+                    logger.info("[WorkflowRuntime.run_single] task_id=%r, node=%r: success, output_keys=%s",
+                                task_id, node_id, list(output.keys()) if isinstance(output, dict) else type(output).__name__)
                     cls._tasks[task_id]['nodes'][node_id] = 'success'
-                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS}
+                    clean_output = {k: v for k, v in output.items() if k not in _META_KEYS} if isinstance(output, dict) else output
                     cls._emit('workflow:node_update', {
                         'taskId': task_id, 'nodeId': node_id, 'status': 'success',
                         'output': clean_output
                     }, room=task_id)
-                    logger.info("[WorkflowRuntime.run_single] task_id=%r: node %r succeeded", task_id, node_id)
 
-            except Exception as e:
-                logger.exception("[WorkflowRuntime.run_single] task_id=%r: node %r execution error: %s",
-                                 task_id, node_id, e)
+            except Exception as exc:
+                logger.exception("[WorkflowRuntime.run_single] task_id=%r, node=%r: exception: %s", task_id, node_id, exc)
                 async with context_lock:
-                    context[node_id] = {'error': str(e)}
+                    context[node_id] = {'error': str(exc)}
                 cls._tasks[task_id]['nodes'][node_id] = 'error'
                 cls._emit('workflow:node_update', {
                     'taskId': task_id, 'nodeId': node_id, 'status': 'error',
-                    'output': {'error': str(e)}
+                    'output': {'error': str(exc)}
                 }, room=task_id)
 
             finally:
