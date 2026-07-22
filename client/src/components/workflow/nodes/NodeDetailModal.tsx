@@ -268,18 +268,39 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
   }, [nodeId, data, fields, setNodes, canRun, workflowId, onNodeUpdate, getNodes, getRunOutput]);
 
   const copyToClipboard = useCallback((text: string) => {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => message.success('已复制'));
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      message.success('已复制');
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(
+          () => message.success('已复制'),
+          () => {
+            // Clipboard API rejected (HTTP context) — fallback
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try { document.execCommand('copy'); message.success('已复制'); } catch { message.error('复制失败，请手动复制'); }
+            document.body.removeChild(ta);
+          },
+        );
+      } else {
+        // No Clipboard API — direct fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); message.success('已复制'); } catch { message.error('复制失败，请手动复制'); }
+        document.body.removeChild(ta);
+      }
+    } catch {
+      message.error('复制失败，请手动复制');
     }
   }, []);
 
@@ -621,6 +642,17 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
                       <span style={{ fontWeight: 600, fontSize: 13 }}>{p.label}</span>
                       {hasDisplay ? <Tag color="green" style={{ margin: 0 }}>有输出</Tag> : <Tag color="orange" style={{ margin: 0 }}>无输出</Tag>}
                       <Tag style={{ fontSize: 10, margin: 0 }}>{p.type}</Tag>
+                      {hasDisplay && (() => {
+                        const copyValue = typeof displayValue === 'string'
+                          ? (isBinaryContent(displayValue) ? null : displayValue)
+                          : typeof displayValue === 'object' ? JSON.stringify(stripRuntimeMeta(displayValue), null, 2) : null;
+                        return copyValue ? (
+                          <CopyOutlined
+                            style={{ marginLeft: 'auto', fontSize: 12, color: '#8c8c8c', cursor: 'pointer' }}
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(copyValue); }}
+                          />
+                        ) : null;
+                      })()}
                     </div>
                     {hasDisplay && (
                       <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
@@ -679,6 +711,16 @@ const NodeDetailModal: React.FC<NodeDetailModalProps> = ({
               })
             ) : (
               <div style={{ background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden', padding: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>结果</span>
+                  {(() => {
+                    const val = typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(stripRuntimeMeta(runOutput), null, 2);
+                    if (typeof val === 'string' && !isBinaryContent(val)) {
+                      return <CopyOutlined style={{ marginLeft: 'auto', fontSize: 12, color: '#8c8c8c', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); copyToClipboard(val); }} />;
+                    }
+                    return null;
+                  })()}
+                </div>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>
                   {(() => {
                     const val = typeof runOutput === 'string' ? runOutput : runOutput?.fileContent || JSON.stringify(stripRuntimeMeta(runOutput), null, 2);

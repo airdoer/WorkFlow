@@ -12,7 +12,9 @@ const API_BASE =
 let _socket: Socket | null = null;
 
 function getSocket(): Socket {
-  if (_socket && _socket.connected) return _socket;
+  // If socket exists (connected or reconnecting), reuse it.
+  // Socket.IO with reconnection:true will auto-reconnect when disconnected.
+  if (_socket) return _socket;
 
   // In dev mode, connect to same origin (proxied via UMI /socket.io/),
   // In Docker / prod, connect to explicit FLASK_BACKEND_URL
@@ -22,8 +24,10 @@ function getSocket(): Socket {
     transports: ['websocket', 'polling'],
     path: '/socket.io/',
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: Infinity,  // Keep trying to reconnect indefinitely
+    reconnectionDelay: 500,          // Faster initial reconnection (default 1000)
+    reconnectionDelayMax: 5000,      // Max delay between reconnection attempts
+    timeout: 10000,                  // Connection timeout
     extraHeaders: {
       'Access-Token': token,
     },
@@ -40,6 +44,41 @@ function getSocket(): Socket {
   });
 
   return _socket;
+}
+
+/**
+ * Emit a Socket.IO event, waiting for the connection to be ready first.
+ * If already connected, emits immediately. If reconnecting, waits up to
+ * `timeoutMs` for the connection to be established before emitting.
+ * Returns a boolean indicating whether the emit was sent while connected.
+ */
+function emitWhenReady(event: string, data: any, timeoutMs = 5000): Promise<boolean> {
+  const socket = getSocket();
+  if (socket.connected) {
+    socket.emit(event, data);
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      // Timeout — emit anyway (Socket.IO will queue it internally)
+      socket.emit(event, data);
+      cleanup();
+      resolve(false);
+    }, timeoutMs);
+
+    const onConnect = () => {
+      clearTimeout(timer);
+      socket.emit(event, data);
+      cleanup();
+      resolve(true);
+    };
+
+    function cleanup() {
+      socket.off('connect', onConnect);
+    }
+
+    socket.on('connect', onConnect);
+  });
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -317,8 +356,8 @@ export const FlowApi = {
     socket.on('workflow:done', onDoneEvt);
     socket.on('workflow:error', onError);
 
-    // Emit run request
-    socket.emit('workflow:run', { workflowId });
+    // Emit run request — wait for connection if reconnecting
+    emitWhenReady('workflow:run', { workflowId });
 
     // Return a cancel function
     return () => {
@@ -393,7 +432,8 @@ export const FlowApi = {
     socket.on('workflow:done', onDoneEvt);
     socket.on('workflow:error', onError);
 
-    socket.emit('workflow:run_from_node', {
+    // Emit run request — wait for connection if reconnecting
+    emitWhenReady('workflow:run_from_node', {
       workflowId,
       startNodeId,
       nodeDataOverrides,
@@ -453,7 +493,8 @@ export const FlowApi = {
     socket.on('workflow:done', onDoneEvt);
     socket.on('workflow:error', onError);
 
-    socket.emit('workflow:run_single_node', {
+    // Emit run request — wait for connection if reconnecting
+    emitWhenReady('workflow:run_single_node', {
       workflowId,
       nodeId,
       nodeDataOverrides,

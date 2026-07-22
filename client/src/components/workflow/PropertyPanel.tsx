@@ -202,19 +202,39 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
 
   // Clipboard helper — navigator.clipboard requires HTTPS, fallback for HTTP (Docker IP)
   const copyToClipboard = useCallback((text: string) => {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => message.success('已复制'));
-    } else {
-      // Fallback for non-HTTPS contexts
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      message.success('已复制');
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(
+          () => message.success('已复制'),
+          () => {
+            // Clipboard API rejected (HTTP context) — fallback
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try { document.execCommand('copy'); message.success('已复制'); } catch { message.error('复制失败，请手动复制'); }
+            document.body.removeChild(ta);
+          },
+        );
+      } else {
+        // No Clipboard API — direct fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); message.success('已复制'); } catch { message.error('复制失败，请手动复制'); }
+        document.body.removeChild(ta);
+      }
+    } catch {
+      message.error('复制失败，请手动复制');
     }
   }, []);
 
@@ -693,6 +713,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
                       弹窗查看
                     </Button>
                   )}
+                  {hasDisplay && previewText && (
+                    <CopyOutlined
+                      style={{ marginLeft: 4, fontSize: 12, color: '#8c8c8c', cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); copyToClipboard(previewText); }}
+                    />
+                  )}
                 </div>
                 {/* Content area: Tables for table node, Univer for Excel, DiffSummary for diff node, pre for others */}
                 {hasDisplay && isTablesPort ? (
@@ -746,7 +772,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
           })
         ) : (
           <>
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Button
                 size="small"
                 icon={<ExpandOutlined />}
@@ -755,6 +781,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({ selectedNode, setNodes, e
               >
                 弹窗查看
               </Button>
+              {outputText && (
+                <CopyOutlined
+                  style={{ fontSize: 12, color: '#8c8c8c', cursor: 'pointer' }}
+                  onClick={() => { copyToClipboard(outputText); }}
+                />
+              )}
             </div>
             <pre
               style={{

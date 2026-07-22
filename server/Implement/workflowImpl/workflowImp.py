@@ -442,7 +442,12 @@ class WorkflowRuntime:
 
     @classmethod
     def _emit(cls, event: str, data: dict, room: str):
-        """Thread-safe socketio emit."""
+        """Thread-safe socketio emit.
+
+        In gevent mode, socketio.emit from a non-gevent thread may not
+        deliver messages promptly. We use the socketio's emit method directly,
+        which Flask-SocketIO documents as thread-safe for background threads.
+        """
         sio = _get_socketio()
         if sio:
             try:

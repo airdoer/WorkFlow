@@ -1164,10 +1164,17 @@ function FlowEditorInner({
 
   const handleRun = useCallback(
     async (json: WorkflowJSON, currentWorkflowId?: string) => {
-      // Auto-save before running to ensure backend has latest state
-      const wfId = await ensureSaved() || currentWorkflowId || workflowId;
+      // Always save before running the entire graph to ensure backend has latest state
+      const wfId = workflowId;
       if (!wfId) {
         message.warning('请先保存工作流');
+        return;
+      }
+      // Always do a save before running (even if not dirty) to ensure the backend
+      // loads the exact same graph the user sees (including latest node positions, field values, etc.)
+      const savedId = await doSave();
+      if (!savedId) {
+        message.error('自动保存失败，请手动保存后重试');
         return;
       }
 
@@ -1194,7 +1201,7 @@ function FlowEditorInner({
 
       setRunCancelFn(() => cancelFn);
     },
-    [workflowId, ensureSaved, setNodes, setEdges, handleNodeUpdate],
+    [workflowId, doSave, setNodes, setEdges, handleNodeUpdate],
   );
 
   // Handle drag-over from Toolbox

@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useStore } from 'reactflow';
 import { Select, message } from 'antd';
-import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined, UndoOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined, ExpandOutlined, UndoOutlined, CopyOutlined } from '@ant-design/icons';
 import { FlowApi } from '../services/FlowApi';
 import { getNodePorts, type PortDefinition } from '../PortTypes';
 import { useWorkflowContext } from '../WorkflowContext';
@@ -18,6 +18,44 @@ export function stripRuntimeMeta<T>(obj: T): T {
   const entries = Object.entries(obj as Record<string, unknown>)
     .filter(([k]) => !RUNTIME_META_KEYS.has(k));
   return Object.fromEntries(entries) as T;
+}
+
+/** Copy text to clipboard with a brief visual feedback. */
+export function copyToClipboard(text: string, onSuccess?: () => void) {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(() => {
+        message.success('已复制', 0.8);
+        onSuccess?.();
+      }).catch(() => {
+        // Clipboard API rejected (e.g. HTTP context, permissions) — fallback
+        copyToClipboardFallback(text, onSuccess);
+      });
+    } else {
+      copyToClipboardFallback(text, onSuccess);
+    }
+  } catch {
+    copyToClipboardFallback(text, onSuccess);
+  }
+}
+
+function copyToClipboardFallback(text: string, onSuccess?: () => void) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    message.success('已复制', 0.8);
+    onSuccess?.();
+  } catch {
+    message.error('复制失败，请手动复制', 1.5);
+  }
+  document.body.removeChild(textarea);
 }
 
 // ── Node sequence badge ──────────────────────────────────────────────
@@ -940,10 +978,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
 
                 return (
                   <div key={p.key} style={{ marginBottom: 4, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d', display: 'flex', alignItems: 'center', gap: 4 }} className="nodrag nopan">
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: PORT_COLORS[p.type] || '#52c41a', display: 'inline-block' }} />
                       {p.label}
                       {hasDisplay ? ' ✅' : ''}
+                      {hasDisplay && typeof displayValue === 'string' && !isBinaryContent(displayValue) && (
+                        <CopyOutlined
+                          style={{ marginLeft: 'auto', fontSize: 10, color: '#8c8c8c', cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); copyToClipboard(displayValue); }}
+                        />
+                      )}
                     </div>
                     {hasDisplay && (
                       <div style={{ padding: '4px 6px', maxHeight: 250, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}
@@ -992,7 +1036,16 @@ const BaseNode: React.FC<BaseNodeProps> = ({
               <div style={{
                 background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, overflow: 'hidden',
               }}>
-                <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d' }}>✅ 结果</div>
+                <div style={{ padding: '3px 6px', fontWeight: 600, fontSize: 10, color: '#389e0d', display: 'flex', alignItems: 'center' }} className="nodrag nopan">
+                  ✅ 结果
+                  {(() => {
+                    const val = typeof runOutput === 'string' ? runOutput : runOutput.fileContent || JSON.stringify(stripRuntimeMeta(runOutput), null, 2);
+                    if (typeof val === 'string' && !isBinaryContent(val)) {
+                      return <CopyOutlined style={{ marginLeft: 'auto', fontSize: 10, color: '#8c8c8c', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); copyToClipboard(val); }} />;
+                    }
+                    return null;
+                  })()}
+                </div>
                 <div style={{ padding: '4px 6px', maxHeight: 120, overflowY: 'auto', fontSize: 9, borderTop: '1px solid #b7eb8f' }}>
                   <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {(() => {

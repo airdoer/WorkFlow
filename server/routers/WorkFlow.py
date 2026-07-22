@@ -311,7 +311,6 @@ def on_workflow_run(data):
         started_at = _now_utc()
         try:
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             loop.run_until_complete(WorkflowRuntime.run(workflow_json, task_id))
             loop.close()
             logger.info("[SocketIO workflow:run] Background task completed: task_id=%r", task_id)
@@ -344,11 +343,12 @@ def on_workflow_run(data):
             except Exception as hist_err:
                 logger.warning("[workflow:run] Failed to write history: %s", hist_err)
 
-    # Run in a dedicated thread (not gevent greenlet) to avoid asyncio event loop conflicts
-    # when multiple workflows run concurrently (e.g., Seal polling + run_from_node)
-    import threading
-    t = threading.Thread(target=run_workflow, daemon=True, name=f"wf-run-{task_id[:8]}")
-    t.start()
+    # Run via gevent greenlet (not threading.Thread) to ensure socketio.emit
+    # messages are delivered promptly by the gevent event loop.
+    # threading.Thread causes 5-20s message delivery delay because the gevent
+    # event loop only processes the emit queue when it gets scheduled.
+    import gevent
+    g = gevent.spawn(run_workflow)
 
 
 @socketio.on('workflow:run_from_node')
@@ -416,7 +416,6 @@ def on_workflow_run_from_node(data) -> None:
         started_at = _now_utc()
         try:
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             loop.run_until_complete(
                 WorkflowRuntime.run(
                     workflow_json,
@@ -457,10 +456,10 @@ def on_workflow_run_from_node(data) -> None:
             except Exception as hist_err:
                 logger.warning("[workflow:run_from_node] Failed to write history: %s", hist_err)
 
-    # Run in a dedicated thread (not gevent greenlet) to avoid asyncio event loop conflicts
-    import threading
-    t = threading.Thread(target=run_subgraph, daemon=True, name=f"wf-node-{task_id[:8]}")
-    t.start()
+    # Run via gevent greenlet (not threading.Thread) to ensure socketio.emit
+    # messages are delivered promptly by the gevent event loop.
+    import gevent
+    gevent.spawn(run_subgraph)
 
 
 @socketio.on('workflow:run_single_node')
@@ -519,7 +518,6 @@ def on_workflow_run_single_node(data) -> None:
         started_at = _now_utc()
         try:
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             loop.run_until_complete(
                 WorkflowRuntime.run_single(
                     workflow_json,
@@ -555,9 +553,10 @@ def on_workflow_run_single_node(data) -> None:
             except Exception as hist_err:
                 logger.warning("[workflow:run_single_node] Failed to write history: %s", hist_err)
 
-    import threading
-    t = threading.Thread(target=run_single, daemon=True, name=f"wf-single-{task_id[:8]}")
-    t.start()
+    # Run via gevent greenlet (not threading.Thread) to ensure socketio.emit
+    # messages are delivered promptly by the gevent event loop.
+    import gevent
+    gevent.spawn(run_single)
 
 
 @socketio.on('workflow:cancel')
