@@ -52,6 +52,74 @@ def _get_socketio():
     return getattr(g, 'socketio', None)
 
 
+def _safe_emit(sio, event: str, data, room: str):
+    """Emit helper that runs inside the gevent event loop.
+
+    Called by the _emit_bridge greenlet so the emit executes in the correct
+    gevent context, allowing the WebSocket write to happen immediately.
+    """
+    try:
+        sio.emit(event, data, room=room)
+    except Exception as exc:
+        logger.warning("[WorkflowRuntime._safe_emit] Failed to emit %r to room %r: %s", event, room, exc)
+
+
+# ── Thread-safe emit queue + bridge greenlet ──────────────────────────────
+# threading.Thread puts messages into this queue; the bridge greenlet reads
+# from it inside the gevent event loop and calls sio.emit() immediately.
+
+import queue as _pyq
+_emit_queue: _pyq.Queue = _pyq.Queue()
+_emit_bridge_started = False
+
+
+def _ensure_emit_bridge():
+    """Start the bridge greenlet lazily on first use."""
+    global _emit_bridge_started
+    if not _emit_bridge_started:
+        _emit_bridge_started = True
+        try:
+            import gevent
+            gevent.spawn(_emit_bridge)
+        except Exception as exc:
+            logger.warning("[workflowImp] Failed to start _emit_bridge: %s", exc)
+
+
+def _emit_bridge():
+    """Greenlet that reads from _emit_queue and calls sio.emit().
+
+    Uses a busy-poll with very short sleep (1ms) when messages are available,
+    and a longer sleep (50ms) when idle.  The stdlib Queue is thread-safe so
+    threads can put() while this greenlet get_nowait()'s without issues.
+    Because sio.emit() runs inside a gevent greenlet, the WebSocket write
+    happens immediately — no Flask-SocketIO internal queue delay.
+    """
+    import gevent
+    idle = False
+    while True:
+        got_any = False
+        while True:
+            try:
+                event, data, room = _emit_queue.get_nowait()
+                got_any = True
+                sio = _get_socketio()
+                if sio:
+                    _safe_emit(sio, event, data, room)
+                else:
+                    logger.debug("[_emit_bridge] socketio not available, skip emit %r", event)
+            except _pyq.Empty:
+                break
+        if got_any:
+            # Messages were just processed — sleep very briefly in case
+            # more messages arrive in the same burst
+            gevent.sleep(0.001)
+            idle = False
+        else:
+            # No messages — longer sleep to avoid CPU waste, but short
+            # enough for near-real-time delivery (~50ms worst case)
+            gevent.sleep(0.05)
+
+
 def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
@@ -442,20 +510,20 @@ class WorkflowRuntime:
 
     @classmethod
     def _emit(cls, event: str, data: dict, room: str):
-        """Thread-safe socketio emit.
+        """Thread-safe socketio emit with immediate gevent delivery.
 
-        In gevent mode, socketio.emit from a non-gevent thread may not
-        deliver messages promptly. We use the socketio's emit method directly,
-        which Flask-SocketIO documents as thread-safe for background threads.
+        When running from a threading.Thread, socketio.emit() puts the message
+        in an internal queue that is only drained when the gevent event loop
+        gets scheduled — causing 5-20s delays.
+
+        We solve this with a dedicated "emit bridge" greenlet that reads from
+        a thread-safe queue and calls sio.emit() inside the gevent event loop.
+        Because the greenlet runs inside gevent, writes to the WebSocket are
+        immediate.  The queue is a simple ``gevent.queue.Queue`` which is
+        thread-safe and wakes up the reading greenlet whenever an item is put.
         """
-        sio = _get_socketio()
-        if sio:
-            try:
-                sio.emit(event, data, room=room)
-            except Exception as exc:
-                logger.warning("[WorkflowRuntime._emit] Failed to emit %r to room %r: %s", event, room, exc)
-        else:
-            logger.debug("[WorkflowRuntime._emit] socketio not available, skip emit %r", event)
+        _ensure_emit_bridge()
+        _emit_queue.put((event, data, room))
 
     @classmethod
     async def run_single(cls, workflow_json, task_id, node_id: str, node_data_overrides: dict = None):
