@@ -11,7 +11,7 @@ API: 复用 hotfixImpl/jenkinsImp.py 的 JenkinsClient
 import logging
 import requests
 from Implement.hotfixImpl.jenkinsImp import JenkinsClient
-from Implement.hotfixImpl.jenkins_config import JENKINS_AUTH, JENKINS_JOB_MAP
+from Implement.hotfixImpl.jenkins_config import JENKINS_AUTH, JENKINS_JOB_MAP, build_kim_notification_tag
 from Implement.workflowImpl.nodeExecutor import BaseNodeExecutor
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,8 @@ JOB_MAP = {
     'preonline_pack_prod_no':     {'job_name': 'Preonline_PublicServer_C7Deploy',      'web_path': '/job/Preonline_PublicServer_C7Deploy/'},
     'preonline_pack_dev_no':      {'job_name': 'Deploy_Local_Preonline',               'web_path': '/job/Deploy_Local_Preonline/'},
     'preonline_pack_dev_cross':   {'job_name': 'Deploy_Local_Machine_Cross_Preonline', 'web_path': '/job/Deploy_Local_Machine_Cross_Preonline/'},
+    # 打包 - Online
+    'online_pack_prod_no':        {'job_name': 'Online_PublicServer_C7Deploy',         'web_path': '/job/Online_PublicServer_C7Deploy/'},
     # 热更 - Preonline only
     'preonline_hotfix_prod':      {'job_name': 'Reload_Cloud_Preonline',               'web_path': '/job/Reload_Cloud_Preonline/'},
     'preonline_hotfix_dev':       {'job_name': 'Preonline_GenerateHotfix',             'web_path': '/job/Preonline_GenerateHotfix/'},
@@ -104,6 +106,9 @@ class JenkinsDeployExecutor(BaseNodeExecutor):
             params["trigger_seal"] = "true" if config.get('trigger_seal') else "false"
             params["with_server_appendix"] = "true" if config.get('with_server_appendix') else "false"
             params["CLEAN_ALL_DB_DATA"] = "true" if config.get('CLEAN_ALL_DB_DATA') else "false"
+
+            # 新增：KIM_NOTIFICATION_TAG（用户mcp+日期+分支+版本），分支用 mainline/preonline/online
+            params["KIM_NOTIFICATION_TAG"] = build_kim_notification_tag(branch, changelist_id)
 
             # 更新模式
             build_type = config.get('SERVER_BUILD_TYPE', 'full')
