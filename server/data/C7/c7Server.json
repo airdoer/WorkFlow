@@ -5,7 +5,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 90001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_dev_cross_weekly": {
         "namespace": "c7_dev_cross_weekly",
@@ -13,7 +14,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 11001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_dev_cross_weekly2": {
         "namespace": "c7_dev_cross_weekly2",
@@ -21,7 +23,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 11002,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_weekly_cross_18001": {
         "namespace": "c7_weekly_cross_18001",
@@ -29,7 +32,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 18001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": true
     },
     "c7_weekly_cross_19001": {
         "namespace": "c7_weekly_cross_19001",
@@ -37,7 +41,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 19001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": true
     },
     "c7_dev": {
         "namespace": "c7_dev",
@@ -45,7 +50,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 10001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_qa1": {
         "namespace": "c7_qa1",
@@ -53,7 +59,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 10002,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_qa3": {
         "namespace": "c7_qa3",
@@ -61,7 +68,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 10004,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_qa4": {
         "namespace": "c7_qa4",
@@ -69,7 +77,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 10005,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_qa6": {
         "namespace": "c7_qa6",
@@ -77,7 +86,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 16001,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_qa6_cross": {
         "namespace": "c7_qa6_cross",
@@ -85,7 +95,8 @@
         "env": "staging",
         "zone_id": 144,
         "server_id": 16101,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": true
     },
     "c7_acceptance": {
         "namespace": "c7_acceptance",
@@ -93,7 +104,8 @@
         "env": "idc",
         "zone_id": 144,
         "server_id": 50007,
-        "tree_id": 81392
+        "tree_id": 81392,
+        "isCrossServer": false
     },
     "c7_ai_training": {
         "namespace": "c7_ai_training",
@@ -101,7 +113,8 @@
         "env": "idc",
         "zone_id": 250,
         "server_id": 50005,
-        "tree_id": null
+        "tree_id": null,
+        "isCrossServer": false
     },
     "c7_daily": {
         "namespace": "c7_daily",
@@ -110,61 +123,78 @@
         "zone_id": 144,
         "server_id": 50006,
         "tree_id": 81391,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
-    "c7_massive_stress_txyun_1": {
-        "namespace": "c7_massive_stress_txyun_1",
+    "c7_massive_stress_txyun_50011": {
+        "namespace": "c7_massive_stress_txyun_50011",
         "name": "线上腾讯云压测服1",
         "env": "idc",
         "zone_id": 263,
         "server_id": 50011,
         "tree_id": 94583,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
-    "c7_massive_stress_txyun_2": {
-        "namespace": "c7_massive_stress_txyun_2",
+    "c7_massive_stress_txyun_50012": {
+        "namespace": "c7_massive_stress_txyun_50012",
         "name": "线上腾讯云压测服2",
         "env": "idc",
         "zone_id": 263,
         "server_id": 50012,
         "tree_id": 94584,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
-    "c7_massive_stress_txyun_3": {
-        "namespace": "c7_massive_stress_txyun_3",
+    "c7_massive_stress_txyun_50013": {
+        "namespace": "c7_massive_stress_txyun_50013",
         "name": "线上腾讯云压测服3",
         "env": "idc",
         "zone_id": 263,
         "server_id": 50013,
-        "tree_id": 94585,
-        "seal_env": "test"
+        "tree_id": 99307,
+        "seal_env": "test",
+        "isCrossServer": false
     },
-    "c7_massive_stress_txyun_4": {
-        "namespace": "c7_massive_stress_txyun_4",
-        "name": "线上腾讯云压测服4",
+    "c7_massive_stress_cross_service_58000": {
+        "namespace": "c7_massive_stress_cross_service_58000",
+        "name": "线上压测服跨服service",
         "env": "idc",
         "zone_id": 263,
-        "server_id": 50014,
-        "tree_id": 97382,
-        "seal_env": "test"
+        "server_id": 58000,
+        "tree_id": 97823,
+        "seal_env": "test",
+        "isCrossServer": true
     },
-    "c7_massive_stress_cross_1": {
-        "namespace": "c7_massive_stress_cross_1",
-        "name": "线上压测服跨服1",
+    "c7_massive_stress_cross_battle_58001": {
+        "namespace": "c7_massive_stress_cross_battle_58001",
+        "name": "线上压测服跨服battle",
         "env": "idc",
         "zone_id": 263,
         "server_id": 58001,
-        "tree_id": 97823,
-        "seal_env": "test"
+        "tree_id": 97824,
+        "seal_env": "test",
+        "isCrossServer": true
     },
-    "c7_massive_stress_cross_2": {
-        "namespace": "c7_massive_stress_cross_2",
-        "name": "线上压测服跨服2",
+    "c7_massive_stress_cross_world_59001": {
+        "namespace": "c7_massive_stress_cross_world_59001",
+        "name": "线上压测服跨服world-59001",
         "env": "idc",
         "zone_id": 263,
         "server_id": 59001,
-        "tree_id": 97824,
-        "seal_env": "test"
+        "tree_id": 100483,
+        "seal_env": "test",
+        "isCrossServer": true
+    },
+    "c7_massive_stress_cross_world_59002": {
+        "namespace": "c7_massive_stress_cross_world_59002",
+        "name": "线上压测服跨服world-59002",
+        "env": "idc",
+        "zone_id": 263,
+        "server_id": 59002,
+        "tree_id": 101377,
+        "seal_env": "test",
+        "isCrossServer": true
     },
     "c7_nvidia_test": {
         "namespace": "c7_nvidia_test",
@@ -173,7 +203,8 @@
         "zone_id": 266,
         "server_id": 10020,
         "tree_id": 95447,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_online_mirror": {
         "namespace": "c7_online_mirror",
@@ -182,7 +213,8 @@
         "zone_id": 268,
         "server_id": 2001,
         "tree_id": 84703,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_mirror_cross": {
         "namespace": "c7_online_mirror_cross",
@@ -191,7 +223,58 @@
         "zone_id": 268,
         "server_id": 2800,
         "tree_id": 98118,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_mirror2_2011": {
+        "namespace": "c7_online_mirror2_2011",
+        "name": "线上镜像服2本服-2011",
+        "env": "idc",
+        "zone_id": 286,
+        "server_id": 2011,
+        "tree_id": 100798,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_mirror2_2012": {
+        "namespace": "c7_online_mirror2_2012",
+        "name": "线上镜像服2本服-2012",
+        "env": "idc",
+        "zone_id": 286,
+        "server_id": 2012,
+        "tree_id": 100799,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_mirror2_cross_service_2900": {
+        "namespace": "c7_online_mirror2_cross_service_2900",
+        "name": "线上镜像服2跨服Service-2900",
+        "env": "idc",
+        "zone_id": 286,
+        "server_id": 2900,
+        "tree_id": 100800,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_mirror2_cross_battle_2901": {
+        "namespace": "c7_online_mirror2_cross_battle_2901",
+        "name": "线上镜像服2跨服Battle-2901",
+        "env": "idc",
+        "zone_id": 286,
+        "server_id": 2901,
+        "tree_id": 100801,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_mirror2_cross_world_2902": {
+        "namespace": "c7_online_mirror2_cross_world_2902",
+        "name": "线上镜像服2跨服World-2902",
+        "env": "idc",
+        "zone_id": 286,
+        "server_id": 2902,
+        "tree_id": 100802,
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_partner": {
         "namespace": "c7_partner",
@@ -200,7 +283,8 @@
         "zone_id": 276,
         "server_id": 50066,
         "tree_id": 98385,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_ios_review": {
         "namespace": "c7_ios_review",
@@ -209,7 +293,8 @@
         "zone_id": 269,
         "server_id": 2101,
         "tree_id": 97026,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_singapore": {
         "namespace": "c7_singapore",
@@ -218,7 +303,8 @@
         "zone_id": 266,
         "server_id": 2103,
         "tree_id": 99590,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_ios_recommend": {
         "namespace": "c7_ios_recommend",
@@ -227,7 +313,8 @@
         "zone_id": 269,
         "server_id": 2100,
         "tree_id": 98384,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_video": {
         "namespace": "c7_video",
@@ -236,7 +323,8 @@
         "zone_id": 266,
         "server_id": 50068,
         "tree_id": 98567,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_taptap_review": {
         "namespace": "c7_taptap_review",
@@ -245,133 +333,162 @@
         "zone_id": 270,
         "server_id": 2102,
         "tree_id": 95881,
-        "seal_env": "test"
+        "seal_env": "test",
+        "isCrossServer": false
     },
     "c7_online_1101": {
         "namespace": "c7_online_1101",
         "name": "正式服本服-1101",
+        "displayName": "灰雾之上",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1101,
         "tree_id": 99460,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1102": {
         "namespace": "c7_online_1102",
         "name": "正式服本服-1102",
+        "displayName": "黑荆棘",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1102,
         "tree_id": 99503,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1103": {
         "namespace": "c7_online_1103",
         "name": "正式服本服-1103",
+        "displayName": "神弃之地",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1103,
         "tree_id": 99504,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1104": {
         "namespace": "c7_online_1104",
         "name": "正式服本服-1104",
+        "displayName": "源堡",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1104,
         "tree_id": 99664,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1105": {
         "namespace": "c7_online_1105",
         "name": "正式服本服-1105",
+        "displayName": "贝克兰德",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1105,
         "tree_id": 99665,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1106": {
         "namespace": "c7_online_1106",
         "name": "正式服本服-1106",
+        "displayName": "廷根",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1106,
         "tree_id": 99666,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1107": {
         "namespace": "c7_online_1107",
         "name": "正式服本服-1107",
+        "displayName": "混沌海",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1107,
         "tree_id": 99667,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1201": {
         "namespace": "c7_online_1201",
         "name": "正式服本服-1201",
+        "displayName": "愚者",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1201,
         "tree_id": 99669,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1202": {
         "namespace": "c7_online_1202",
         "name": "正式服本服-1202",
+        "displayName": "塔罗会",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1202,
         "tree_id": 99670,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1203": {
         "namespace": "c7_online_1203",
         "name": "正式服本服-1203",
+        "displayName": "福生玄黄",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1203,
         "tree_id": 99671,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1204": {
         "namespace": "c7_online_1204",
         "name": "正式服本服-1204",
+        "displayName": "命运道标",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1204,
         "tree_id": 99672,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1205": {
         "namespace": "c7_online_1205",
         "name": "正式服本服-1205",
+        "displayName": "空想家",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1205,
         "tree_id": 99673,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1206": {
         "namespace": "c7_online_1206",
         "name": "正式服本服-1206",
+        "displayName": "魔女",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1206,
         "tree_id": 99674,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_1207": {
         "namespace": "c7_online_1207",
         "name": "正式服本服-1207",
+        "displayName": "黑皇帝",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1207,
         "tree_id": 99675,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": false
     },
     "c7_online_cross_battle_1801": {
         "namespace": "c7_online_cross_battle_1801",
@@ -380,7 +497,8 @@
         "zone_id": 279,
         "server_id": 1801,
         "tree_id": 99462,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_battle_1802": {
         "namespace": "c7_online_cross_battle_1802",
@@ -389,9 +507,9 @@
         "zone_id": 279,
         "server_id": 1802,
         "tree_id": 99626,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
-    
     "c7_online_cross_battle_1803": {
         "namespace": "c7_online_cross_battle_1803",
         "name": "正式服跨服Battle-1803",
@@ -399,9 +517,9 @@
         "zone_id": 279,
         "server_id": 1803,
         "tree_id": 99627,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
-    
     "c7_online_cross_battle_1804": {
         "namespace": "c7_online_cross_battle_1804",
         "name": "正式服跨服Battle-1804",
@@ -409,7 +527,28 @@
         "zone_id": 279,
         "server_id": 1804,
         "tree_id": 99628,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_battle_1805": {
+        "namespace": "c7_online_cross_battle_1805",
+        "name": "正式服跨服Battle-1805",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1805,
+        "tree_id": 100369,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_battle_1806": {
+        "namespace": "c7_online_cross_battle_1806",
+        "name": "正式服跨服Battle-1806",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1806,
+        "tree_id": 100370,
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_service_1700": {
         "namespace": "c7_online_cross_service_1700",
@@ -418,42 +557,746 @@
         "zone_id": 279,
         "server_id": 1700,
         "tree_id": 99461,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_world_1901": {
         "namespace": "c7_online_cross_world_1901",
         "name": "正式服跨服World-1901",
+        "displayName": "幻形之野",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1901,
         "tree_id": 99463,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_world_1902": {
         "namespace": "c7_online_cross_world_1902",
         "name": "正式服跨服World-1902",
+        "displayName": "龙骸荒原",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1902,
         "tree_id": 99499,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_world_1903": {
         "namespace": "c7_online_cross_world_1903",
         "name": "正式服跨服World-1903",
+        "displayName": "暮光王庭",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1903,
         "tree_id": 99500,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
     },
     "c7_online_cross_world_1904": {
         "namespace": "c7_online_cross_world_1904",
         "name": "正式服跨服World-1904",
+        "displayName": "荆棘要塞",
         "env": "idc",
         "zone_id": 279,
         "server_id": 1904,
         "tree_id": 99501,
-        "seal_env": "prod"
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1905": {
+        "namespace": "c7_online_cross_world_1905",
+        "name": "正式服跨服World-1905",
+        "displayName": "秘银壁垒",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1905,
+        "tree_id": 99767,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1906": {
+        "namespace": "c7_online_cross_world_1906",
+        "name": "正式服跨服World-1906",
+        "displayName": "狮鹫高地",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1906,
+        "tree_id": 99768,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1907": {
+        "namespace": "c7_online_cross_world_1907",
+        "name": "正式服跨服World-1907",
+        "displayName": "誓约之门",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1907,
+        "tree_id": 99769,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1908": {
+        "namespace": "c7_online_cross_world_1908",
+        "name": "正式服跨服World-1908",
+        "displayName": "猩红王座",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1908,
+        "tree_id": 99770,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1909": {
+        "namespace": "c7_online_cross_world_1909",
+        "name": "正式服跨服World-1909",
+        "displayName": "断剑峡谷",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1909,
+        "tree_id": 99771,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1910": {
+        "namespace": "c7_online_cross_world_1910",
+        "name": "正式服跨服World-1910",
+        "displayName": "永夜边境",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1910,
+        "tree_id": 99773,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1911": {
+        "namespace": "c7_online_cross_world_1911",
+        "name": "正式服跨服World-1911",
+        "displayName": "雾隐穹庭",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1911,
+        "tree_id": 99774,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1912": {
+        "namespace": "c7_online_cross_world_1912",
+        "name": "正式服跨服World-1912",
+        "displayName": "灵潮边境",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1912,
+        "tree_id": 99775,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1913": {
+        "namespace": "c7_online_cross_world_1913",
+        "name": "正式服跨服World-1913",
+        "displayName": "征服疆域",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1913,
+        "tree_id": 99776,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1914": {
+        "namespace": "c7_online_cross_world_1914",
+        "name": "正式服跨服World-1914",
+        "displayName": "凯旋回廊",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1914,
+        "tree_id": 99777,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1915": {
+        "namespace": "c7_online_cross_world_1915",
+        "name": "正式服跨服World-1915",
+        "displayName": "权杖之野",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1915,
+        "tree_id": 99778,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1916": {
+        "namespace": "c7_online_cross_world_1916",
+        "name": "正式服跨服World-1916",
+        "displayName": "王座深渊",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1916,
+        "tree_id": 99779,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1917": {
+        "namespace": "c7_online_cross_world_1917",
+        "name": "正式服跨服World-1917",
+        "displayName": "战旗平原",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1917,
+        "tree_id": 99780,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1918": {
+        "namespace": "c7_online_cross_world_1918",
+        "name": "正式服跨服World-1918",
+        "displayName": "铁砧要塞",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1918,
+        "tree_id": 99781,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1919": {
+        "namespace": "c7_online_cross_world_1919",
+        "name": "正式服跨服World-1919",
+        "displayName": "荣耀战场",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1919,
+        "tree_id": 99782,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1920": {
+        "namespace": "c7_online_cross_world_1920",
+        "name": "正式服跨服World-1920",
+        "displayName": "锋刃战线",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1920,
+        "tree_id": 99783,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1921": {
+        "namespace": "c7_online_cross_world_1921",
+        "name": "正式服跨服World-1921",
+        "displayName": "铁幕壁垒",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1921,
+        "tree_id": 99784,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1922": {
+        "namespace": "c7_online_cross_world_1922",
+        "name": "正式服跨服World-1922",
+        "displayName": "裁决沙盘",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1922,
+        "tree_id": 99785,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1923": {
+        "namespace": "c7_online_cross_world_1923",
+        "name": "正式服跨服World-1923",
+        "displayName": "制衡棋盘",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1923,
+        "tree_id": 99786,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1924": {
+        "namespace": "c7_online_cross_world_1924",
+        "name": "正式服跨服World-1924",
+        "displayName": "合纵原野",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1924,
+        "tree_id": 99787,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1925": {
+        "namespace": "c7_online_cross_world_1925",
+        "name": "正式服跨服World-1925",
+        "displayName": "连横海峡",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1925,
+        "tree_id": 99788,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1926": {
+        "namespace": "c7_online_cross_world_1926",
+        "name": "正式服跨服World-1926",
+        "displayName": "枢衡支点",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1926,
+        "tree_id": 99789,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1927": {
+        "namespace": "c7_online_cross_world_1927",
+        "name": "正式服跨服World-1927",
+        "displayName": "加冕之地",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1927,
+        "tree_id": 99790,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1928": {
+        "namespace": "c7_online_cross_world_1928",
+        "name": "正式服跨服World-1928",
+        "displayName": "圣冠回廊",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1928,
+        "tree_id": 99791,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1929": {
+        "namespace": "c7_online_cross_world_1929",
+        "name": "正式服跨服World-1929",
+        "displayName": "幽梦深谷",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1929,
+        "tree_id": 99792,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1930": {
+        "namespace": "c7_online_cross_world_1930",
+        "name": "正式服跨服World-1930",
+        "displayName": "黯夜钟楼",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1930,
+        "tree_id": 99793,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1931": {
+        "namespace": "c7_online_cross_world_1931",
+        "name": "正式服跨服World-1931",
+        "displayName": "雷鸣海角",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1931,
+        "tree_id": 99794,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1932": {
+        "namespace": "c7_online_cross_world_1932",
+        "name": "正式服跨服World-1932",
+        "displayName": "烈阳旷野",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1932,
+        "tree_id": 99795,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1933": {
+        "namespace": "c7_online_cross_world_1933",
+        "name": "正式服跨服World-1933",
+        "displayName": "智识高塔",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1933,
+        "tree_id": 99796,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1934": {
+        "namespace": "c7_online_cross_world_1934",
+        "name": "正式服跨服World-1934",
+        "displayName": "丰饶林地",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1934,
+        "tree_id": 99797,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1935": {
+        "namespace": "c7_online_cross_world_1935",
+        "name": "正式服跨服World-1935",
+        "displayName": "黄昏战线",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1935,
+        "tree_id": 99798,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1936": {
+        "namespace": "c7_online_cross_world_1936",
+        "name": "正式服跨服World-1936",
+        "displayName": "深海壁垒",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1936,
+        "tree_id": 99799,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1937": {
+        "namespace": "c7_online_cross_world_1937",
+        "name": "正式服跨服World-1937",
+        "displayName": "命运轮盘",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1937,
+        "tree_id": 99800,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1938": {
+        "namespace": "c7_online_cross_world_1938",
+        "name": "正式服跨服World-1938",
+        "displayName": "丝线剧场",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1938,
+        "tree_id": 99801,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1939": {
+        "namespace": "c7_online_cross_world_1939",
+        "name": "正式服跨服World-1939",
+        "displayName": "灾厄荒原",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1939,
+        "tree_id": 99802,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1940": {
+        "namespace": "c7_online_cross_world_1940",
+        "name": "正式服跨服World-1940",
+        "displayName": "秩序天平",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1940,
+        "tree_id": 99803,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1941": {
+        "namespace": "c7_online_cross_world_1941",
+        "name": "正式服跨服World-1941",
+        "displayName": "1941",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1941,
+        "tree_id": 101750,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    
+    "c7_online_cross_world_1942": {
+        "namespace": "c7_online_cross_world_1942",
+        "name": "正式服跨服World-1942",
+        "displayName": "1942",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1942,
+        "tree_id": 101751,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1943": {
+        "namespace": "c7_online_cross_world_1943",
+        "name": "正式服跨服World-1943",
+        "displayName": "1943",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1943,
+        "tree_id": 101752,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1944": {
+        "namespace": "c7_online_cross_world_1944",
+        "name": "正式服跨服World-1944",
+        "displayName": "1944",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1944,
+        "tree_id": 101753,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1945": {
+        "namespace": "c7_online_cross_world_1945",
+        "name": "正式服跨服World-1945",
+        "displayName": "1945",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1945,
+        "tree_id": 101754,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_cross_world_1946": {
+        "namespace": "c7_online_cross_world_1946",
+        "name": "正式服跨服World-1946",
+        "displayName": "1946",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1946,
+        "tree_id": 101755,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_1108": {
+        "namespace": "c7_online_1108",
+        "name": "正式服本服-1108",
+        "displayName": "深渊",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1108,
+        "tree_id": 99760,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1109": {
+        "namespace": "c7_online_1109",
+        "name": "正式服本服-1109",
+        "displayName": "白银城",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1109,
+        "tree_id": 100365,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1110": {
+        "namespace": "c7_online_1110",
+        "name": "正式服本服-1110",
+        "displayName": "霍纳奇斯",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1110,
+        "tree_id": 100366,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1111": {
+        "namespace": "c7_online_1111",
+        "name": "正式服本服-1111",
+        "displayName": "巨人王庭",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1111,
+        "tree_id": 100371,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1112": {
+        "namespace": "c7_online_1112",
+        "name": "正式服本服-1112",
+        "displayName": "母巢",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1112,
+        "tree_id": 100422,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1113": {
+        "namespace": "c7_online_1113",
+        "name": "正式服本服-1113",
+        "displayName": "毁灭天灾",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1113,
+        "tree_id": 100424,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1208": {
+        "namespace": "c7_online_1208",
+        "name": "正式服本服-1208",
+        "displayName": "死神",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1208,
+        "tree_id": 99765,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1209": {
+        "namespace": "c7_online_1209",
+        "name": "正式服本服-1209",
+        "displayName": "征服者",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1209,
+        "tree_id": 100367,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1210": {
+        "namespace": "c7_online_1210",
+        "name": "正式服本服-1210",
+        "displayName": "永恒烈阳",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1210,
+        "tree_id": 100368,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1211": {
+        "namespace": "c7_online_1211",
+        "name": "正式服本服-1211",
+        "displayName": "天灾君主",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1211,
+        "tree_id": 100372,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1212": {
+        "namespace": "c7_online_1212",
+        "name": "正式服本服-1212",
+        "displayName": "命运之轮",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1212,
+        "tree_id": 100425,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_1213": {
+        "namespace": "c7_online_1213",
+        "name": "正式服本服-1213",
+        "displayName": "万物黄昏",
+        "env": "idc",
+        "zone_id": 279,
+        "server_id": 1213,
+        "tree_id": 100423,
+        "seal_env": "prod",
+        "isCrossServer": false
+    },
+    "c7_online_tmp_cross_service_1997": {
+        "namespace": "c7_online_tmp_cross_service_1997",
+        "name": "正式临时服跨服Service-1997",
+        "env": "idc",
+        "zone_id": 283,
+        "server_id": 1997,
+        "tree_id": 99833,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_tmp_cross_battle_1998": {
+        "namespace": "c7_online_tmp_cross_battle_1998",
+        "name": "正式临时服跨服Battle-1998",
+        "env": "idc",
+        "zone_id": 283,
+        "server_id": 1998,
+        "tree_id": 99834,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_online_tmp_cross_world_1999": {
+        "namespace": "c7_online_tmp_cross_world_1999",
+        "name": "正式临时服跨服World-1999",
+        "env": "idc",
+        "zone_id": 283,
+        "server_id": 1999,
+        "tree_id": 99835,
+        "seal_env": "prod",
+        "isCrossServer": true
+    },
+    "c7_preview_1501": {
+        "namespace": "c7_preview_1501",
+        "name": "正式偷跑服本服-1501",
+        "env": "idc",
+        "zone_id": 282,
+        "server_id": 1501,
+        "tree_id": 99825,
+        "seal_env": "test",
+        "isCrossServer": false
+    },
+    "c7_preview_1502": {
+        "namespace": "c7_preview_1502",
+        "name": "正式偷跑服本服-1502",
+        "env": "idc",
+        "zone_id": 282,
+        "server_id": 1502,
+        "tree_id": 99826,
+        "seal_env": "test",
+        "isCrossServer": false
+    },
+    "c7_preview_cross_service_1597": {
+        "namespace": "c7_preview_cross_service_1597",
+        "name": "正式偷跑服跨服Service-1597",
+        "env": "idc",
+        "zone_id": 282,
+        "server_id": 1597,
+        "tree_id": 99827,
+        "seal_env": "test",
+        "isCrossServer": true
+    },
+    "c7_preview_cross_battle_1598": {
+        "namespace": "c7_preview_cross_battle_1598",
+        "name": "正式偷跑服跨服Battle-1598",
+        "env": "idc",
+        "zone_id": 282,
+        "server_id": 1598,
+        "tree_id": 99828,
+        "seal_env": "test",
+        "isCrossServer": true
+    },
+    "c7_preview_cross_world_1599": {
+        "namespace": "c7_preview_cross_world_1599",
+        "name": "正式偷跑服跨服World-1599",
+        "env": "idc",
+        "zone_id": 282,
+        "server_id": 1599,
+        "tree_id": 99829,
+        "seal_env": "test",
+        "isCrossServer": true
+    },
+    "c7_profile": {
+        "namespace": "c7_profile",
+        "name": "Profile服",
+        "env": "idc",
+        "zone_id": 278,
+        "server_id": 2104,
+        "tree_id": 99836,
+        "seal_env": "test",
+        "isCrossServer": false
+    },
+    "c7_idc_1": {
+        "namespace": "c7_idc_1",
+        "name": "对外测试IDC1服",
+        "env": "idc",
+        "zone_id": 285,
+        "server_id": 2201,
+        "tree_id": 100235,
+        "seal_env": "test",
+        "isCrossServer": false
     }
 }

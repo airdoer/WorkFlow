@@ -1,14 +1,62 @@
 {
+    "c7_dev_cross_weekly": {
+        "namespaces": ["c7_dev_cross_weekly", "c7_dev_cross_weekly2", "c7_weekly_cross_18001", "c7_weekly_cross_19001"],
+        "name": "周版本跨服",
+        "tree_id": null
+    },
+    "c7_qa6": {
+        "namespaces": ["c7_qa6", "c7_qa6_cross"],
+        "name": "QA6跨服",
+        "tree_id": null
+    },
     "online_mirror": {
         "namespaces": ["c7_online_mirror", "c7_online_mirror_cross"],
-        "name": "线上预发布服",
+        "name": "线上镜像服",
         "tree_id": 99523,
         "seal_env": "prod"
     },
+    "online_mirror2": {
+        "namespaces": [
+            "c7_online_mirror2_2011",
+            "c7_online_mirror2_2012",
+            "c7_online_mirror2_cross_service_2900",
+            "c7_online_mirror2_cross_battle_2901",
+            "c7_online_mirror2_cross_world_2902"
+        ],
+        "name": "线上镜像服2",
+        "tree_id": 100797,
+        "seal_env": "prod",
+        "ignore_manifest": true
+    },
     "online": {
-        "namespaces": ["c7_online_1101", "c7_online_1102", "c7_online_1103", "c7_online_1104", "c7_online_1105", "c7_online_1106", "c7_online_1107", "c7_online_1201", "c7_online_1202", "c7_online_1203", "c7_online_1204", "c7_online_1205", "c7_online_1206", "c7_online_1207", "c7_online_cross_battle_1801", "c7_online_cross_battle_1802", "c7_online_cross_battle_1803", "c7_online_cross_battle_1804", "c7_online_cross_service_1700", "c7_online_cross_world_1901", "c7_online_cross_world_1902", "c7_online_cross_world_1903", "c7_online_cross_world_1904"],
+        "namespaces": [
+            "c7_online_1101", "c7_online_1102", "c7_online_1103", "c7_online_1104", "c7_online_1105", "c7_online_1106", 
+            "c7_online_1107", "c7_online_1108", "c7_online_1109", "c7_online_1110",
+            "c7_online_1201", "c7_online_1202", "c7_online_1203", "c7_online_1204", "c7_online_1205", "c7_online_1206", 
+            "c7_online_1207", "c7_online_1208", "c7_online_1209", "c7_online_1210",
+            "c7_online_cross_battle_1801", "c7_online_cross_battle_1802", "c7_online_cross_battle_1803", "c7_online_cross_battle_1804", 
+            "c7_online_cross_battle_1805", "c7_online_cross_battle_1806",
+            "c7_online_cross_service_1700", "c7_online_cross_world_1901", "c7_online_cross_world_1902", "c7_online_cross_world_1903", 
+            "c7_online_cross_world_1904", "c7_online_cross_world_1905", "c7_online_cross_world_1906", "c7_online_cross_world_1907", 
+            "c7_online_cross_world_1908", "c7_online_cross_world_1909", "c7_online_cross_world_1910", "c7_online_cross_world_1911", 
+            "c7_online_cross_world_1912", "c7_online_cross_world_1913", "c7_online_cross_world_1914", "c7_online_cross_world_1915", 
+            "c7_online_cross_world_1916", "c7_online_cross_world_1917", "c7_online_cross_world_1918", "c7_online_cross_world_1919", 
+            "c7_online_cross_world_1920", "c7_online_cross_world_1921", "c7_online_cross_world_1922", "c7_online_cross_world_1923", 
+            "c7_online_cross_world_1924", "c7_online_cross_world_1925", "c7_online_cross_world_1926", "c7_online_cross_world_1927", 
+            "c7_online_cross_world_1928", "c7_online_cross_world_1929", "c7_online_cross_world_1930", "c7_online_cross_world_1931", 
+            "c7_online_cross_world_1932", "c7_online_cross_world_1933", "c7_online_cross_world_1934", "c7_online_cross_world_1935", 
+            "c7_online_cross_world_1936", "c7_online_cross_world_1937", "c7_online_cross_world_1938", "c7_online_cross_world_1939", 
+            "c7_online_cross_world_1940", "c7_online_cross_world_1941", "c7_online_cross_world_1942", "c7_online_cross_world_1943", 
+            "c7_online_cross_world_1944", "c7_online_cross_world_1945", "c7_online_cross_world_1946"
+        ],
         "name": "线上正式服",
         "tree_id": 99522,
         "seal_env": "prod"
+    },
+    "preview": {
+        "namespaces": ["c7_preview_1501", "c7_preview_1502", "c7_preview_cross_service_1597", "c7_preview_cross_battle_1598", "c7_preview_cross_world_1599"],
+        "name": "正式偷跑服",
+        "tree_id": 99823,
+        "seal_env": "test"
     }
 }
