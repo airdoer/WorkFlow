@@ -10,7 +10,10 @@ import os
 import time
 import uuid
 
-import requests
+try:
+    import requests
+except ImportError:  # 本地 Windows 无 requests 时仍可导入纯数据函数（供 mcp/seal_ops.py 复用）；HTTP 方法需 requests
+    requests = None
 
 logger = logging.getLogger(__name__)
 

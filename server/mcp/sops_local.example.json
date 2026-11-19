@@ -1,0 +1,5 @@
+{
+  "_comment": "复制本文件为 sops_local.json 并填入真实值。sops_local.json 已被 gitignore，不会入库。",
+  "SOPS_TOKEN": "",
+  "SOPS_PROJECT": ""
+}
