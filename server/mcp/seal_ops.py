@@ -68,7 +68,6 @@ OP_ALIASES = {
     "开关外网": ("FirewallProd", "FirewallTest"),
     "防火墙": ("FirewallProd", "FirewallTest"),
     "更新代码": ("DeployProd", "DeployTest"),
-    "更新引擎": ("DeployProd", "DeployTest"),
     "修改环境变量": ("ModifyEnvProd", "ModifyEnvTest"),
     "热更": ("HotfixProd", "HotfixTest"),
     "hotfix": ("HotfixProd", "HotfixTest"),
@@ -219,6 +218,10 @@ def collect_args(op_info, arg_kv):
     """
     args_def = op_info.get('args_def', []) or []
     types = {a.get('key'): a.get('type') for a in args_def}
+    arg_options = {
+        a.get('key'): {str(option.get('value')) for option in a.get('options', []) if 'value' in option}
+        for a in args_def
+    }
     required = [a.get('key') for a in args_def if a.get('required')]
 
     missing = [k for k in required if not arg_kv.get(k)]
@@ -236,8 +239,20 @@ def collect_args(op_info, arg_kv):
         if v in (None, ""):
             continue
         if types.get(k) == 'multiselect':
-            extra[k] = [x.strip() for x in str(v).split(',') if x.strip()]
+            values = [x.strip() for x in str(v).split(',') if x.strip()]
+            allowed = arg_options.get(k, set())
+            invalid = [value for value in values if allowed and value not in allowed]
+            if invalid:
+                raise SealOpsError(
+                    f"参数 {k} 包含无效选项：{'、'.join(invalid)}；可选：{'、'.join(sorted(allowed))}"
+                )
+            extra[k] = values
         else:
+            allowed = arg_options.get(k, set())
+            if allowed and str(v) not in allowed:
+                raise SealOpsError(
+                    f"参数 {k} 的值 '{v}' 无效；可选：{'、'.join(sorted(allowed))}"
+                )
             extra[k] = v
     return extra
 

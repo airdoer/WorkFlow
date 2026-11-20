@@ -1,11 +1,11 @@
 {
     "DeployProd": {
-        "label": "【正式环境】更新代码或引擎",
+        "label": "【正式环境】更新代码",
         "seal_env": "prod",
         "template_id": 1042,
         "source": "",
         "args": "",
-        "description": "正式环境：更新代码或引擎",
+        "description": "正式环境：更新代码",
         "args_def": [
             {
                 "key": "source_file",
@@ -21,19 +21,18 @@
                 "required": true,
                 "options": [
                     {"label": "全量更新(full)", "value": "full"},
-                    {"label": "脚本更新(script)", "value": "script"},
-                    {"label": "引擎更新(engine)", "value": "engine"}
+                    {"label": "补丁更新(patch)", "value": "patch"}
                 ]
             }
         ]
     },
     "DeployTest": {
-        "label": "【测试环境】更新代码或引擎",
+        "label": "【测试环境】更新代码",
         "seal_env": "test",
         "template_id": 1036,
         "source": "",
         "args": "",
-        "description": "测试环境：更新代码或引擎",
+        "description": "测试环境：更新代码",
         "args_def": [
             {
                 "key": "source_file",
@@ -49,8 +48,7 @@
                 "required": true,
                 "options": [
                     {"label": "全量更新(full)", "value": "full"},
-                    {"label": "脚本更新(script)", "value": "script"},
-                    {"label": "引擎更新(engine)", "value": "engine"}
+                    {"label": "补丁更新(patch)", "value": "patch"}
                 ]
             }
         ]
